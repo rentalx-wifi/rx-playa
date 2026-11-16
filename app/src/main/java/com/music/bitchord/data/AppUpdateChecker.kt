@@ -66,7 +66,11 @@ object AppUpdateChecker {
      * Nothing here is fatal: a phone with no network, a rate-limited API or a
      * repository that has no release yet simply leaves no update on offer.
      */
-    suspend fun check() {
+    suspend fun check(context: Context? = null) {
+        context?.let { app ->
+            prefs = app.getSharedPreferences("bitchord_settings", Context.MODE_PRIVATE)
+            dismissedTag = prefs?.getString(KEY_DISMISSED_UPDATE, null)
+        }
         val json = runCatching {
             withContext(Dispatchers.IO) {
                 val request = Request.Builder()
@@ -81,17 +85,28 @@ object AppUpdateChecker {
 
         val release = runCatching { JSONObject(json) }.getOrNull() ?: return
         val tag = release.optString("tag_name").ifBlank { return }
+        if (tag == dismissedTag) return
         if (versionOrdinal(tag) <= versionOrdinal(BuildConfig.VERSION_NAME)) return
 
         val assets = release.optJSONArray("assets")
+        // More than one APK can hang off a release (ABI splits, a TV build), and
+        // installing the wrong one is an INSTALL_FAILED_NO_MATCHING_ABIS at the
+        // end of the download. The phone's own architecture wins, the first APK
+        // is only the fallback.
         var apkUrl: String? = null
+        var fallbackApkUrl: String? = null
         for (index in 0 until (assets?.length() ?: 0)) {
             val asset = assets?.optJSONObject(index) ?: continue
-            if (asset.optString("name").endsWith(".apk", ignoreCase = true)) {
-                apkUrl = asset.optString("browser_download_url").ifBlank { null }
+            val name = asset.optString("name")
+            if (!name.endsWith(".apk", ignoreCase = true)) continue
+            val url = asset.optString("browser_download_url").ifBlank { null } ?: continue
+            if (fallbackApkUrl == null) fallbackApkUrl = url
+            if (name.contains(Build.SUPPORTED_ABIS.first(), ignoreCase = true)) {
+                apkUrl = url
                 break
             }
         }
+        apkUrl = apkUrl ?: fallbackApkUrl
         _available.value = UpdateInfo(
             version = tag,
             releaseUrl = release.optString("html_url"),
@@ -102,8 +117,19 @@ object AppUpdateChecker {
 
     /** "Remind me later", or the release page has been opened instead. */
     fun dismiss() {
+        val tag = _available.value?.version
         _available.value = null
+        if (tag != null) {
+            dismissedTag = tag
+            runCatching { prefs?.edit()?.putString(KEY_DISMISSED_UPDATE, tag)?.apply() }
+        }
     }
+
+    /** The tag "Remind me later" was last used on, so a rotation cannot re-ask. */
+    @Volatile
+    private var dismissedTag: String? = null
+    private var prefs: android.content.SharedPreferences? = null
+    private const val KEY_DISMISSED_UPDATE = "dismissed_update_tag"
 
     /**
      * The number at the end of a version name: `1.9-rx-playa-v35` and `v35` both
@@ -198,7 +224,7 @@ object AppUpdateChecker {
      * launched anyway and shows its own "not allowed" prompt with a way in.
      */
     fun installApk(context: Context, file: File) {
-        if (_available.value == null) return
+        if (_available.value == null || !file.exists()) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             !context.packageManager.canRequestPackageInstalls()
         ) {
@@ -211,17 +237,25 @@ object AppUpdateChecker {
             }.isSuccess
             if (opened) return
         }
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        context.startActivity(
-            Intent(Intent.ACTION_INSTALL_PACKAGE)
-                .setDataAndType(uri, "application/vnd.android.package-archive")
-                .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                .putExtra(Intent.EXTRA_RETURN_RESULT, true)
-                .addFlags(
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                        Intent.FLAG_ACTIVITY_NEW_TASK,
-                ),
-        )
+        // Wrapped: a ROM without an installer activity answers
+        // ActivityNotFoundException, and a crash on the Install button is a
+        // worse outcome than nothing happening at all.
+        runCatching {
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            context.startActivity(
+                Intent(Intent.ACTION_INSTALL_PACKAGE)
+                    .setDataAndType(uri, "application/vnd.android.package-archive")
+                    .addFlags(
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                            Intent.FLAG_ACTIVITY_NEW_TASK,
+                    )
+                    // Some installers read the URI from the clip data rather than
+                    // the intent data, and refuse the grant without it.
+                    .also { intent -> intent.clipData = android.content.ClipData.newRawUri("apk", uri) }
+                    .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                    .putExtra(Intent.EXTRA_RETURN_RESULT, true),
+            )
+        }
     }
 
 }

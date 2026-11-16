@@ -31,6 +31,16 @@ private const val PERSONAL_WAVE_PER_ARTIST = 2
 /** Below this, strangers top the station up rather than leaving it short. */
 private const val MIN_PERSONAL_WAVE_TRACKS = 6
 
+/** Every fifth row of a station may be an artist the profile has never named. */
+private const val DISCOVERY_EVERY = 5
+
+/** What one more radio agreeing on an artist is worth next to a profile score. */
+private const val RADIO_CONSENSUS_BONUS = 0.6
+
+/** Below a minute it is an interlude; above fifteen it is not a song. */
+private const val MIN_STATION_TRACK_MS = 60_000L
+private const val MAX_STATION_TRACK_MS = 15 * 60_000L
+
 private val YOUTUBE_VIDEO_ID = Regex("[A-Za-z0-9_-]{11}")
 
 /**
@@ -173,6 +183,33 @@ suspend fun loadAutoplayTracks(
 }
 
 /**
+ * Folds one unknown artist into every [DISCOVERY_EVERY]th row of [known].
+ *
+ * Discovery is a share, not an accident: the owner asked for new music by
+ * *similar* artists, and a station built only from names the profile already
+ * knows can never do that. A stranger from the same radio is exactly that
+ * neighbour — the rule only stops them from taking the station over, which is
+ * what made it feel random. The tail of a short station is topped up with them
+ * so it is not cut off early.
+ */
+private fun interleaveDiscovery(known: List<Song>, strangers: List<Song>, limit: Int): List<Song> {
+    if (strangers.isEmpty()) return known.take(limit)
+    val out = ArrayList<Song>(minOf(limit, known.size + strangers.size))
+    val pool = ArrayDeque(strangers)
+    for (song in known) {
+        if (out.size >= limit) break
+        out += song
+        if (out.size % DISCOVERY_EVERY == 0 && pool.isNotEmpty()) {
+            out += pool.removeFirst()
+        }
+    }
+    while (out.size < limit && pool.isNotEmpty()) {
+        out += pool.removeFirst()
+    }
+    return out
+}
+
+/**
  * The station behind the "RX Wave" pill, built from what the listener liked.
  *
  * The catalogue's My Supermix was the wrong answer here: it belongs to the
@@ -234,6 +271,11 @@ suspend fun loadPersonalWave(
     val seenTitles = HashSet<String>()
     val known = mutableListOf<Pair<Song, Double>>()
     val strangers = mutableListOf<Song>()
+    // How many of the seeds' radios carried each artist. A name two of them
+    // agree on is a neighbour of the taste; one that a single radio put in one
+    // slot is the part that felt random, and this is the cheapest way to tell
+    // the two apart without a model.
+    val artistHits = HashMap<String, Int>()
 
     // More seeds than the first pass needs, because a strict filter empties a
     // three-seed station quickly. Each round asks the next liked artist's radio
@@ -244,6 +286,8 @@ suspend fun loadPersonalWave(
         val candidates = runCatching {
             YtMusicRepository.radio(videoId, preferVideo = seed.isVideo).getOrNull().orEmpty()
         }.getOrNull().orEmpty()
+        candidates.mapTo(HashSet()) { normalizedArtistName(it.artist) }
+            .forEach { artist -> artistHits[artist] = (artistHits[artist] ?: 0) + 1 }
         for (song in candidates) {
             if (song.videoId.isBlank() || song.title.isBlank() || song.artist.isBlank()) continue
             val artist = normalizedArtistName(song.artist)
@@ -253,25 +297,37 @@ suspend fun loadPersonalWave(
             if (title in dislikedTitles) continue
             if (artist to title in knownRecordings) continue
             if (!seenIds.add(song.videoId) || !seenTitles.add(title)) continue
+            // A 30-second interlude, an hour-long "mix" or a radio rip: neither
+            // is what a station is for, and both come out of a radio sometimes.
+            val runtime = song.durationMillis()
+            if (runtime in 1..MIN_STATION_TRACK_MS) continue
+            if (runtime > MAX_STATION_TRACK_MS) continue
             // A stranger advertising an edit, or an edit of a track they liked.
             if (isStrangerEdit(song, seed)) continue
             if (weight > 0.0) {
-                known += song to weight
+                // Artists the radios agree on outrank a single radio's pick.
+                known += song to (weight + (artistHits[artist] ?: 1) * RADIO_CONSENSUS_BONUS)
             } else {
                 strangers += song
             }
         }
     }
 
-    // Known artists only, strongest first. The strangers are the last resort and
-    // are added *after* everything the profile knows, in radio order, so they
-    // can only ever top up a station rather than colour one.
+    // Known artists first, strongest first, with a stranger folded in every
+    // [DISCOVERY_EVERY] rows: a station that never introduces anyone is a
+    // playlist of what they already have, and the whole point of radio is to
+    // open the next artist. The strangers come from the same radios, so they
+    // are the neighbours of what they like, not a chart pick.
     val preferred = known.sortedByDescending { it.second }.map { it.first }
-    val ordered = if (preferred.size >= MIN_PERSONAL_WAVE_TRACKS) {
-        preferred
-    } else {
-        preferred + strangers.distinctBy { TrackText.titleKey(it.title) }
-    }
+    // A stranger is only worth introducing when more than one radio asked the
+    // listener's taste about them; when the radios disagree with each other
+    // there is no such name and any stranger will do, briefly.
+    val agreed = strangers.filter { (artistHits[normalizedArtistName(it.artist)] ?: 0) >= 2 }
+    val ordered = interleaveDiscovery(
+        known = preferred,
+        strangers = (agreed.ifEmpty { strangers }).distinctBy { TrackText.titleKey(it.title) },
+        limit = limit,
+    )
     if (ordered.isEmpty()) return Result.success(emptyList())
 
     val picked = mutableListOf<Song>()

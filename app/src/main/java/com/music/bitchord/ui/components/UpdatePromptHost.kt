@@ -1,5 +1,6 @@
 package com.music.bitchord.ui.components
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
@@ -37,22 +38,38 @@ fun UpdatePromptHost(
             notes = info.notes,
             hazeState = hazeState,
             onDismiss = { AppUpdateChecker.dismiss() },
-            onDownload = { scope.launch { AppUpdateChecker.downloadApk(context) } },
+            // A release with no APK attached has nothing to stream: send the
+            // listener to the page instead of leaving the button dead.
+            onDownload = {
+                if (info.apkUrl == null) {
+                    openReleasePage(context, info.releaseUrl)
+                    AppUpdateChecker.dismiss()
+                } else {
+                    scope.launch { AppUpdateChecker.downloadApk(context) }
+                }
+            },
             onCancelDownload = { AppUpdateChecker.cancelDownload() },
             onInstall = {
                 val ready = AppUpdateChecker.download.value as? AppUpdateChecker.DownloadState.Ready
-                if (ready != null) AppUpdateChecker.installApk(context, ready.file)
+                if (ready != null) {
+                    runCatching { AppUpdateChecker.installApk(context, ready.file) }
+                }
             },
             onOpenReleasePage = {
-                runCatching {
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse(info.releaseUrl))
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                }
+                openReleasePage(context, info.releaseUrl)
                 AppUpdateChecker.dismiss()
             },
             modifier = modifier,
+        )
+    }
+}
+
+/** Opens a release page in whatever browser the phone has. */
+private fun openReleasePage(context: Context, url: String) {
+    runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
 }
