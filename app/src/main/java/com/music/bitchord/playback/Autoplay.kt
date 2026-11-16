@@ -37,6 +37,9 @@ private const val DISCOVERY_EVERY = 5
 /** What one more radio agreeing on an artist is worth next to a profile score. */
 private const val RADIO_CONSENSUS_BONUS = 0.6
 
+/** One like is worth this many ordinary plays when ranking an artist. */
+private const val LIKE_WEIGHT = 4.0
+
 /** Below a minute it is an interlude; above fifteen it is not a song. */
 private const val MIN_STATION_TRACK_MS = 60_000L
 private const val MAX_STATION_TRACK_MS = 15 * 60_000L
@@ -55,7 +58,8 @@ private val YOUTUBE_VIDEO_ID = Regex("[A-Za-z0-9_-]{11}")
  */
 private val STRANGER_EDIT = Regex(
     """\b(karaoke|cover|tribute|nightcore|8d|sped ?up|speed ?up|slowed|reverb|""" +
-        """instrumental|ringtone|mashup|reaction|lyrics? video)\b""",
+        """instrumental|ringtone|mashup|reaction|lyrics? video|phonk|brazil|brasil|""" +
+        """br ?funk|funk ?brasileiro|tiktok|meme)\b""",
     RegexOption.IGNORE_CASE,
 )
 
@@ -241,20 +245,35 @@ suspend fun loadPersonalWave(
 ): Result<List<Song>> {
     if (profile.isEmpty) return Result.success(emptyList())
 
-    // Likes first, then whatever is played most — one track per artist, so the
-    // seeds are different corners of what they listen to.
+    // What counts as taste here is what they said they like, not everything the
+    // app has ever played. The profile's history is a record of what reached the
+    // speakers — including whatever a previous radio pushed on them — and using
+    // it as the definition of "good" is how a station keeps recommending its own
+    // junk. So: liked tracks, and tracks they chose to play again, and nothing
+    // else. The fallback only exists for a profile with neither.
+    // Likes only. A play count cannot tell a track the listener chose from one
+    // a radio pushed on them and they left running — and treating those as
+    // taste is exactly how a station feeds its own junk back: the phonk a
+    // previous wave played became "known", and the next wave served more of it.
+    val tasteTracks = profile.tracks.filter { it.liked }
+        .ifEmpty { profile.tracks.sortedByDescending { it.score }.take(PERSONAL_WAVE_SEEDS) }
+
     val likedSeeds = (profile.recentLikes.map { it.song } +
-        profile.tracks.filter { it.liked }.sortedByDescending { it.score }.map { it.song })
-    val seeds = (likedSeeds + profile.tracks.sortedByDescending { it.score }.map { it.song })
+        tasteTracks.filter { it.liked }.sortedByDescending { it.score }.map { it.song })
+    val seeds = (likedSeeds + tasteTracks.sortedByDescending { it.score }.map { it.song })
         .filter { it.videoId.isNotBlank() && it.title.isNotBlank() && it.artist.isNotBlank() }
         .distinctBy { normalizedArtistName(it.artist) }
     if (seeds.isEmpty()) return Result.success(emptyList())
 
-    val artistWeight = profile.artists
-        .mapNotNull { artist ->
-            normalizedArtistName(artist.artist.name).takeIf { it.isNotEmpty() }?.let { it to artist.score }
+    // Weight by what the listener actually did with each artist: a like is
+    // worth a few ordinary plays, and an artist merely present in the history
+    // is worth nothing at all.
+    val artistWeight = tasteTracks
+        .mapNotNull { track ->
+            normalizedArtistName(track.song.artist).takeIf { it.isNotEmpty() }?.let { it to track }
         }
-        .toMap()
+        .groupBy({ it.first }, { it.second })
+        .mapValues { (_, tracks) -> tracks.sumOf { if (it.liked) LIKE_WEIGHT else 1.0 } }
     val knownRecordings = profile.tracks
         .map { normalizedArtistName(it.song.artist) to TrackText.titleKey(it.song.title) }
         .toHashSet()
@@ -303,7 +322,9 @@ suspend fun loadPersonalWave(
             if (runtime in 1..MIN_STATION_TRACK_MS) continue
             if (runtime > MAX_STATION_TRACK_MS) continue
             // A stranger advertising an edit, or an edit of a track they liked.
-            if (isStrangerEdit(song, seed)) continue
+            // The genre/edition filter is for artists outside the taste; a
+            // liked artist's own edit is their music, however it is titled.
+            if (weight <= 0.0 && isStrangerEdit(song, seed)) continue
             if (weight > 0.0) {
                 // Artists the radios agree on outrank a single radio's pick.
                 known += song to (weight + (artistHits[artist] ?: 1) * RADIO_CONSENSUS_BONUS)
