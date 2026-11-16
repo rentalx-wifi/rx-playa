@@ -1,156 +1,119 @@
-<div align="center">
+# RX Playa
 
-<br/>
-<br/>
+**Музыка без подписок и без чужих рекомендаций.**
 
-<img src="Logo.png" alt="BitChord app icon" width="200" />
+Android-клиент, который играет оттуда, где трек реально есть: YouTube Music,
+SoundCloud, Spotify, Яндекс Музыка, VK, локальные файлы и аддоны — в одном
+списке, с одним поиском. Где именно играет трек, решает приложение, а не
+пользователь.
 
-# BitChord
-
-### Aesthetic YouTube Music Client
-
-<br/>
-
-[![Latest release](https://img.shields.io/github/v/release/kushagrasinghx/BitChord?style=for-the-badge&labelColor=0d1117)](https://github.com/kushagrasinghx/BitChord/releases)
-[![License](https://img.shields.io/github/license/kushagrasinghx/BitChord?style=for-the-badge&labelColor=0d1117)](https://github.com/kushagrasinghx/BitChord/blob/main/LICENSE)
-[![Downloads](https://img.shields.io/github/downloads/kushagrasinghx/BitChord/total?style=for-the-badge&labelColor=0d1117)](https://github.com/kushagrasinghx/BitChord/releases)
-[![Listening now](https://api.bitchord.kushagrasingh.in/api/stats/live/badge.svg)](https://api.bitchord.kushagrasingh.in/api/stats/live)
-
-<br/>
-
-[**Download**](#download) · [**Features**](#features) · [**Contributing**](#contributing) · [**Support**](#support) · [**Disclaimer**](#disclaimer)
-
-<br/>
-
-<a href="https://fmhy.net/mobile#youtube-music" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/available/fmhy/cozy.svg" alt="Featured on FMHY" height="55"/></a>
-<a href="https://trendshift.io/repositories/177639?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-177639" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/177639" alt="kushagrasinghx%2FBitChord | Trendshift" width="250" height="55"/></a>
-
-</div>
-
-> [!IMPORTANT]
-> BitChord is not affiliated with, endorsed by, or connected to YouTube or Google in any way. Use it at your own discretion.
+*An Android music client with multi-source playback. Russian-first readme;
+the build and install sections are the ones to copy.*
 
 ---
 
-<div align="center">
+## Возможности
 
-<img src="Banner.png" alt="BitChord banner" width="100%" />
+**Источники**
+YouTube Music, SoundCloud, Spotify, Яндекс Музыка, VK, локальные файлы и аддоны
+в одном поиске и одной очереди. Импорт плейлистов из чужого сервиса, лайки и
+плейлисты аккаунта, история прослушиваний.
 
-<h1><a id="features"></a>Features</h1>
+**RX Wave**
+Персональная станция из *ваших* лайков, а не из глобального чарта. Свои треки
+служат семенем, радио каждого из них — источником похожего, и дальше работает
+фильтр: знакомые артисты вперёд, уже слышанное мимо, чужие slowed / cover /
+karaoke / 8D-перепевки отбрасываются, больше двух треков на артиста и никаких
+двух подряд.
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
+**Подмена источника**
+Если YouTube не отдаёт трек (регион, возраст, удалён), он ищется на остальных
+включённых источниках: сначала тот же артист с любой длительностью, затем
+совпадение длительности до секунды. Чужой артист с другой длительностью не
+подставляется, и замена не происходит молча — приложение говорит, откуда играет.
 
-#### Playback
-- **Search, browse and play** anything available on YouTube Music.
-- **Hi-Res lossless audio** — FLAC/ALAC from a configured module source, with YouTube Music as fallback.
-- **Gapless playback with true crossfade**, adjustable 0–12s.
-- **Automix [Beta]** — DJ-style transitions with beat-matching and tempo-stretching.
-- **Offline downloads** — save tracks with embedded metadata.
-- **Local music library** integration.
-- **Background playback** via a proper foreground media session.
-- **Apple-like lyrics animation** — credit to [binimum](https://github.com/binimum/am-lyrics).
+**Оформление**
+Material 3, перенесённый из Pixel Music: палитра, Montserrat, скругления
+8/16/24, парящий док, настройки карточками, заголовки разделов в акцентном
+цвете. Цвета из обоев (Material You) или свой акцент.
 
-#### Connectivity & Accounts
-- **Sign in with your Google account** for personalized content.
-- **Spotify integration** — connect your account to play your playlists and Liked Songs.
-- **Discord Rich Presence** — in-app login, live track/artist/album and progress.
-- **Scrobbling** to Last.fm and ListenBrainz.
-- **Pluggable sources** — add, edit, test and health-check module sources.
+**Звук**
+Automix и кроссфейд, bit-perfect и USB DAC, выбор PCM, эквалайзер, Dolby Atmos,
+пространственное аудио, нормализация громкости, пропуск тишины, скорость без
+изменения тона.
 
-    </td>
-    <td width="50%" valign="top">
+**Ещё**
+Текст песен с переводом и подсветкой строки, скачивание и офлайн, Discord Rich
+Presence, Listen Together, обложки-канвасы, плеер с очередью и текстом в одном
+экране.
 
-#### Experience
-- **Animated album canvas** — motion artwork on the now-playing screen.
-- **Word-synced lyrics** — word/syllable-level highlighting from multiple sources.
-- **Lyrics providers** — credit to [lrc.red](https://lrc.red), [BiniLyrics](https://github.com/binimum), [BetterLyrics](https://github.com/better-lyrics/better-lyrics), [PaxSenix](https://lyrics.paxsenix.org), [LyricsPlus](https://github.com/ibratabian17/YouLyPlus), [SimpMusic](https://github.com/maxrave-dev/SimpMusic), [Unison](https://unison.boidu.dev), [Megalobiz](https://www.megalobiz.com), [KuGou](https://www.kugou.com), [LRCLIB](https://lrclib.net), [Musixmatch](https://www.musixmatch.com) and [Genius](https://genius.com).
-- **Dynamic, artwork-driven theming** — Material palette extracted from album art.
-- **Frosted-glass UI** — Telegram-style translucent bars via Haze, Material 3 theming.
+## Статус
 
-#### Controls & Tweaks
-- **Per-network audio quality** — separate quality ceilings for Wi-Fi and mobile data.
-- **Playback speed control** (0.5×–2.0×) and **skip silence**.
-- **Sleep timer** — fixed presets or "stop after this track".
-- **System equalizer** integration.
-- **Bit-perfect USB exclusive output** — sends lossless tracks to a USB DAC unchanged, at each track's own rate and bit depth. Thanks to [Mornye](https://github.com/mornyeapp/Mornye) for the reference.
-- **Stats for nerds** — codec, bit depth, sample rate, and more on the now-playing screen.
+- **Обход замедления YouTube (zapret) — бета.** Нужен root. Скрипт переписан с
+  нуля (раньше `su -c` съедал аргументы, и nfqws не запускался ни разу), но на
+  части прошивок он всё ещё не заводится. Это ожидаемо, а не сюрприз.
+- **Виджеты — в работе.** Новые переносятся из Pixel Music; до тех пор работают
+  старые: квадратный, широкий и пилюля.
 
-    </td>
-  </tr>
-</table>
+## Установка
 
-</div>
+Готовый APK лежит в [Releases](../../releases): `arm64-v8a`, Android 8.0+
+(`minSdk 26`).
 
----
+Подпись не менялась с первых сборок, поэтому новая версия ставится поверх
+предыдущей: настройки, лайки и скачанное остаются на месте.
 
-<div align="center">
+Пакет: `com.dev.bitchord`.
 
-<h1><a id="download"></a>Download</h1>
+## Сборка
 
-<a href="https://github.com/kushagrasinghx/BitChord/releases" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/supported/android/cozy.svg" alt="Download for Android" height="55"/></a>
+Нужны JDK 17, Android SDK с `compileSdk 37` и build-tools 37.
 
-Grab the latest signed APK from the [Releases](https://github.com/kushagrasinghx/BitChord/releases) page. Sideloading requires enabling "Install unknown apps" for whichever app you download it with.
+```bash
+export JAVA_HOME=/path/to/jdk17
+export ANDROID_HOME=/path/to/android-sdk
 
+# debug
+./gradlew :app:assembleDevDebug
 
-</div>
+# release, arm64 only
+./gradlew :app:assembleDevRelease \
+  -PbitchordAbi=arm64-v8a \
+  -Pbitchord.bundleWear=false
+```
 
----
+Для подписанной сборки положите `keystore.properties` рядом с `app/` по образцу
+[`keystore.properties.example`](keystore.properties.example) и передайте init-
+script, который применит подпись:
 
-<div align="center">
+```bash
+./gradlew :app:assembleDevRelease -PbitchordAbi=arm64-v8a \
+  --init-script build/rx-local-signing.init.gradle
+```
 
-<h1><a id="contributing"></a>Contributing</h1>
+Ключи, `keystore.properties`, `local.properties` и `build/` в репозиторий не
+попадают — они в `.gitignore`.
 
-We welcome contributions to BitChord! Please review our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before submitting a Pull Request.
+## Документация
 
-[**Contributing Guide**](CONTRIBUTING.md) · [**Code of Conduct**](CODE_OF_CONDUCT.md) · [**Maintainers**](MAINTAINERS.md) · [**Additional Docs**](ADDITIONAL.md)
+- [`docs/ACCOUNT_INTEGRATIONS.md`](docs/ACCOUNT_INTEGRATIONS.md) — подключение Spotify, SoundCloud и VK
+- [`docs/YANDEX_MUSIC.md`](docs/YANDEX_MUSIC.md) — Яндекс Музыка
+- [`docs/LYRICS_TRANSLATION.md`](docs/LYRICS_TRANSLATION.md) — перевод текстов
 
-### Thanks to all contributors ❤
+## Благодарности
 
-<a href="https://github.com/kushagrasinghx/BitChord/graphs/contributors">
-  <img src="https://raw.githubusercontent.com/kushagrasinghx/BitChord/contributors/contributors.svg" />
-</a>
+- [BitChord](https://github.com/kushagrasinghx/BitChord) — основа, из которой
+  вырос этот форк.
+- [Pixel Music](https://github.com/ianshulyadav/PixelMusic) — оформление,
+  которое здесь перенесено: палитра, типографика, формы.
+- Montserrat — шрифт под OFL, лицензия лежит рядом с файлом шрифта.
 
-</div>
+## Лицензия
 
----
+GPL-3.0 — см. [`LICENSE`](LICENSE).
 
-<div align="center">
+## Дисклеймер
 
-<h1><a id="support"></a>Support</h1>
-
-BitChord is free and always will be — if it's earned a spot in your rotation, you can chip in here:
-
-<a href="https://ko-fi.com/kushagrasinghx" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/donate/kofi-singular-alt/cozy.svg" alt="Support me on Ko-fi" height="55"/></a>
-<a href="https://paypal.me/kuxhagrasingh" target="_blank" rel="noopener noreferrer"><img src="https://cdn.jsdelivr.net/gh/JMcrafter26/badges@main/src/assets/donate/paypal-plural/cozy.svg" alt="Support us on PayPal" height="55"/></a>
-
-<br/>
-<img src="upi_support.jpg" alt="UPI Support" width="250" />
-
-</div>
-
----
-
-<div align="center">
-
-<h1><a id="disclaimer"></a>Disclaimer & Legal Notice</h1>
-
-BitChord is an independent, community-driven third-party audio player and client. It is **not** associated with Google LLC, YouTube Music, Deezer, Telegram, or any of their parent companies.
-
-* **No Media Hosting:** BitChord does not host, upload, or store copyrighted music files. It operates strictly as an interface to scan local device storage or stream media directly from public, public-facing, or user-authenticated APIs.
-* **Fair Use & API Usage:** This software is created solely for personal research, educational, and fair-use purposes. The user is entirely responsible for ensuring their usage aligns with their local copyright laws and YouTube Terms of Service.
-* **No Ad-Blocking Guarantee:** While BitChord focuses on providing a clean listening environment, it does not guarantee permanent bypasses or modifications to commercial third-party platform conditions.
-* **Copyleft:** BitChord is free software under the GPLv3. The license does not let anyone forbid others from selling or redistributing copies, but any distribution must come with the Corresponding Source under the same license.
-
-</div>
-
----
-
-<div align="center">
-
-<h1><a id="license"></a>License</h1>
-
-This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. See the [LICENSE](LICENSE) file for details.
-
-</div>
+Неофициальный клиент. Не связан с YouTube, Spotify, SoundCloud, VK или Яндексом;
+подписки не нужны, аккаунт используется свой собственный. Проект не хранит
+музыку и не распространяет её.

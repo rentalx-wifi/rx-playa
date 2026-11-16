@@ -91,6 +91,17 @@ func TestGetBool(t *testing.T) {
 	}
 }
 
+func TestGetString(t *testing.T) {
+	t.Setenv("BITCHORD_TEST_STRING", "  configured  ")
+	if got := getString("BITCHORD_TEST_STRING", "fallback"); got != "configured" {
+		t.Fatalf("got %q", got)
+	}
+	t.Setenv("BITCHORD_TEST_STRING", "")
+	if got := getString("BITCHORD_TEST_STRING", "fallback"); got != "fallback" {
+		t.Fatalf("got %q", got)
+	}
+}
+
 func TestIsAllowedOrigin(t *testing.T) {
 	old := AllowedOrigins
 	AllowedOrigins = []string{"https://app.example", "https://admin.example"}

@@ -22,20 +22,27 @@ import (
 	"github.com/KabirSinghBhatia/BitChord/backend/codes"
 	"github.com/KabirSinghBhatia/BitChord/backend/config"
 	"github.com/KabirSinghBhatia/BitChord/backend/hub"
+	"github.com/KabirSinghBhatia/BitChord/backend/oauthbroker"
 	"github.com/KabirSinghBhatia/BitChord/backend/party"
 	"github.com/KabirSinghBhatia/BitChord/backend/presence"
 	"github.com/KabirSinghBhatia/BitChord/backend/protocol"
 )
 
 var (
-	store    = party.NewPartyStore()
-	hubInst  = hub.NewHub()
-	createLimiter = newIPRateLimiter(time.Minute, config.CreateRatePerMinute, config.RateLimitMaxEntries)
+	store           = party.NewPartyStore()
+	hubInst         = hub.NewHub()
+	createLimiter   = newIPRateLimiter(time.Minute, config.CreateRatePerMinute, config.RateLimitMaxEntries)
 	presenceTracker = presence.NewTracker(
 		time.Duration(config.PresenceIntervalSec+config.PresenceGraceSec)*time.Second,
 		config.PresenceMaxEntries,
 	)
 	presenceLimiter = newIPRateLimiter(time.Minute, config.PresencePingsPerMinute, config.PresenceRateLimitMaxIPs)
+	oauthLimiter    = newIPRateLimiter(time.Minute, config.OAuthRatePerMinute, config.RateLimitMaxEntries)
+	soundCloudOAuth = oauthbroker.NewSoundCloud(
+		config.SoundCloudClientID,
+		config.SoundCloudClientSecret,
+		config.SoundCloudRedirectURI,
+	)
 	upgrader = websocket.Upgrader{
 		// Answered only to a browser that offered it with its token (see
 		// parseSocketToken); a native client offers no subprotocol and gets none.
@@ -67,6 +74,11 @@ func main() {
 	mux.HandleFunc("POST /api/presence", handlePresence)
 	mux.HandleFunc("GET /api/stats/live", handleLiveStats)
 	mux.HandleFunc("GET /api/stats/live/badge.svg", handleLiveBadge)
+
+	// OAuth brokers. Secrets remain on this server; Android owns PKCE/state.
+	mux.HandleFunc("GET /api/integrations/soundcloud/config", soundCloudOAuth.ServeConfig)
+	mux.HandleFunc("POST /api/integrations/soundcloud/exchange", withOAuthLimit(soundCloudOAuth.Exchange))
+	mux.HandleFunc("POST /api/integrations/soundcloud/refresh", withOAuthLimit(soundCloudOAuth.Refresh))
 
 	// Web invite endpoint
 	mux.HandleFunc("GET /invite/{code}", handleInviteLanding)
@@ -110,6 +122,16 @@ func corsMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func withOAuthLimit(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !oauthLimiter.Allow(clientIP(r)) {
+			jsonError(w, http.StatusTooManyRequests, "oauth_rate_limited", "Too many authorization attempts from this address.")
+			return
+		}
+		next(w, r)
+	}
 }
 
 type ipRateLimiter struct {
@@ -250,10 +272,10 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"service":    "bitchord-listen-together",
-		"members":    store.MemberCount(),
-		"parties":    store.Len(),
-		"serverMs":   clock.NowMs(),
+		"service":  "bitchord-listen-together",
+		"members":  store.MemberCount(),
+		"parties":  store.Len(),
+		"serverMs": clock.NowMs(),
 	})
 }
 
@@ -358,7 +380,9 @@ func handleCreateParty(w http.ResponseWriter, r *http.Request) {
 	}
 
 	maxMembers := 5
-	if req.MaxMembers != nil { maxMembers = *req.MaxMembers }
+	if req.MaxMembers != nil {
+		maxMembers = *req.MaxMembers
+	}
 	p, err := store.CreateWithLimits(config.MaxParties, maxMembers)
 	if err != nil {
 		if pe, ok := err.(*party.PartyError); ok {
@@ -1155,7 +1179,9 @@ func applyControl(p *party.Party, member *party.Member, action string, frame map
 
 	case protocol.ActionSetMaxMembers:
 		value, ok := frame["maxMembers"].(float64)
-		if !ok { return false, "invalid_capacity", "Choose a party size between 2 and 10." }
+		if !ok {
+			return false, "invalid_capacity", "Choose a party size between 2 and 10."
+		}
 		if err := p.SetMaxMembers(member, int(value)); err != nil {
 			pe := err.(*party.PartyError)
 			return false, pe.Code, pe.Message
@@ -1183,9 +1209,15 @@ func applyControl(p *party.Party, member *party.Member, action string, frame map
 
 	case protocol.ActionKick:
 		targetID, _ := frame["memberId"].(string)
-		if !member.IsHost { return false, "host_only", "Only the host can remove listeners." }
-		if targetID == "" || targetID == member.MemberId { return false, "invalid_member", "Choose another listener to remove." }
-		if p.Remove(targetID) == nil { return false, "not_found", "That listener is no longer in this party." }
+		if !member.IsHost {
+			return false, "host_only", "Only the host can remove listeners."
+		}
+		if targetID == "" || targetID == member.MemberId {
+			return false, "invalid_member", "Choose another listener to remove."
+		}
+		if p.Remove(targetID) == nil {
+			return false, "not_found", "That listener is no longer in this party."
+		}
 		hubInst.Send(p.Code, targetID, map[string]interface{}{
 			"type":    protocol.FrameBye,
 			"reason":  "kicked",
@@ -1218,27 +1250,46 @@ func activityFrame(member *party.Member, action string, frame map[string]interfa
 	}
 	switch action {
 	case protocol.ActionSetTrack:
-		if title := trackTitle(frame["track"]); title != "" { detail = "Changed the song to \"" + title + "\"" }
+		if title := trackTitle(frame["track"]); title != "" {
+			detail = "Changed the song to \"" + title + "\""
+		}
 	case protocol.ActionQueueAdd:
 		if tracks, ok := frame["tracks"].([]interface{}); ok && len(tracks) > 0 {
 			title := trackTitle(tracks[0])
 			if title != "" {
-				if len(tracks) == 1 { detail = "Added \"" + title + "\" to the queue" } else { detail = fmt.Sprintf("Added \"%s\" and %d more to the queue", title, len(tracks)-1) }
+				if len(tracks) == 1 {
+					detail = "Added \"" + title + "\" to the queue"
+				} else {
+					detail = fmt.Sprintf("Added \"%s\" and %d more to the queue", title, len(tracks)-1)
+				}
 			}
 		}
 	case protocol.ActionSetQueue:
-		if tracks, ok := frame["queue"].([]interface{}); ok { detail = fmt.Sprintf("Replaced the queue with %d tracks", len(tracks)) }
-	case protocol.ActionQueueRemove: detail = "Removed a track from the queue"
-	case protocol.ActionQueueClear: detail = "Cleared upcoming tracks"
-	case protocol.ActionQueueMove: detail = "Reordered the upcoming queue"
-	case protocol.ActionNext: detail = "Skipped to the next song"
-	case protocol.ActionPrevious: detail = "Went back to the previous song"
-	case protocol.ActionPlay: detail = "Started playback"
-	case protocol.ActionPause: detail = "Paused playback"
-	case protocol.ActionSeek: detail = "Changed the playback position"
-	case protocol.ActionKick: detail = "Removed a listener from the party"
-	case protocol.ActionSetMaxMembers: detail = "Changed the party size"
-	case protocol.ActionSetAutoplay: detail = "Changed AutoPlay"
+		if tracks, ok := frame["queue"].([]interface{}); ok {
+			detail = fmt.Sprintf("Replaced the queue with %d tracks", len(tracks))
+		}
+	case protocol.ActionQueueRemove:
+		detail = "Removed a track from the queue"
+	case protocol.ActionQueueClear:
+		detail = "Cleared upcoming tracks"
+	case protocol.ActionQueueMove:
+		detail = "Reordered the upcoming queue"
+	case protocol.ActionNext:
+		detail = "Skipped to the next song"
+	case protocol.ActionPrevious:
+		detail = "Went back to the previous song"
+	case protocol.ActionPlay:
+		detail = "Started playback"
+	case protocol.ActionPause:
+		detail = "Paused playback"
+	case protocol.ActionSeek:
+		detail = "Changed the playback position"
+	case protocol.ActionKick:
+		detail = "Removed a listener from the party"
+	case protocol.ActionSetMaxMembers:
+		detail = "Changed the party size"
+	case protocol.ActionSetAutoplay:
+		detail = "Changed AutoPlay"
 	}
 	return map[string]interface{}{"type": protocol.FrameActivity, "action": action, "by": member.DisplayName, "detail": detail, "atMs": clock.NowMs()}
 }

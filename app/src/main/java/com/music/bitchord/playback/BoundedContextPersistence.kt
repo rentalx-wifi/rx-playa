@@ -613,7 +613,8 @@ object BoundedContextPersistence {
     private fun Song.matchesSource(source: QueueSource): Boolean =
         (playbackSource == null || playbackSource == source.title) &&
             (playbackSourceType == null || playbackSourceType == source.type) &&
-            (playbackSourceId == null || playbackSourceId == source.id)
+            (playbackSourceId == null || playbackSourceId == source.id ||
+                (videoId.startsWith("soundcloud:") && playbackSourceId?.startsWith("https://") == true))
 
     private fun sourceKey(source: QueueSource): String =
         "${source.type.name}:${source.id.orEmpty()}"

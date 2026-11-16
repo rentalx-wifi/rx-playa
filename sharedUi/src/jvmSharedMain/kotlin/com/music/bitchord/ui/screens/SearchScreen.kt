@@ -8,11 +8,6 @@ import com.music.bitchord.ui.components.contextClick
 import androidx.compose.ui.unit.Dp
 import com.music.bitchord.sharedui.resources.*
 import org.jetbrains.compose.resources.stringResource
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -46,6 +41,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -69,6 +65,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.BrowseItem
 import com.music.bitchord.data.model.BrowseType
+import com.music.bitchord.data.model.HomeSource
 import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.SearchFilter
 import com.music.bitchord.data.model.artworkAt
@@ -79,6 +76,7 @@ import com.music.bitchord.data.model.UiState
 import com.music.bitchord.data.model.SearchHistoryEntity
 import com.music.bitchord.data.model.EntityType
 import com.music.bitchord.ui.components.MessageState
+import com.music.bitchord.ui.components.HomeSourceBadges
 import com.music.bitchord.ui.components.PAGE_GUTTER
 import com.music.bitchord.ui.components.RowMoreButton
 import com.music.bitchord.ui.components.ROW_DIVIDER_INSET
@@ -147,6 +145,13 @@ fun SearchScreen(
     searchingAddons: Boolean = false,
     /** The Addons source's tracks for the submitted query; null until one is submitted. */
     addonResults: UiState<List<Song>>? = null,
+    /** A remote catalogue (or the merged catalogue) whose rows have been matched to playable songs. */
+    searchingPlatforms: Boolean = false,
+    platformResults: UiState<List<Song>>? = null,
+    platformLoadingMore: Boolean = false,
+    onPlatformLoadMore: () -> Unit = {},
+    platformEmptyMessage: String = "",
+    platformNoResultsMessage: String = "",
     /**
      * Addon rows the connection's quality setting won't play. Shown dimmed,
      * kept out of the queue a tap builds, and answered by [onBlockedSongClick]
@@ -192,19 +197,29 @@ fun SearchScreen(
     // MainViewModel.suggestions. Nothing below it is worth showing while it is
     // up: the results are for whatever was searched before this edit began,
     // and so are the filter tabs above them.
-    val suggesting = suggestions.isNotEmpty() && !searchingLibrary && !searchingAddons
+    val suggesting = suggestions.isNotEmpty() && !searchingLibrary && !searchingAddons && !searchingPlatforms
     // Live media results arrive from the parallel typeahead pipeline; show
     // them only while the user is still typing (suggestions visible), so they
     // appear as a dropdown beneath the text completions rather than floating
     // after the search has committed.
     val showTypeahead = typeaheadResults.isNotEmpty() && suggesting
-    LaunchedEffect(listState, results, loadingMore, searchingLibrary, searchingAddons) {
-        if (results !is UiState.Success || searchingLibrary || searchingAddons) return@LaunchedEffect
+    LaunchedEffect(
+        listState, results, platformResults, loadingMore, platformLoadingMore,
+        searchingLibrary, searchingAddons, searchingPlatforms,
+    ) {
+        val activeResults = if (searchingPlatforms) platformResults else results
+        if (activeResults !is UiState.Success || searchingLibrary || searchingAddons) return@LaunchedEffect
         snapshotFlow {
             val layout = listState.layoutInfo
             (layout.visibleItemsInfo.lastOrNull()?.index ?: -1) to layout.totalItemsCount
         }.collect { (lastVisible, total) ->
-            if (!loadingMore && total > 0 && lastVisible >= total - 4) onLoadMore()
+            if (total > 0 && lastVisible >= total - 4) {
+                if (searchingPlatforms) {
+                    if (!platformLoadingMore) onPlatformLoadMore()
+                } else if (!loadingMore) {
+                    onLoadMore()
+                }
+            }
         }
     }
     Column(modifier = modifier.fillMaxSize()) {
@@ -232,14 +247,8 @@ fun SearchScreen(
                 )
             }
             if (sourceSwitcher != null) {
-                AnimatedVisibility(
-                    visible = query.isEmpty(),
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically(),
-                ) {
-                    Box(Modifier.padding(start = PAGE_GUTTER, end = PAGE_GUTTER, bottom = 4.dp)) {
-                        sourceSwitcher()
-                    }
+                Box(Modifier.padding(start = PAGE_GUTTER, end = PAGE_GUTTER, bottom = 4.dp)) {
+                    sourceSwitcher()
                 }
             }
             // The filters only mean something once there is a result set to narrow;
@@ -248,9 +257,9 @@ fun SearchScreen(
             // They are YouTube's categories, so the Library source has none.
             // The same selector as the sources above it and a folder's tabs, so
             // the app has one look for "pick one of these".
-            if (results != null && !suggesting && !searchingLibrary && !searchingAddons) {
+            if (results != null && !suggesting && !searchingLibrary && !searchingAddons && !searchingPlatforms) {
                 PillSegmentedControl(
-                    options = SearchFilter.entries.map { it.label },
+                    options = SEARCH_FILTER_LABELS,
                     selectedIndex = filter.ordinal,
                     onSelect = { onFilterChange(SearchFilter.entries[it]) },
                     modifier = Modifier.padding(start = PAGE_GUTTER, end = PAGE_GUTTER, bottom = 6.dp),
@@ -258,16 +267,40 @@ fun SearchScreen(
             }
         }
 
+        // The content builder of a LazyColumn runs again on every
+        // recomposition, and this screen recomposes on every letter typed; the
+        // rows and sections are derived once per result set instead.
+        val successData = (results as? UiState.Success)?.data
+        val resultTracks = remember(successData) {
+            successData.orEmpty().mapNotNull { row -> when (row) {
+                is SearchResult.TopTrack -> row.song
+                is SearchResult.Track -> row.song
+                else -> null
+            } }
+        }
+        val resultSections = remember(successData, filter) { searchSections(successData.orEmpty(), filter) }
+        val topSearchResult = remember(successData) {
+            successData.orEmpty().filterIsInstance<SearchResult.TopTrack>().firstOrNull()
+        }
+        val isCurrentRow = remember(resultTracks, currentSong) { playingRowMatcher(resultTracks, currentSong) }
+
         LazyColumn(
             state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
         ) {
             when {
-                searchingLibrary || searchingAddons -> librarySearchResults(
+                searchingLibrary || searchingAddons || searchingPlatforms -> librarySearchResults(
                     query = query.trim(),
-                    results = if (searchingAddons) addonResults else libraryResults,
+                    results = when {
+                        searchingAddons -> addonResults
+                        searchingPlatforms -> platformResults
+                        else -> libraryResults
+                    },
                     addons = searchingAddons,
+                    external = searchingPlatforms,
+                    externalEmptyMessage = platformEmptyMessage,
+                    externalNoResultsMessage = platformNoResultsMessage,
                     addonHistory = addonHistory,
                     onAddonHistoryClick = onAddonHistoryClick,
                     onAddonHistoryRemove = onAddonHistoryRemove,
@@ -279,6 +312,7 @@ fun SearchScreen(
                     onSongSwipe = onSongSwipe,
                     isBlocked = if (searchingAddons) isBlocked else { _ -> false },
                     onBlockedSongClick = onBlockedSongClick,
+                    loadingMore = platformLoadingMore,
                 )
                 suggesting -> {
                     searchSuggestions(
@@ -321,15 +355,8 @@ fun SearchScreen(
                 results is UiState.Loading -> songListSkeleton(circular = filter == SearchFilter.ARTISTS)
                 results is UiState.Error -> item { MessageState(results.message) }
                 results is UiState.Success -> {
-                    val tracks = results.data
-                        .mapNotNull { row -> when (row) {
-                            is SearchResult.TopTrack -> row.song
-                            is SearchResult.Track -> row.song
-                            is SearchResult.Browse -> null
-                            else -> null
-                        } }
-                    val isCurrentRow = playingRowMatcher(tracks, currentSong)
-                    val topResult = results.data.filterIsInstance<SearchResult.TopTrack>().firstOrNull()
+                    val tracks = resultTracks
+                    val topResult = topSearchResult
                     if (filter == SearchFilter.ALL && topResult != null) {
                         item(key = "search:top-result:${topResult.song.videoId}") {
                             SwipeToQueueBox(
@@ -345,7 +372,7 @@ fun SearchScreen(
                             }
                         }
                     }
-                    searchSections(results.data, filter).forEach { section ->
+                    resultSections.forEach { section ->
                         section.title?.let { title ->
                             item(key = "search-section:$title") {
                                 Text(
@@ -414,6 +441,15 @@ fun SearchScreen(
 
 private data class SearchSection(val title: String?, val rows: List<SearchResult>)
 
+/**
+ * The filter strip's labels, built once.
+ *
+ * They were built inside the screen, and they are the `remember` key of the pill
+ * control — a fresh list on every recomposition meant every label was measured
+ * again on every letter typed into the field.
+ */
+private val SEARCH_FILTER_LABELS = SearchFilter.entries.map { it.label }
+
 /** The unfiltered page is useful only when its mixed result types are readable at a glance. */
 private fun searchSections(rows: List<SearchResult>, filter: SearchFilter): List<SearchSection> {
     if (filter != SearchFilter.ALL) return listOf(SearchSection(null, rows))
@@ -435,6 +471,9 @@ private fun LazyListScope.librarySearchResults(
     query: String,
     results: UiState<List<Song>>?,
     addons: Boolean,
+    external: Boolean,
+    externalEmptyMessage: String,
+    externalNoResultsMessage: String,
     addonHistory: List<String>,
     onAddonHistoryClick: (String) -> Unit,
     onAddonHistoryRemove: (String) -> Unit,
@@ -446,13 +485,18 @@ private fun LazyListScope.librarySearchResults(
     onSongSwipe: (Song) -> Unit,
     isBlocked: (Song) -> Boolean,
     onBlockedSongClick: (Song) -> Unit,
+    loadingMore: Boolean,
 ) {
     when (results) {
         null -> if (addons && query.isEmpty() && addonHistory.isNotEmpty()) {
             recentAddonSearches(addonHistory, onAddonHistoryClick, onAddonHistoryRemove, onAddonHistoryClear)
         } else item(key = "library:empty") {
             MessageState(
-                stringResource(if (addons) Res.string.search_addons_empty else Res.string.search_library_empty),
+                when {
+                    external && externalEmptyMessage.isNotBlank() -> externalEmptyMessage
+                    addons -> stringResource(Res.string.search_addons_empty)
+                    else -> stringResource(Res.string.search_library_empty)
+                },
             )
         }
         UiState.Loading -> songListSkeleton(keyPrefix = "skeleton:search:library")
@@ -460,7 +504,9 @@ private fun LazyListScope.librarySearchResults(
         is UiState.Success -> if (results.data.isEmpty()) {
             item(key = "library:no-match") {
                 MessageState(
-                    if (addons) {
+                    if (external && externalNoResultsMessage.isNotBlank()) {
+                        externalNoResultsMessage
+                    } else if (addons) {
                         stringResource(Res.string.search_addons_no_results, query)
                     } else {
                         stringResource(Res.string.search_library_no_results, query)
@@ -472,6 +518,11 @@ private fun LazyListScope.librarySearchResults(
             val isCurrentRow = playingRowMatcher(tracks, currentSong)
             itemsIndexed(tracks, key = { index, song -> "${if (addons) "addon" else "library"}_${song.videoId}_$index" }) { index, song ->
                 val blocked = isBlocked(song)
+                val sourceBadge = when {
+                    song.videoId.startsWith("spotify-track:") || song.playbackSource == "Spotify" -> HomeSource.SPOTIFY
+                    song.videoId.startsWith("soundcloud:") || song.playbackSource == "SoundCloud" -> HomeSource.SOUNDCLOUD
+                    else -> null
+                }
                 SongRow(
                     song = song,
                     // Dimmed rather than hidden, so the listener can see the
@@ -493,6 +544,9 @@ private fun LazyListScope.librarySearchResults(
                     isPlaying = isPlaying && isCurrentRow(song),
                     searchPlayingStyle = true,
                     showSourceQuality = addons,
+                    trailing = sourceBadge?.let { source ->
+                        { HomeSourceBadges(setOf(source)) }
+                    },
                 )
                 if (index < tracks.lastIndex) {
                     HorizontalDivider(
@@ -500,6 +554,16 @@ private fun LazyListScope.librarySearchResults(
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outline,
                     )
+                }
+            }
+            if (loadingMore) {
+                item(key = "external:loading-more") {
+                    Box(
+                        Modifier.fillMaxWidth().padding(vertical = 18.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                    }
                 }
             }
         }

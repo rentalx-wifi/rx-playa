@@ -7,6 +7,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.isActive
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -212,6 +214,17 @@ internal class PlayerScrub {
         }
     }
 
+    /**
+     * As [shown], for a fraction the caller has already advanced between the
+     * player's position samples — see [rememberSmoothFraction]. A drag still
+     * wins: the handle under a finger must not be animated by anything else.
+     */
+    fun shown(fraction: Float): Float = when {
+        scrubbing -> value
+        pendingSeek != null -> pendingSeek!!
+        else -> fraction.coerceIn(0f, 1f)
+    }
+
     fun drag(to: Float) {
         scrubbing = true
         value = to
@@ -222,6 +235,42 @@ internal class PlayerScrub {
         seekTo(value)
         scrubbing = false
     }
+}
+
+/**
+ * The played fraction, advanced every frame in between the player's own
+ * position samples.
+ *
+ * Media3 reports the playhead a few times a second, and a bar drawn straight
+ * from those samples steps: it sits still, then jumps 300 ms of music at once.
+ * Every music player anyone likes interpolates, so this counts the time since
+ * the last sample and adds it — the bar moves at exactly the rate the music
+ * does, and snaps back to the truth on each new sample.
+ *
+ * The value is returned as a lambda and read in the bar's own draw, so a frame
+ * of it invalidates that draw and nothing else. Returns 0 while paused, which
+ * is where the interpolation would otherwise run on into the track.
+ */
+@Composable
+internal fun rememberSmoothFraction(
+    positionMs: Long,
+    isPlaying: Boolean,
+    durationMs: Long,
+): () -> Float {
+    val fraction = remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(positionMs, isPlaying, durationMs) {
+        val duration = durationMs.coerceAtLeast(1L).toFloat()
+        fraction.floatValue = (positionMs / duration).coerceIn(0f, 1f)
+        if (!isPlaying) return@LaunchedEffect
+        val sampledAt = withFrameNanos { it }
+        while (isActive) {
+            withFrameNanos { now ->
+                val advancedMs = positionMs + (now - sampledAt) / 1_000_000L
+                fraction.floatValue = (advancedMs / duration).coerceIn(0f, 1f)
+            }
+        }
+    }
+    return { fraction.floatValue }
 }
 
 @Composable

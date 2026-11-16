@@ -42,6 +42,9 @@ object SourceResolver {
 
     private const val TAG = "BitChord"
 
+    /** How many search rows a loose fallback weighs before giving up on the track. */
+    private const val TOP_HIT_CANDIDATES = 5
+
     /**
      * What to ask a source for, right now, from the connection's ceiling alone
      * — see [AppSettings.effectiveAudioQuality].
@@ -305,6 +308,61 @@ object SourceResolver {
     }
 
     /**
+     * A copy of [target] from any enabled source, whatever its rank, for a
+     * YouTube row YouTube itself refuses to serve.
+     *
+     * [substituteForYouTube] only asks the sources the user ranked *above*
+     * YouTube, which is the right rule while YouTube can answer: nobody wants a
+     * module quietly taking over the track. It is the wrong rule when the
+     * answer is an error. A playlist imported from YouTube Music is a list of
+     * YouTube ids, and a good part of it is region-locked, age-gated or pulled —
+     * those rows played a red error while Spotify or SoundCloud had the same
+     * recording all along, one rank below.
+     *
+     * Called only after YouTube has failed, so the ordering is never violated:
+     * the sources that were asked first already had their turn.
+     */
+    suspend fun rescueOnAnySource(target: TrackMatcher.Target): SourceStream? {
+        if (target.title.isBlank() || target.isVideo) return null
+        val others = SourceRegistry.activeForPlayback().filter { it.kind != SourceKind.YOUTUBE }
+        if (others.isEmpty()) return null
+        val request = requestForNow()
+        // Two passes, strictest rule first. A row is only rescued when the copy
+        // is demonstrably the same recording: the same artist with any runtime
+        // (their own extended mix is still their song), and failing that a
+        // runtime exact to the second — the rule [TrackMatcher.best] itself
+        // uses to let length stand in for a credit. A different artist of a
+        // different length is never played in place of the track that was asked
+        // for; a missing row is better than a lie in the queue.
+        val sameArtist = bestAcross(
+            sources = others,
+            target = target,
+            request = request,
+            waitForAll = true,
+            requireSharedArtist = true,
+            timeoutMs = RESCUE_BUDGET_MS,
+        )
+        val exactLength = sameArtist ?: bestAcross(
+            sources = others,
+            target = target,
+            request = request,
+            waitForAll = true,
+            strictLength = true,
+            timeoutMs = RESCUE_BUDGET_MS,
+        )
+        val (source, stream) = exactLength ?: return null
+        TrackLog.w(
+            TAG,
+            "rescued: '${target.title}' by '${target.artist}' from ${source.displayName}" +
+                " after YouTube refused it",
+        )
+        return stream
+    }
+
+    /** The budget one rescue pass gets; the caller allows a little more for two. */
+    private const val RESCUE_BUDGET_MS = 2_500L
+
+    /**
      * The addons Direct Source Stream plays from: enabled, inside the
      * connection's ceiling, and ranked above YouTube — in rank order.
      *
@@ -365,6 +423,45 @@ object SourceResolver {
         )?.also {
             TrackLog.d(TAG, "YouTube fallback matched '${target.title}' after its higher-quality source failed")
         }
+    }
+
+    /**
+     * The best-effort YouTube answer for a track whose own catalogue refused to
+     * play it: the top search hit for its title and artist, with no recording
+     * match attached.
+     *
+     * [youtubeFallback] asks “is this the same recording” and is right to. This
+     * one asks “can something be played instead of nothing”, which is the only
+     * question left for a row whose own stream is gone. A SoundCloud upload is
+     * often an extended mix, a sped-up edit or a live take, and every one of
+     * them fails the runtime check that keeps a *substitution* honest — which
+     * is why a row that resolved to nothing used to end as a row that did
+     * nothing: the strict match above is the only fallback the player has.
+     *
+     * Never reached while [youtubeFallback] has an answer, and logged as the
+     * loose match it is, so a wrong recording is something the log admits
+     * rather than something the user has to guess at.
+     */
+    suspend fun youtubeTopHit(target: TrackMatcher.Target): SourceStream? {
+        if (target.title.isBlank() || target.isVideo) return null
+        val youtube = SourceRegistry.activeForPlayback()
+            .firstOrNull { it.kind == SourceKind.YOUTUBE }
+            ?: return null
+        val query = listOf(target.title, target.artist).filter(String::isNotBlank).joinToString(" ")
+        val rows = attempt(youtube) { youtube.search(query, limit = TOP_HIT_CANDIDATES) }
+            .orEmpty()
+            .filterNot { it.isVideo }
+        // Checked, not merely first: a search for a title answers with covers
+        // and re-uploads under the same name, and taking the top row played
+        // somebody else's recording with the right title on it.
+        val row = TrackMatcher.looseHit(rows, target) ?: return null
+        val stream = attempt(youtube) { youtube.stream(row.videoId, StreamRequest.Best) } ?: return null
+        TrackLog.w(
+            TAG,
+            "loose YouTube match for '${target.title}' by '${target.artist}': " +
+                "'${row.title}' by ${row.artist}",
+        )
+        return stream.copy(sourceConfigId = youtube.configId)
     }
 
     /**

@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.music.bitchord.R
 import com.music.bitchord.data.model.Song
@@ -160,6 +161,13 @@ class DownloadService : Service() {
         scope.cancel()
         Downloads.onStopped()
         super.onDestroy()
+    }
+
+    /** Android 15+ can exhaust the shared data-sync quota; stop cleanly instead of being killed as ANR. */
+    @RequiresApi(35)
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        Downloads.active.value.keys.toList().forEach(Downloads::cancel)
+        shutdown(stopWork = true)
     }
 
     // ---- Notification -------------------------------------------------------

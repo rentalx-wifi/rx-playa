@@ -410,6 +410,12 @@ data class ShelfItem(
      * picture the player can show. Drawn as a 16:9 card, as the web player does.
      */
     val isVideo: Boolean = false,
+    /** Full metadata for local files and personalized cards; ordinary server cards leave it null. */
+    val song: Song? = null,
+    /** The catalogues that contributed this card, not a claim about the eventual audio stream. */
+    val sources: Set<HomeSource> = emptySet(),
+    /** External metadata must be matched to a playable catalogue id before any player/menu action. */
+    val requiresMatching: Boolean = false,
 )
 
 /** How a shelf's items are laid out — the web player's `ShelfLayout`, by the same rules. */
@@ -597,6 +603,8 @@ data class DetailPage(
      * fetched with a session; see [SubscriptionState].
      */
     val subscription: SubscriptionState? = null,
+    /** Artist header's Mix target, retained so the UI can start an artist-seeded wave. */
+    val radio: WatchTarget? = null,
 )
 
 /**

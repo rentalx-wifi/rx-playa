@@ -40,7 +40,7 @@ enum class TelemetryProvenance {
  */
 object NerdStats {
 
-    class Snapshot(
+    data class Snapshot(
         val mimeType: String?,
         val bitrateKbps: Int?,
         val sampleRateHz: Int?,

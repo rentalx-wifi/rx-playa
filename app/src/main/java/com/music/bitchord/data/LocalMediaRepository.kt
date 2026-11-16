@@ -24,8 +24,10 @@ import java.util.Locale
 
 object LocalMediaRepository {
 
-    private const val TAG = "BitChord"
+    private const val TAG = "RXMusic"
     private const val MIN_LOCAL_MUSIC_DURATION_MS = 30_000L
+    /** Folders earlier builds wrote to; both stay indexed after a rename. */
+    private val LEGACY_DOWNLOAD_FOLDERS = listOf("BitChord", "RX Music")
 
     // `mp4` only ever reaches this list as an audio row — MediaStore files a
     // video .mp4 under Video, not Audio — so it is the audio-only MP4s Dolby
@@ -64,7 +66,7 @@ object LocalMediaRepository {
     }
 
     /**
-     * Retrieves all songs in the `Music/BitChord` directory, combining app downloads
+     * Retrieves all songs in `Music/RX Playa` (and the legacy `Music/BitChord` folder), combining app downloads
      * with any local audio files present in that folder.
      *
      * The download record is the better source for a title and a credit — it
@@ -94,8 +96,11 @@ object LocalMediaRepository {
                     MediaStore.Audio.Media.DATE_ADDED,
                     MediaStore.Audio.Media.DATE_MODIFIED,
                 )
-                val selection = "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?"
-                val selectionArgs = arrayOf("%${DownloadStore.FOLDER}%")
+                val folders = listOf(DownloadStore.FOLDER) + LEGACY_DOWNLOAD_FOLDERS
+                val selection = folders.joinToString(" OR ") {
+                    "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?"
+                }
+                val selectionArgs = folders.map { "%$it%" }.toTypedArray()
 
                 context.contentResolver.query(
                     MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
@@ -134,13 +139,14 @@ object LocalMediaRepository {
                     }
                 }
             } else {
-                val folder = File(
-                    android.os.Environment.getExternalStoragePublicDirectory(
-                        android.os.Environment.DIRECTORY_MUSIC,
-                    ),
-                    DownloadStore.FOLDER,
-                )
-                if (folder.exists() && folder.isDirectory) {
+                (listOf(DownloadStore.FOLDER) + LEGACY_DOWNLOAD_FOLDERS).forEach { folderName ->
+                    val folder = File(
+                        android.os.Environment.getExternalStoragePublicDirectory(
+                            android.os.Environment.DIRECTORY_MUSIC,
+                        ),
+                        folderName,
+                    )
+                    if (!folder.exists() || !folder.isDirectory) return@forEach
                     folder.listFiles()?.forEach { file ->
                         if (file.isFile && isAudioFileName(file.name)) {
                             val uriStr = Uri.fromFile(file).toString()
@@ -159,7 +165,7 @@ object LocalMediaRepository {
                     }
                 }
             }
-        }.onFailure { Log.w(TAG, "Failed scanning Music/BitChord directory: ${it.message}") }
+        }.onFailure { Log.w(TAG, "Failed scanning RX Playa download folders: ${it.message}") }
 
         val filled = appDownloads.map { song ->
             val uri = song.localUri ?: return@map song

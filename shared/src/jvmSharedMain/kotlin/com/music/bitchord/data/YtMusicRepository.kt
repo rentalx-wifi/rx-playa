@@ -333,12 +333,47 @@ object YtMusicRepository {
      */
     suspend fun searchPage(query: String, filter: SearchFilter, anonymous: Boolean = true): Result<SearchPage> =
         call("search:${filter.name}") {
-            InnertubeParser.parseSearchPage(
-                Innertube.search(query, filter.params, anonymous),
-                includeVideos = filter == SearchFilter.VIDEOS,
-            ).let { page ->
-                SearchPage(page.rows.distinctBy { it.identityKey() }, page.continuation)
-            }
+            val cleanQuery = query.trim()
+            require(cleanQuery.isNotEmpty()) { "Search query is empty" }
+            val primary = runCatching {
+                InnertubeParser.parseSearchPage(
+                    Innertube.search(cleanQuery, filter.params, anonymous),
+                    includeVideos = filter == SearchFilter.VIDEOS,
+                )
+            }.getOrNull()
+            // YouTube changes the opaque filter params occasionally. An old
+            // Songs token then returns a valid but empty page, while the same
+            // title is still present in the unfiltered result. Falling back to
+            // ALL keeps both typed search and playlist migration useful without
+            // guessing a replacement token. The mixed rows are narrowed back
+            // to playable tracks before they leave this function.
+            val hasPlayableSong = primary?.rows?.any {
+                it is SearchResult.Track || it is SearchResult.TopTrack
+            } == true
+            val page = when {
+                filter == SearchFilter.SONGS && !hasPlayableSong -> runCatching {
+                    InnertubeParser.parseSearchPage(
+                        Innertube.search(cleanQuery, params = null, anonymous = anonymous),
+                        includeVideos = false,
+                    )
+                }.getOrNull()?.let { fallback ->
+                    fallback.copy(
+                        rows = fallback.rows.filter {
+                            it is SearchResult.Track || it is SearchResult.TopTrack
+                        },
+                        // The continuation belongs to a mixed search page.
+                        continuation = null,
+                    )
+                } ?: primary
+                filter == SearchFilter.ALL && primary?.rows.isNullOrEmpty() -> runCatching {
+                    InnertubeParser.parseSearchPage(
+                        Innertube.searchTypeahead(cleanQuery),
+                        includeVideos = false,
+                    ).copy(continuation = null)
+                }.getOrNull() ?: primary
+                else -> primary
+            } ?: error("YouTube Music search returned no response")
+            SearchPage(page.rows.distinctBy { it.identityKey() }, page.continuation)
         }
 
     /** Fetches the next page of a search only when the result list needs it. */
@@ -357,6 +392,50 @@ object YtMusicRepository {
      */
     suspend fun search(query: String, filter: SearchFilter): Result<List<SearchResult>> =
         searchPage(query, filter).map { it.rows }
+
+    /**
+     * Search candidates for a track imported from another service.
+     *
+     * The exact `title + full byline` query is tried first. Collaborations and
+     * edition suffixes are common sources of empty searches, so only on a miss
+     * do we retry with a primary artist, a cleaned title, and finally the title
+     * alone. There is no arbitrary playlist-size cap; this helper bounds work
+     * per track instead.
+     */
+    suspend fun songCandidates(title: String, artist: String): List<Song> {
+        val cleanTitle = title.trim()
+        if (cleanTitle.isEmpty()) return emptyList()
+        val primaryArtist = artist.split(
+            Regex("""\s+(?:feat\.?|ft\.?)\s+|\s*[,&]\s*""", RegexOption.IGNORE_CASE),
+            limit = 2,
+        ).firstOrNull().orEmpty().trim()
+        val plainTitle = cleanTitle.replace(
+            Regex(
+                """\s*[\[(][^)\]]*(?:remaster|live|version|edit|mix|sped|slowed)[^)\]]*[)\]]\s*""",
+                RegexOption.IGNORE_CASE,
+            ),
+            " ",
+        ).replace(Regex("""\s+"""), " ").trim()
+        val queries = listOf(
+            "$cleanTitle $artist",
+            "$plainTitle $primaryArtist",
+            cleanTitle,
+            plainTitle,
+        ).map(String::trim).filter(String::isNotEmpty).distinct()
+        for (candidateQuery in queries) {
+            val songs = search(candidateQuery, SearchFilter.SONGS).getOrNull().orEmpty()
+                .mapNotNull {
+                    when (it) {
+                        is SearchResult.Track -> it.song
+                        is SearchResult.TopTrack -> it.song
+                        is SearchResult.Browse -> null
+                    }
+                }
+                .distinctBy { it.videoId }
+            if (songs.isNotEmpty()) return songs
+        }
+        return emptyList()
+    }
 
     private fun SearchResult.identityKey(): String = when (this) {
         is SearchResult.TopTrack -> "v:${song.videoId}"

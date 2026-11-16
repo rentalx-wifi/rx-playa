@@ -474,11 +474,7 @@ open class DiscordWebSocket(
                 d = json.encodeToJsonElement(d),
             ),
         )
-        if (op == IDENTIFY) {
-            logger.info("Gateway sending payload: [REDACTED IDENTIFY PAYLOAD]")
-        } else {
-            logger.info("Gateway sending payload: $payload")
-        }
+        logger.info("Gateway sending payload: ${gatewayPayloadForLog(op, payload)}")
         socket.send(Frame.Text(payload))
         return true
     }
@@ -589,6 +585,9 @@ open class DiscordWebSocket(
         private val CLOSE_TIMEOUT = 2.seconds
     }
 }
+
+internal fun gatewayPayloadForLog(op: OpCode, payload: String): String =
+    if (op == IDENTIFY || op == RESUME) "[REDACTED ${op.name} PAYLOAD]" else payload
 
 /**
  * Milliseconds since boot, counting time the device spent asleep.

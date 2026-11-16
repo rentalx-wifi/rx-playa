@@ -2,10 +2,10 @@
 <resources>
     <string name="connecting">Connecting…</string>
     <string name="no_phone_title">Phone not connected</string>
-    <string name="no_phone_body">Open BitChord on your phone, and keep it near your watch.</string>
+    <string name="no_phone_body">Open RX Playa on your phone, and keep it near your watch.</string>
     <string name="retry">Try again</string>
     <string name="nothing_playing">Not Playing</string>
-    <string name="nothing_playing_body">Play something in BitChord on your phone.</string>
+    <string name="nothing_playing_body">Play something in RX Playa on your phone.</string>
     <string name="resume">Resume</string>
     <string name="up_next">Up Next</string>
     <string name="queue_empty">Nothing up next</string>
@@ -38,6 +38,31 @@
     <string name="other_output">Other output</string>
     <string name="moving_to_watch">Moving to watch…</string>
     <string name="update_channel">Updates</string>
-    <string name="update_ready">BitChord update ready</string>
+    <string name="update_ready">RX Playa update ready</string>
     <string name="update_tap">Tap to install the update from your phone.</string>
+    <string name="dpi_bypass_title">Bypass provider throttling (experimental)</string>
+    <string name="dpi_bypass_subtitle">Routes this app\'s music traffic through a local proxy that splits the TLS handshake. Helps where YouTube Music, Spotify or SoundCloud are slowed by the access provider. It is not a VPN: a service blocked by address or unavailable in your region stays unavailable.</string>
+    <string name="zapret_title">Root DPI bypass (zapret)</string>
+    <string name="zapret_subtitle">Controls an installed nfqws: diverts this app music traffic to NFQUEUE and runs the chosen fake/split strategy. Needs root and a zapret binary on the device.</string>
+    <string name="zapret_check">Check</string>
+    <string name="zapret_start">Start</string>
+    <string name="zapret_stop">Stop</string>
+    <string name="zapret_import">Import nfqws binary</string>
+    <string name="zapret_log">Journal</string>
+    <string name="zapret_arguments">Custom arguments</string>
+    <string name="zapret_autostart">Start on boot</string>
+    <string name="zapret_save">Save</string>
+    <string name="accent_colour">Accent colour</string>
+    <string name="vless_title">Your VLESS key</string>
+    <string name="vless_subtitle">Routes this app music traffic through your own VLESS server. Paste a vless:// link with security=tls and type=tcp; Reality, WebSocket and flow keys are refused with a reason.</string>
+    <string name="vless_add">Paste key</string>
+    <string name="vless_save">Save</string>
+    <string name="google_signin_blocked_notice">Google refuses sign-in inside an embedded browser. Sign in with a normal browser on this device, then paste the Cookie header here.</string>
+    <string name="vless_clear">Remove key</string>
+    <string name="vless_test">Test key</string>
+    <string name="vless_state_on">On · %1$s</string>
+    <string name="vless_state_saved">Saved · %1$s</string>
+    <string name="zapret_not_checked">Not checked</string>
+    <string name="liquid_glass_title">Liquid Glass</string>
+    <string name="liquid_glass_subtitle">Refracting frosted chrome on the bars, the mini player and the top bar. Falls back to plain frosting on devices without the required GPU features.</string>
 </resources>

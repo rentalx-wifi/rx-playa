@@ -34,6 +34,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.ThumbDown
+import androidx.compose.material.icons.rounded.ThumbDownOffAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -418,6 +420,8 @@ internal fun LandscapeCredits(
     /** The menu glyph is briefly the undo arrow after a quality upgrade. */
     showRevertCue: Boolean,
     onToggleLike: () -> Unit,
+    onToggleDislike: () -> Unit,
+    dislikeLabel: String,
     onOpenMenu: () -> Unit,
     onOpenAlbum: (String) -> Unit,
     /** Null browse id for anyone but the lead credit — see [NowPlayingScreen]. */
@@ -463,22 +467,26 @@ internal fun LandscapeCredits(
             }
         }
         Spacer(Modifier.width(10.dp))
-        // Same gate as the portrait player's: no account to like against for a
-        // guest — but a local file or a finished download is liked on the
-        // device, which needs none.
-        if (signedIn || song.localUri != null) {
-            val liked = likeStatus == LikeStatus.LIKE
-            CircleGlyph(
-                icon = if (liked) BitChordIcons.StarFilled else BitChordIcons.Star,
-                contentDescription = stringResource(
-                    if (liked) Res.string.remove_from_liked else Res.string.like,
-                ),
-                onClick = onToggleLike,
-                active = liked,
-                haptic = if (liked) Haptic.ToggleOff else Haptic.ToggleOn,
-            )
-            Spacer(Modifier.width(8.dp))
-        }
+        val liked = likeStatus == LikeStatus.LIKE
+        val disliked = likeStatus == LikeStatus.DISLIKE
+        CircleGlyph(
+            icon = if (disliked) Icons.Rounded.ThumbDown else Icons.Rounded.ThumbDownOffAlt,
+            contentDescription = dislikeLabel,
+            onClick = onToggleDislike,
+            active = disliked,
+            haptic = if (disliked) Haptic.ToggleOff else Haptic.ToggleOn,
+        )
+        Spacer(Modifier.width(6.dp))
+        CircleGlyph(
+            icon = if (liked) BitChordIcons.StarFilled else BitChordIcons.Star,
+            contentDescription = stringResource(
+                if (liked) Res.string.remove_from_liked else Res.string.like,
+            ),
+            onClick = onToggleLike,
+            active = liked,
+            haptic = if (liked) Haptic.ToggleOff else Haptic.ToggleOn,
+        )
+        Spacer(Modifier.width(8.dp))
         CircleGlyph(
             icon = if (showRevertCue) Icons.AutoMirrored.Rounded.Undo else Icons.Rounded.MoreHoriz,
             contentDescription = stringResource(Res.string.more),

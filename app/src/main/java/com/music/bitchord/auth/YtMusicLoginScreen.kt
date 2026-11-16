@@ -1,7 +1,9 @@
 package com.music.bitchord.auth
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
 import android.webkit.CookieManager
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,13 +22,15 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import java.net.URI
 
 private const val MUSIC_ORIGIN = "https://music.youtube.com"
+private const val MUSIC_WEB_URL = "$MUSIC_ORIGIN/?app=desktop"
 
 private const val LOGIN_URL =
     "https://accounts.google.com/ServiceLogin" +
         "?ltmpl=music&service=youtube&prompt=select_account" +
-    "&continue=https%3A%2F%2Fmusic.youtube.com%2F"
+    "&continue=https%3A%2F%2Fmusic.youtube.com%2F%3Fapp%3Ddesktop"
 
 private const val TAG = "BitChord"
 
@@ -40,7 +44,9 @@ private const val TAG = "BitChord"
  * Google redirects back to music.youtube.com the listener confirms the profile
  * shown by the live page. This deliberately leaves a multiple-channel account
  * enough time to choose its Personal or Brand identity before anything is
- * saved. The browser's local Google cookies are cleared on the way in without
+ * saved. With [initialCookie], Music opens directly using the listener's own
+ * browser session instead of attempting Google sign-in in an embedded browser.
+ * The browser's local Google cookies are cleared on the way in without
  * visiting Google's logout endpoint, so adding an account cannot invalidate a
  * previously saved session.
  *
@@ -51,13 +57,13 @@ private const val TAG = "BitChord"
  * by raising [captureRequest].
  *
  * Either way what is read is the page's own `ytcfg`, not a guess made later
- * from a server-side fetch. The credential itself never passes through app code.
+ * from a server-side fetch. Passwords are handled by Google, never by the app.
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun YtMusicLoginScreen(
     mode: WebSessionMode,
-    /** Cookie snapshot to install before opening an existing account's channel picker. */
+    /** An imported browser session, or the snapshot for an existing account's channel picker. */
     initialCookie: String? = null,
     onCaptured: (CapturedSession) -> Unit,
     modifier: Modifier = Modifier,
@@ -72,11 +78,21 @@ fun YtMusicLoginScreen(
     onPageReady: (Boolean) -> Unit = {},
     /** For a host that needs the WebView set up differently — the TV app, for its remote. */
     configureWebView: (WebView) -> Unit = {},
+    /**
+     * Called once when Google refuses this embedded browser outright.
+     *
+     * The message is policy, not something a user agent can fix: Google blocks
+     * WebView sign-in on many accounts. Detecting it is what turns a dead end
+     * into the cookie import that does work.
+     */
+    onBlocked: () -> Unit = {},
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     val currentOnCaptured by rememberUpdatedState(onCaptured)
     val currentOnUnavailable by rememberUpdatedState(onCaptureUnavailable)
     val currentOnPageReady by rememberUpdatedState(onPageReady)
+    val currentOnBlocked by rememberUpdatedState(onBlocked)
+    var blockedReported by remember { mutableStateOf(false) }
 
     LaunchedEffect(captureRequest) {
         if (captureRequest == 0) return@LaunchedEffect
@@ -88,9 +104,6 @@ fun YtMusicLoginScreen(
     AndroidView(
         modifier = modifier.fillMaxSize(),
         factory = { context ->
-            if (mode == WebSessionMode.SIGN_IN) {
-                BrowserSession.clearGoogleCookies()
-            } else initialCookie?.let(BrowserSession::installGoogleCookies)
             WebView(context).apply {
                 if (mode == WebSessionMode.SIGN_IN) {
                     clearCache(true)
@@ -99,24 +112,101 @@ fun YtMusicLoginScreen(
                 }
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
+                settings.databaseEnabled = true
+                // A mobile/WebView UA makes music.youtube.com advertise its
+                // Android APK and redirect to Play instead of loading the web
+                // client. Keep the device's actual Chromium version but present
+                // it as desktop Chrome, which is a supported YouTube Music web
+                // surface and still gives us the same account cookies.
+                settings.userAgentString = youtubeMusicWebUserAgent(settings.userAgentString)
+                settings.useWideViewPort = true
+                CookieManager.getInstance().setAcceptCookie(true)
+                CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                 configureWebView(this)
 
                 webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(
+                        view: WebView,
+                        request: WebResourceRequest,
+                    ): Boolean {
+                        val target = request.url
+                        if (target.host.equals("play.google.com", ignoreCase = true) ||
+                            target.scheme in setOf("market", "intent", "vnd.youtube.music")
+                        ) {
+                            view.loadUrl(MUSIC_WEB_URL)
+                            return true
+                        }
+                        return false
+                    }
+
+                    override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                        currentOnPageReady(false)
+                    }
+
                     override fun onPageFinished(view: WebView?, url: String?) {
+                        if (!blockedReported && url?.contains("accounts.google.com") == true) {
+                            view?.evaluateJavascript(
+                                "(document.body && document.body.innerText || '').slice(0, 4000)",
+                            ) { text ->
+                                val lowered = text.orEmpty().lowercase()
+                                val refused = lowered.contains("secure") ||
+                                    lowered.contains("couldn't sign you in") ||
+                                    lowered.contains("unsupported browser") ||
+                                    lowered.contains("не удалось войти")
+                                if (refused && !blockedReported) {
+                                    blockedReported = true
+                                    currentOnBlocked()
+                                }
+                            }
+                        }
                         // Reaching the Music origin only enables confirmation.
                         // A multi-channel login can still be waiting for the
                         // listener to choose an identity on this very page.
                         // Capturing automatically here is the race that used to
                         // create a fake "Personal" profile and close too soon.
-                        currentOnPageReady(url?.startsWith(MUSIC_ORIGIN) == true)
+                        currentOnPageReady(isYouTubeMusicWebPage(url) && isYouTubeMusicWebPage(view?.url))
                     }
                 }
 
                 webView = this
-                loadUrl(if (mode == WebSessionMode.SIGN_IN) LOGIN_URL else "$MUSIC_ORIGIN/")
+                val view = this
+                val load = {
+                    // Cookie callbacks can outlive a fast Back press. Never load
+                    // into a WebView Compose has already released and destroyed.
+                    if (webView === view) {
+                        view.loadUrl(
+                            if (mode == WebSessionMode.SIGN_IN && initialCookie == null) LOGIN_URL else MUSIC_WEB_URL,
+                        )
+                    }
+                }
+                when {
+                    initialCookie != null -> BrowserSession.installGoogleCookies(initialCookie, load)
+                    mode == WebSessionMode.SIGN_IN -> BrowserSession.clearGoogleCookies(load)
+                    else -> load()
+                }
             }
         },
+        onRelease = { view ->
+            webView = null
+            view.stopLoading()
+            view.destroy()
+        },
     )
+}
+
+internal fun isYouTubeMusicWebPage(rawUrl: String?): Boolean {
+    val uri = rawUrl?.let { runCatching { URI(it) }.getOrNull() } ?: return false
+    return uri.scheme.equals("https", ignoreCase = true) &&
+        uri.host.equals("music.youtube.com", ignoreCase = true) &&
+        uri.userInfo == null && uri.port in setOf(-1, 443)
+}
+
+private val CHROME_VERSION = Regex("""Chrome/[0-9.]+""")
+
+internal fun youtubeMusicWebUserAgent(platformUserAgent: String?): String {
+    val chrome = CHROME_VERSION.find(platformUserAgent.orEmpty())?.value ?: "Chrome/129.0.0.0"
+    return "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) " +
+        "$chrome Safari/537.36"
 }
 
 /**
@@ -132,6 +222,10 @@ private fun captureFrom(
     onCaptured: (CapturedSession) -> Unit,
     onUnavailable: () -> Unit,
 ) {
+    if (!isYouTubeMusicWebPage(view.url)) {
+        onUnavailable()
+        return
+    }
     val cookies = CookieManager.getInstance().getCookie(MUSIC_ORIGIN)
     if (cookies == null || !AuthStore.hasApiSid(cookies)) {
         onUnavailable()
@@ -143,6 +237,10 @@ private fun captureFrom(
     CookieManager.getInstance().flush()
 
     view.evaluateJavascript(YTCFG_PROBE) { raw ->
+        if (!isYouTubeMusicWebPage(view.url)) {
+            onUnavailable()
+            return@evaluateJavascript
+        }
         val config = raw.parseConfig()
         val loggedIn = config?.get("loggedIn").let {
             it is JsonPrimitive && it.content == "true"

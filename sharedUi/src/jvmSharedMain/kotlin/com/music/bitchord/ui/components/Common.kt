@@ -81,6 +81,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.music.bitchord.ui.theme.LocalMaterial3StyleEnabled
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -98,6 +99,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.ROW_ART_PX
+import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.isMatchPending
 import com.music.bitchord.data.model.isMatchMissing
@@ -518,6 +520,7 @@ private fun SongRowContent(
     showSourceQuality: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
 ) {
+    val skin = LocalMaterial3StyleEnabled.current
     val titleColor by animateColorAsState(
         targetValue = if (isCurrent && !searchPlayingStyle) activeTint else MaterialTheme.colorScheme.onBackground,
         label = "song row title",
@@ -571,15 +574,15 @@ private fun SongRowContent(
                 }
             }
         } else {
-            Box(Modifier.trackArtSize(52.dp, song.isVideo)) {
+            Box(Modifier.trackArtSize(if (skin) 56.dp else 52.dp, song.isVideo)) {
                 AsyncImage(
                     model = com.music.bitchord.ui.player.rememberRemoteArtworkUrl(song)?.artworkAt(ROW_ART_PX),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .matchParentSize()
-                        .clip(RoundedCornerShape(8.dp))
-                        .thumbnailBorder(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(if (skin) 12.dp else 8.dp))
+                        .thumbnailBorder(RoundedCornerShape(if (skin) 12.dp else 8.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                 )
                 if (searchPlayingStyle && isCurrent && isPlaying) {
@@ -815,6 +818,18 @@ fun SearchPlayingBars(modifier: Modifier = Modifier) {
  * that can claim a file a file manager has since deleted, until something asks
  * for it and the record is pruned.
  */
+/**
+ * A stable identity for a shelf card, for a `LazyRow` to key its items by.
+ *
+ * Keyed by position, a shelf that is refilled — the home filter chip, a
+ * refreshed feed, a sorted library — reuses the slots for different cards and
+ * every one of them asks its artwork again. A track has a video id, a card of
+ * an album or playlist a browse id; a card with neither is identified by what
+ * it says, which is the best that can be done and rare.
+ */
+internal fun ShelfItem.shelfKey(): String =
+    videoId ?: browseId ?: ("text:$title\u0000$subtitle")
+
 @Composable
 fun DownloadedBadge(videoId: String, tint: Color, modifier: Modifier = Modifier) {
     if (videoId !in AppUi.host.downloadedIds()) return

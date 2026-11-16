@@ -124,6 +124,21 @@ class QueueBuilderTest {
     }
 
     @Test
+    fun `extend excludes disliked provider aliases of the same recording`() {
+        val extra = QueueBuilder.extend(
+            existing = emptyList(),
+            candidates = listOf(
+                song("youtube", "Track (Official Video)", "Artist - Topic"),
+                song("other", "Allowed", "Someone Else"),
+            ),
+            limit = 10,
+            excluded = listOf(song("spotify-track:1", "Track", "Artist")),
+        )
+
+        assertEquals(listOf("other"), extra.map { it.videoId })
+    }
+
+    @Test
     fun `extend honours the limit`() {
         val candidates = (1..10).map { song("v$it", "Song $it", "Artist $it") }
         assertEquals(3, QueueBuilder.extend(emptyList(), candidates, limit = 3).size)

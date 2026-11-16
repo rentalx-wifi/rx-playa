@@ -62,6 +62,11 @@ import com.music.bitchord.ui.components.thumbnailBorder
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
 import com.music.bitchord.ui.player.PlayerDock
+import com.music.bitchord.ui.theme.NothingCompactShape
+import com.music.bitchord.ui.theme.NothingPanelShape
+import com.music.bitchord.ui.theme.nothingPanelChrome
+import com.music.bitchord.ui.theme.LocalNothingStyleEnabled
+import com.music.bitchord.ui.theme.NothingRed
 import com.music.bitchord.ui.player.AndroidMusicVideo
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.fillMaxSize
@@ -366,15 +371,28 @@ fun MiniPlayer(
     modifier: Modifier = Modifier,
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val nothing = LocalNothingStyleEnabled.current
+    // The skin draws a plain tonal card here instead of a frosted pill: the bar
+    // below it is a solid surface, and a glass capsule next to it would read as
+    // two different apps stacked.
+    val material3 = com.music.bitchord.ui.theme.LocalMaterial3StyleEnabled.current
     val haptics = rememberHaptics()
     // percent rather than a dp figure, so the corner stays exactly half the
     // height if the row's contents ever change it — which is what keeps a pill
     // a pill instead of a rounded rectangle. Same idiom as [FloatingBottomBar]
     // directly below it, so the two shapes are the same family.
-    val shape = RoundedCornerShape(percent = 50)
+    val shape = remember(nothing, material3) {
+        when {
+            nothing -> NothingPanelShape
+            material3 -> RoundedCornerShape(22.dp)
+            else -> RoundedCornerShape(percent = 50)
+        }
+    }
     Box(
         modifier = modifier
-            .padding(horizontal = BAR_GUTTER)
+            // The skin's dock floats at 16dp either side; the card above it
+            // shares that edge, so the two read as one stack.
+            .padding(horizontal = if (material3) 16.dp else BAR_GUTTER)
             // Ahead of the surface, so a pull lifts the whole of it, frost and all.
             .miniPlayerGestures(
                 pull = pull,
@@ -391,16 +409,28 @@ fun MiniPlayer(
             )
             .clip(shape)
             .then(
-                if (reduceDynamicBlur) {
-                    Modifier.background(MaterialTheme.colorScheme.surface)
-                } else {
-                    Modifier.optimizedHazeEffect(
+                when {
+                    material3 -> Modifier.background(MaterialTheme.colorScheme.surfaceContainer)
+                    reduceDynamicBlur -> Modifier.background(MaterialTheme.colorScheme.surface)
+                    LocalLiquidGlassEnabled.current && isGlassSupported() ->
+                        Modifier.liquidGlass(shape)
+                    else -> Modifier.optimizedHazeEffect(
                         state = hazeState,
-                        style = HazeMaterials.thin(MaterialTheme.colorScheme.surface),
+                        style = barFrost(MaterialTheme.colorScheme.surface),
                     )
                 },
             )
-            .border(0.5.dp, Color.White.copy(alpha = 0.10f), shape)
+            .border(
+                width = when {
+                    nothing -> 1.dp
+                    material3 -> 0.dp
+                    else -> 0.5.dp
+                },
+                color = if (nothing) NothingRed.copy(alpha = 0.42f)
+                else Color.White.copy(alpha = 0.10f),
+                shape = shape,
+            )
+            .nothingPanelChrome(nothing)
             // Deliberately silent: the whole bar is the target, so it catches
             // stray taps meant for the page behind it, and the sheet rising is
             // its own confirmation. The glyphs on it still buzz.
@@ -421,12 +451,15 @@ fun MiniPlayer(
                 targetValue = if (song.isVideo) VIDEO_ART_WIDTH else 40.dp,
                 label = "miniArtWidth",
             )
+            val artShape = remember(nothing) {
+                if (nothing) NothingCompactShape else RoundedCornerShape(ART_CORNER)
+            }
             Box(
                 modifier = Modifier
                     .size(width = artWidth, height = 40.dp)
                     .playerDockArt(dock, ART_CORNER)
-                    .clip(RoundedCornerShape(ART_CORNER))
-                    .thumbnailBorder(RoundedCornerShape(ART_CORNER))
+                    .clip(artShape)
+                    .thumbnailBorder(artShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 AsyncImage(

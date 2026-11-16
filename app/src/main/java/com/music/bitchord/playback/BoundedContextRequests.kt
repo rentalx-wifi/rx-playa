@@ -22,6 +22,8 @@ object BoundedContextRequests {
         val source: QueueSource,
         val continuationToken: String?,
         val shuffle: Boolean,
+        /** False for Favorites: the selected list plays as one uninterrupted block. */
+        val preserveUserQueue: Boolean = true,
         /** Opaque handoff id, filled by [put] and returned by [take]. */
         val handoffToken: String? = null,
     )

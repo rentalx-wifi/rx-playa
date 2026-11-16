@@ -3,6 +3,8 @@ package com.music.bitchord.data.spotify
 import android.content.Context
 import android.content.SharedPreferences
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.model.HomeSource
+import com.music.bitchord.data.model.PlaybackSourceType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
@@ -12,6 +14,8 @@ data class LocalPlaylist(
     val id: String,
     val title: String,
     val songs: List<Song>,
+    /** Legacy imports did not retain their provider and remain honestly labelled Local. */
+    val source: HomeSource = HomeSource.LOCAL,
 ) {
     val browseId: String get() = "local:playlist:$id"
 }
@@ -54,22 +58,41 @@ object LocalPlaylistStore {
                         albumId = sObj.optString("albumId", null).takeIf { !it.isNullOrBlank() && it != "null" },
                         albumName = sObj.optString("albumName", null).takeIf { !it.isNullOrBlank() && it != "null" },
                         isVideo = sObj.optBoolean("isVideo", false),
+                        isVideoOrigin = sObj.optBoolean("isVideoOrigin", false),
+                        playbackSource = sObj.optString("playbackSource", null)
+                            .takeIf { !it.isNullOrBlank() && it != "null" },
+                        playbackSourceType = sObj.optString("playbackSourceType", null)
+                            .takeIf { !it.isNullOrBlank() && it != "null" }
+                            ?.let { runCatching { PlaybackSourceType.valueOf(it) }.getOrNull() },
+                        playbackSourceId = sObj.optString("playbackSourceId", null)
+                            .takeIf { !it.isNullOrBlank() && it != "null" },
                     )
                     songs.add(song)
                 }
-                list.add(LocalPlaylist(id, title, songs))
+                val source = runCatching { HomeSource.valueOf(obj.optString("source", "LOCAL")) }
+                    .getOrDefault(HomeSource.LOCAL)
+                list.add(LocalPlaylist(id, title, songs, source))
             }
             _playlists.value = list
         }
     }
 
-    fun savePlaylist(title: String, songs: List<Song>): LocalPlaylist {
+    fun savePlaylist(title: String, songs: List<Song>, source: HomeSource = HomeSource.LOCAL): LocalPlaylist {
         val id = "sp_local_" + System.currentTimeMillis()
-        val playlist = LocalPlaylist(id = id, title = title, songs = songs)
+        val playlist = LocalPlaylist(id = id, title = title, songs = songs, source = source)
         val updated = listOf(playlist) + _playlists.value.filterNot { it.id == id }
         _playlists.value = updated
         persist(updated)
         return playlist
+    }
+
+    /** Adds imported playlists, keeping this device's own ones untouched. */
+    fun importAll(imported: List<LocalPlaylist>) {
+        if (imported.isEmpty()) return
+        val byId = _playlists.value.associateBy { it.id }.toMutableMap()
+        imported.forEach { byId[it.id] = it }
+        _playlists.value = byId.values.sortedBy { it.title.lowercase() }
+        persist(_playlists.value)
     }
 
     fun deletePlaylist(id: String) {
@@ -102,6 +125,7 @@ object LocalPlaylistStore {
                 val pObj = JSONObject()
                 pObj.put("id", playlist.id)
                 pObj.put("title", playlist.title)
+                pObj.put("source", playlist.source.name)
                 val songsArray = JSONArray()
                 for (song in playlist.songs) {
                     val sObj = JSONObject()
@@ -114,6 +138,10 @@ object LocalPlaylistStore {
                     sObj.put("albumId", song.albumId)
                     sObj.put("albumName", song.albumName)
                     sObj.put("isVideo", song.isVideo)
+                    sObj.put("isVideoOrigin", song.isVideoOrigin)
+                    sObj.put("playbackSource", song.playbackSource)
+                    sObj.put("playbackSourceType", song.playbackSourceType?.name)
+                    sObj.put("playbackSourceId", song.playbackSourceId)
                     songsArray.put(sObj)
                 }
                 pObj.put("songs", songsArray)

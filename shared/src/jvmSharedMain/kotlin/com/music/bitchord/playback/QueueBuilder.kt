@@ -1,6 +1,7 @@
 package com.music.bitchord.playback
 
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.model.durationMillis
 import java.util.Locale
 
 /**
@@ -37,7 +38,13 @@ object QueueBuilder {
      * The subset of [candidates] worth appending after [existing]: nothing
      * already queued, nothing repeated, at most [limit] tracks.
      */
-    fun extend(existing: List<Song>, candidates: List<Song>, limit: Int, preferVideos: Boolean = false): List<Song> {
+    fun extend(
+        existing: List<Song>,
+        candidates: List<Song>,
+        limit: Int,
+        preferVideos: Boolean = false,
+        excluded: List<Song> = emptyList(),
+    ): List<Song> {
         val taken = existing.toMutableList()
         val perArtist = mutableMapOf<String, Int>()
         val seedArtists = existing.lastOrNull()?.artist?.let(::artistSet).orEmpty()
@@ -60,6 +67,7 @@ object QueueBuilder {
 
         for (candidate in ordered) {
             if (out.size >= limit) break
+            if (excluded.any { isSameRecording(it, candidate) }) continue
             if (taken.any { isSameRecording(it, candidate) }) continue
 
             val artists = artistSet(candidate.artist)
@@ -102,20 +110,66 @@ object QueueBuilder {
      * recording as far as a queue is concerned. Remix and cover markers are
      * deliberately left in — those really are different tracks.
      */
-    fun normalisedTitle(raw: String): String = raw.lowercase(Locale.ROOT)
-        .substringBefore(" | ")
-        .replace(NOISE, " ")
-        .replace(PUNCTUATION, " ")
-        .replace(SPACES, " ")
-        .trim()
+    fun normalisedTitle(raw: String): String =
+        TrackText.titleKey(NOISE.replace(raw.substringBefore(" | "), " "))
 
     /** The cast behind a credit, split out so billing order stops mattering. */
     fun artistSet(raw: String): Set<String> = raw.lowercase(Locale.ROOT)
         .replace(TOPIC, " ")
         .split(",", "&", "·", "•", ";", " feat", " ft.", " ft ", " x ", " with ")
-        .map { it.replace(PUNCTUATION, " ").replace(SPACES, " ").trim() }
+        .map { TrackText.foldScript(it.replace(PUNCTUATION, " ").replace(SPACES, " ").trim()) }
         .filter { it.isNotEmpty() }
         .toSet()
+
+    /**
+     * Orders YouTube's watch queue by how close each row is to the seed.
+     *
+     * The queue is the station, and it arrives in the order YouTube would play
+     * it from the seed's own page - which includes rows carried over from
+     * elsewhere in the session. Sorting by evidence we can actually read (shared
+     * credits, overlapping title words, album, runtime) keeps a track radio
+     * sounding like the track instead of like the previous hour of listening.
+     * The original order stays the tie-break, so the ranking never scrambles
+     * rows it has no opinion about.
+     */
+    fun rankRelated(seed: Song, candidates: List<Song>): List<Song> {
+        if (candidates.size < 3) return candidates
+        val seedArtists = artistSet(seed.artist)
+        val seedWords = wordSet(seed.title)
+        val seedAlbum = TrackText.titleKey(seed.albumName.orEmpty())
+        val seedDuration = seed.durationMillis()
+        fun closeness(song: Song): Double {
+            val artists = artistSet(song.artist)
+            var score = 0.0
+            if (seedArtists.isNotEmpty() && artists.isNotEmpty()) {
+                score += 3.0 * artists.count { it in seedArtists }.coerceAtMost(3)
+            }
+            if (seedWords.isNotEmpty()) {
+                val words = wordSet(song.title)
+                if (words.isNotEmpty()) {
+                    score += 2.0 * words.count { it in seedWords }.toDouble() /
+                        seedWords.size.coerceAtLeast(words.size)
+                }
+            }
+            if (seedAlbum.isNotEmpty() && seedAlbum == TrackText.titleKey(song.albumName.orEmpty())) {
+                score += 1.5
+            }
+            val duration = song.durationMillis()
+            if (seedDuration > 0L && duration > 0L && kotlin.math.abs(duration - seedDuration) <= 41000L) {
+                score += 1.0
+            }
+            return score
+        }
+        return candidates.withIndex()
+            .sortedWith(
+                compareByDescending<IndexedValue<Song>> { closeness(it.value) }
+                    .thenBy { it.index },
+            )
+            .map { it.value }
+    }
+
+    private fun wordSet(raw: String): Set<String> =
+        TrackText.titleKey(raw).split(" ").filter { it.length > 2 }.toSet()
 
     private val NOISE = Regex(
         """\((?:official|lyric|lyrics|lyrical|audio|video|visuali[sz]er|full song|hd|4k)[^)]*\)""" +

@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.music.bitchord.ui.theme.LocalMaterial3StyleEnabled
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -81,7 +82,12 @@ fun SearchField(
                     // Fixed height prevents the row from growing when text is entered
                     Modifier
                         .height(46.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(11.dp))
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            // The skin draws the field as a pill on a tonal
+                            // surface; the classic field is a tighter bar.
+                            RoundedCornerShape(if (LocalMaterial3StyleEnabled.current) 24.dp else 11.dp),
+                        )
                 },
             )
             // Asymmetric: the magnifier is a button now and wants a real touch

@@ -43,6 +43,19 @@ fun Modifier.optimizedHazeEffect(
  *
  * [fill] alone stands in where the blur can't be drawn.
  */
+/**
+ * The frost under a floating bar: deeper than the stock thin material, because
+ * the bar sits over artwork and a weak blur reads as a grey rectangle rather
+ * than glass. The input scale above keeps the cost close to the stock effect.
+ */
+fun barFrost(fill: Color, alpha: Float = 0.62f): HazeStyle = HazeStyle(
+    backgroundColor = fill,
+    tints = listOf(HazeTint(fill.copy(alpha = alpha))),
+    blurRadius = 22.dp,
+    noiseFactor = 0.02f,
+    fallbackTint = HazeTint(fill),
+)
+
 fun menuFrost(fill: Color, alpha: Float = MENU_FROST_ALPHA): HazeStyle = HazeStyle(
     backgroundColor = fill,
     tints = listOf(HazeTint(fill.copy(alpha = alpha))),

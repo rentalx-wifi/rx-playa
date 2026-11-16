@@ -81,6 +81,14 @@ object QueueShuffle {
         ctx = null
     }
 
+    /** Prevents shuffle restore from resurrecting a recording removed by Dislike. */
+    fun removeMatchingRecording(target: Song) {
+        val kept = canonicalContext.filterNot { item ->
+            QueueBuilder.isSameRecording(item.toSong(), target)
+        }
+        canonicalContext = kept
+    }
+
     /**
      * Checks if the active [canonicalContext] matches the player's active queue.
      *

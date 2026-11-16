@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">BitChord</string>
+    <string name="google_cookie_import_title">Import YouTube Music session</string>
+    <string name="google_cookie_import_subtitle">Use your own browser session if Google blocks embedded sign-in</string>
+    <string name="google_cookie_import_description">Sign in to music.youtube.com in your normal browser. Copy its Cookie request header from browser developer tools and paste it here. Cookies grant account access: use only your own session and never share them. Confirm the profile on the next screen.</string>
+    <string name="google_cookie_import_invalid">Paste a complete, current YouTube Music Cookie header, not a password, Set-Cookie, or all request headers.</string>
+    <string name="google_cookie_import_button">Open my session</string>
+    <string name="vk_import_title">Import VK track list</string>
+    <string name="vk_import_subtitle">Paste track names or choose your TXT, CSV/TSV, or JSON export</string>
+    <string name="vk_import_description">Use one Artist — Title per line, or your own TXT, CSV/TSV, or VK JSON export. Matching YouTube recordings are saved in RX Playa. This imports metadata, not VK credentials or private audio.</string>
+    <string name="vk_import_hint">Artist — Title\nArtist — Another title</string>
+    <string name="vk_import_reading">Reading the track list…</string>
+    <string name="vk_import_invalid">Could not read or match that list. Use Artist — Title, CSV/TSV with artist/title columns, or a VK JSON track array.</string>
+    <string name="vk_public_import_subtitle">Without VK API keys you can import your track list, but not access a private VK library.</string>
+    <string name="soundcloud_public_choose">Choose public liked tracks or a playlist</string>
+    <string name="soundcloud_public_import_subtitle">Public playlists and liked tracks, without signing in</string>
+    <string name="app_name">RX Playa</string>
     <string name="playback_channel_name">Đang phát</string>
     <string name="download_channel_name">Tải xuống</string>
     <string name="download_channel_description">Các bài hát đang được lưu vào thư mục Nhạc của bạn</string>
@@ -106,10 +120,10 @@
     <string name="dolby_atmos_open_failed">Không thể mở cài đặt Dolby Atmos</string>
     <string name="update_available">Có bản cập nhật mới: v%1$s</string>
     <string name="software_update">Cập nhật phần mềm</string>
-    <string name="update_available_body">BitChord %1$s đã sẵn sàng để tải xuống.</string>
-    <string name="update_downloading_body">Đang tải xuống BitChord %1$s…</string>
-    <string name="update_ready_body">BitChord %1$s đã sẵn sàng để cài đặt.</string>
-    <string name="update_failed_body">Không thể tải xuống BitChord %1$s.</string>
+    <string name="update_available_body">RX Playa %1$s đã sẵn sàng để tải xuống.</string>
+    <string name="update_downloading_body">Đang tải xuống RX Playa %1$s…</string>
+    <string name="update_ready_body">RX Playa %1$s đã sẵn sàng để cài đặt.</string>
+    <string name="update_failed_body">Không thể tải xuống RX Playa %1$s.</string>
     <string name="download_now">Tải ngay</string>
     <string name="install_now">Cài đặt ngay</string>
     <string name="later">Để sau</string>
@@ -127,7 +141,7 @@
     <string name="personalized_recommendations">Nhận các đề xuất dành riêng cho bạn</string>
     <string name="play_next">Phát tiếp theo</string>
     <string name="queue">Hàng đợi</string>
-    <string name="source_unrecognised">BitChord không nhận dạng được liên kết đó</string>
+    <string name="source_unrecognised">RX Playa không nhận dạng được liên kết đó</string>
     <string name="source_already_added">Đã được thêm dưới tên %1$s</string>
     <string name="source_setup_required">Nhấn để hoàn tất thiết lập</string>
     <string name="source_skipped_by_quality">Không dùng trên %1$s · chất lượng được đặt thành %2$s</string>
@@ -144,7 +158,7 @@
     <string name="widget_previous">Trước</string>
     <string name="widget_artwork">Ảnh bìa album</string>
     <string name="widget_nothing_played">Chưa phát bài nào</string>
-    <string name="widget_open_bitchord">Mở BitChord</string>
+    <string name="widget_open_bitchord">Mở RX Playa</string>
     <string name="widget_preview_title">Tên bài hát</string>
     <string name="widget_preview_artist">Nghệ sĩ</string>
     <string name="widget_pill_label">Đang phát 4×1</string>
@@ -179,7 +193,7 @@
     <string name="cancel_all">Hủy tất cả</string>
     <string name="language">Ngôn ngữ</string>
     <string name="app_language">Ngôn ngữ ứng dụng</string>
-    <string name="app_language_description">Chọn ngôn ngữ sử dụng trong BitChord.</string>
+    <string name="app_language_description">Chọn ngôn ngữ sử dụng trong RX Playa.</string>
     <string name="english">Tiếng Anh</string>
     <string name="spanish">Tiếng Tây Ban Nha</string>
     <string name="french">Tiếng Pháp</string>
@@ -239,7 +253,6 @@
     <string name="reduce_dynamic_blur">Giảm độ mờ động</string>
     <string name="reduce_dynamic_blur_subtitle">Dùng màu nền đặc thay cho hiệu ứng kính mờ trong toàn bộ ứng dụng</string>
     <string name="liquid_glass">Kính lỏng (Liquid Glass)</string>
-    <string name="liquid_glass_subtitle">Hiệu ứng kính khúc xạ trên thanh điều hướng nổi. Chỉ dành cho Android 12+; sử dụng nhiều GPU hơn.</string>
     <string name="liquid_glass_unavailable">Yêu cầu Android 12 trở lên</string>
     <string name="full_screen_cover_art">Ảnh bìa toàn màn hình</string>
     <string name="legacy_mesh_gradient">Dải màu lưới kiểu cũ</string>
@@ -286,10 +299,10 @@
     <string name="beta">Beta</string>
     <string name="refresh_rate">Tần số quét</string>
     <string name="high_performance_before_enabling">Trước khi bật</string>
-    <string name="high_performance_battery_warning">Trước tiên hãy đặt mức sử dụng pin của BitChord thành Không hạn chế. Tần số quét cao hơn sử dụng nhiều pin, CPU và GPU hơn, đồng thời có thể làm thiết bị ấm lên.</string>
+    <string name="high_performance_battery_warning">Trước tiên hãy đặt mức sử dụng pin của RX Playa thành Không hạn chế. Tần số quét cao hơn sử dụng nhiều pin, CPU và GPU hơn, đồng thời có thể làm thiết bị ấm lên.</string>
     <string name="open_battery_settings">Mở cài đặt pin</string>
     <string name="enable_high_performance_title">Bật chế độ hiệu năng cao?</string>
-    <string name="enable_high_performance_confirmation">Chỉ bật nếu mức sử dụng pin của BitChord được đặt thành Không hạn chế. Android vẫn có thể giới hạn tần số quét khi thiết bị nóng hoặc pin yếu.</string>
+    <string name="enable_high_performance_confirmation">Chỉ bật nếu mức sử dụng pin của RX Playa được đặt thành Không hạn chế. Android vẫn có thể giới hạn tần số quét khi thiết bị nóng hoặc pin yếu.</string>
     <string name="enable">Bật</string>
     <string name="not_yet">Chưa bật</string>
     <string name="activity">Hoạt động</string>
@@ -300,7 +313,7 @@
     <string name="activity_playing">Đang phát</string>
     <string name="activity_watching">Đang xem</string>
     <string name="add_addon">Thêm tiện ích mở rộng</string>
-    <string name="add_addon_detail">Trỏ BitChord tới máy chủ tiện ích bạn tự lưu trữ hoặc được chia sẻ liên kết</string>
+    <string name="add_addon_detail">Trỏ RX Playa tới máy chủ tiện ích bạn tự lưu trữ hoặc được chia sẻ liên kết</string>
     <string name="add_to_queue">Thêm vào hàng đợi</string>
     <string name="after_this_song">Sau bài hát này</string>
     <string name="always_on">Luôn bật</string>
@@ -326,7 +339,7 @@
     <string name="discord_presence_footer">Thẻ sẽ cập nhật khi bài hát, vị trí phát hoặc trạng thái phát thay đổi. Thẻ sẽ biến mất khi dừng phát.</string>
     <string name="discord_show_audio_quality">Hiển thị chất lượng âm thanh</string>
     <string name="discord_show_audio_quality_subtitle">Thông số Hi-Res, lossless và Dolby trên thẻ trạng thái</string>
-    <string name="discord_sign_in_footer">Đăng nhập sẽ mở trang đăng nhập của Discord. Không có thông tin nào được nhập vào BitChord.</string>
+    <string name="discord_sign_in_footer">Đăng nhập sẽ mở trang đăng nhập của Discord. Không có thông tin nào được nhập vào RX Playa.</string>
     <string name="discord_token">Token Discord</string>
     <string name="discord_token_description">Dán mã token tài khoản Discord của bạn. Token được mã hóa an toàn trên thiết bị này và chỉ được gửi đến Discord.</string>
     <string name="discord_token_rejected">Discord đã từ chối token đó.</string>
@@ -363,7 +376,7 @@
     <string name="starting">Đang bắt đầu</string>
     <string name="start_radio">Phát radio</string>
     <string name="radio_started">Đã bắt đầu radio %1$s</string>
-    <string name="saved_to_bitchord_folder">Đã lưu vào Music/BitChord</string>
+    <string name="saved_to_bitchord_folder">Đã lưu vào Music/RX Playa</string>
     <string name="nothing_downloading">Không có nội dung đang tải</string>
     <string name="nothing_to_explore">Hiện không có gì để khám phá</string>
     <string name="no_youtube_music_results">Không có kết quả nào từ YouTube Music</string>
@@ -431,7 +444,7 @@
     <string name="max_delay_subtitle">Độ trễ scrobble tối đa tính bằng giây</string>
     <string name="min_song_duration">Thời lượng bài hát tối thiểu</string>
     <string name="min_song_duration_subtitle">Các bài hát ngắn hơn sẽ không được scrobble</string>
-    <string name="addon_url_description">Dán URL của tiện ích mở rộng — đường dẫn gốc hoặc manifest.json. BitChord sẽ đọc các mục có thể tìm kiếm và phát, sau đó yêu cầu bản nhạc qua giao thức HTTP tiêu chuẩn.</string>
+    <string name="addon_url_description">Dán URL của tiện ích mở rộng — đường dẫn gốc hoặc manifest.json. RX Playa sẽ đọc các mục có thể tìm kiếm và phát, sau đó yêu cầu bản nhạc qua giao thức HTTP tiêu chuẩn.</string>
     <string name="monthly_listeners">%1$s người nghe hàng tháng</string>
     <string name="name">Tên</string>
     <string name="no_playlists_yet">Chưa có danh sách phát nào. Dùng hàng bên trên để tạo danh sách phát.</string>
@@ -485,7 +498,7 @@
     <string name="sleep_timer_custom">Tùy chỉnh</string>
     <string name="start_sleep_timer">Bắt đầu hẹn giờ</string>
     <string name="sources_no_lossless">Không có nguồn nào được bật có thể cung cấp âm thanh Lossless. Hãy thêm tiện ích mở rộng để phát các tệp Lossless mà không cần chuyển mã.</string>
-    <string name="sources_order_footer">Nếu một nguồn không có bản nhạc hoặc không thể kết nối, BitChord sẽ thử nguồn tiếp theo. Các nguồn nằm trên YouTube có thể thay thế bản ghi âm của YouTube khi tìm được phiên bản tốt hơn.</string>
+    <string name="sources_order_footer">Nếu một nguồn không có bản nhạc hoặc không thể kết nối, RX Playa sẽ thử nguồn tiếp theo. Các nguồn nằm trên YouTube có thể thay thế bản ghi âm của YouTube khi tìm được phiên bản tốt hơn.</string>
     <string name="sources_order_header">Các nguồn nhạc, được thử theo thứ tự này</string>
     <string name="sources_quality_capped">Kết nối này được đặt dưới chất lượng Cao, vì vậy luồng phát sẽ được chuyển mã để phù hợp giới hạn đó. Việc tải xuống không bị ảnh hưởng.</string>
     <string name="sources_subtitle">Nguồn cung cấp âm thanh và thứ tự ưu tiên</string>
@@ -523,7 +536,7 @@
     <string name="biggest_day_note">Ngày bạn nghe nhiều nhất là %1$s với %2$s thời gian nghe.</string>
     <string name="close_replay">Đóng Replay</string>
     <string name="couldnt_draw_picture">Không thể tạo hình ảnh</string>
-    <string name="default_replay_holder">Người nghe BitChord</string>
+    <string name="default_replay_holder">Người nghe RX Playa</string>
     <string name="different_albums">Album khác nhau</string>
     <string name="genres_pending">Các thể loại sẽ xuất hiện khi lịch sử nghe nhạc của bạn nhiều hơn</string>
     <string name="hour_am">%1$d SA</string>
@@ -553,7 +566,7 @@
     <string name="replay_artist_end"> liên tục quay trở lại.</string>
     <string name="replay_artist_focus">Một nghệ sĩ</string>
     <string name="replay_artist_start">Suốt cả tháng, </string>
-    <string name="replay_empty_description">Hãy nghe thêm một chút và BitChord sẽ biến lịch sử nghe của bạn thành bản tóm tắt Replay.</string>
+    <string name="replay_empty_description">Hãy nghe thêm một chút và RX Playa sẽ biến lịch sử nghe của bạn thành bản tóm tắt Replay.</string>
     <string name="replay_genre_end"> đã định hình gu âm nhạc của bạn.</string>
     <string name="replay_genre_focus">Thể loại của bạn</string>
     <string name="replay_genre_start">Cùng nhau, </string>
@@ -589,7 +602,7 @@
     <string name="your_biggest_day">Ngày nghe nhiều nhất: %1$s</string>
     <string name="your_listening_experience">Trải nghiệm nghe nhạc của bạn</string>
     <string name="your_lyrics_card">Thẻ lời bài hát của bạn</string>
-    <string name="your_replay">BitChord Replay của bạn</string>
+    <string name="your_replay">RX Playa Replay của bạn</string>
     <plurals name="replay_artist_count">
         <item quantity="other">%1$s nghệ sĩ</item>
     </plurals>
@@ -619,7 +632,7 @@
     <string name="webdav_subtitle">Nhạc trên máy chủ của bạn</string>
     <string name="webdav_not_configured">Kết nối máy chủ trong mục Nguồn</string>
     <string name="webdav_empty">Không tìm thấy tệp âm thanh nào trên máy chủ WebDAV. Kiểm tra URL trong Cài đặt.</string>
-    <string name="webdav_description">Trỏ BitChord tới thư mục nhạc WebDAV — thư mục Music trên Nextcloud của bạn hoặc bất kỳ máy chủ nào hỗ trợ WebDAV.</string>
+    <string name="webdav_description">Trỏ RX Playa tới thư mục nhạc WebDAV — thư mục Music trên Nextcloud của bạn hoặc bất kỳ máy chủ nào hỗ trợ WebDAV.</string>
     <string name="webdav_server_url">URL máy chủ</string>
     <string name="webdav_server_url_hint">https://cloud.example.com/remote.php/dav/files/user/Music</string>
     <string name="webdav_disconnect">Ngắt kết nối</string>
@@ -636,7 +649,7 @@
     <string name="smb_subtitle">Nhạc trên thư mục chia sẻ</string>
     <string name="smb_not_configured">Kết nối thư mục chia sẻ trong mục Nguồn</string>
     <string name="smb_empty">Không tìm thấy tệp âm thanh nào trên thư mục chia sẻ SMB. Kiểm tra máy chủ trong mục Nguồn.</string>
-    <string name="smb_description">Trỏ BitChord tới thư mục nhạc chia sẻ — NAS hoặc máy Windows hỗ trợ SMB.</string>
+    <string name="smb_description">Trỏ RX Playa tới thư mục nhạc chia sẻ — NAS hoặc máy Windows hỗ trợ SMB.</string>
     <string name="smb_server_hint">nas.local hoặc 192.168.1.10:4445</string>
     <string name="smb_share_hint">Tên share, ví dụ Music</string>
     <string name="smb_folder_hint">Thư mục trong share, ví dụ media/music (không bắt buộc)</string>
@@ -685,7 +698,7 @@
     </plurals>
     <string name="no_local_albums">Chưa có mục nào ở đây thuộc về một album hoặc danh sách phát. Tải xuống toàn bộ album hoặc danh sách phát và nội dung sẽ xuất hiện ở đây.</string>
     <string name="play_your_replay">Phát Replay của bạn</string>
-    <string name="counted_on_device_with_bitchord">Được thống kê trên thiết bị này bằng BitChord</string>
+    <string name="counted_on_device_with_bitchord">Được thống kê trên thiết bị này bằng RX Playa</string>
     <string name="this_month">Tháng này</string>
     <string name="this_year">Năm nay</string>
     <string name="all_time">Tất cả thời gian</string>
@@ -781,11 +794,12 @@
 
     <string name="auto_recents">Recent</string>
 
-    <string name="auto_liked">Liked songs</string>
+    <string name="favorites_tab">Yêu thích</string>
+    <string name="auto_liked">Bài hát yêu thích</string>
 
     <string name="auto_login_title">Sign in to YouTube on your phone</string>
 
-    <string name="auto_login_subtitle">Open BitChord on your phone to sign in</string>
+    <string name="auto_login_subtitle">Open RX Playa on your phone to sign in</string>
 
     <string name="auto_empty_recents_title">No recent songs</string>
 
@@ -799,9 +813,9 @@
 
     <string name="auto_empty_playlists_subtitle">Check your connection and try again</string>
 
-    <string name="auto_empty_liked_title">No liked songs</string>
+    <string name="auto_empty_liked_title">Chưa có bài hát yêu thích</string>
 
-    <string name="auto_empty_liked_subtitle">Tap the heart on a song to save it here</string>
+    <string name="auto_empty_liked_subtitle">Nhấn vào ngôi sao của bài hát để lưu tại đây</string>
 
     <string name="auto_empty_offline_title">No offline songs</string>
 
@@ -823,7 +837,7 @@
 
     <string name="smart_version_alignment_subtitle">Analyze audio waveforms to match the exact corresponding playback moment</string>
 
-    <string name="equalizer_footer">Shapes the sound inside BitChord, before it reaches the system.</string>
+    <string name="equalizer_footer">Shapes the sound inside RX Playa, before it reaches the system.</string>
 
     <string name="equalizer_dynamic">Dynamic</string>
 
@@ -866,7 +880,7 @@
 
     <string name="system_equalizer_subtitle">Your device\'s own panel</string>
 
-    <string name="system_equalizer_footer">Runs after BitChord\'s, on the whole audio session. Using both applies both.</string>
+    <string name="system_equalizer_footer">Runs after RX Playa\'s, on the whole audio session. Using both applies both.</string>
 
     <string name="eq_preset_flat">Flat</string>
 
@@ -1054,7 +1068,7 @@
 
     <string name="copy_code">Copy code</string>
 
-    <string name="listen_together_share_text">Listen with me on BitChord — party code %1$s</string>
+    <string name="listen_together_share_text">Listen with me on RX Playa — party code %1$s</string>
 
     <string name="listen_together_now_playing">Now playing</string>
 
@@ -1129,7 +1143,7 @@
     <string name="listen_together_custom_server_dialog_message">This party is hosted on an external server:\n\n%1$s\n\nDo you want to switch your party server and join party %2$s?</string>
     <string name="listen_together_custom_server_switch_and_join">Switch &amp; Join</string>
     <string name="listen_together_official_server_dialog_title">Switch to official server?</string>
-    <string name="listen_together_official_server_dialog_message">This party is hosted on the official BitChord server.\n\nDo you want to switch back to the official server and join party %1$s?</string>
+    <string name="listen_together_official_server_dialog_message">This party is hosted on the official RX Playa server.\n\nDo you want to switch back to the official server and join party %1$s?</string>
     <string name="listen_together_switch_failed_stayed_in_party">Couldn’t join party: %1$s. Remaining in party %2$s.</string>
     <string name="listen_together_switch_failed">Couldn’t join party: %1$s.</string>
     <string name="cast_dialog_title">Cast</string>
@@ -1222,6 +1236,57 @@
     <string name="spotify_sign_in">Đăng nhập bằng Spotify</string>
     <string name="spotify_use_spdc_token">Dùng token sp_dc</string>
     <string name="spotify_track_unavailable">Không tìm thấy bài hát đó trên YouTube Music</string>
+    <string name="search_source_all">Tất cả nền tảng</string>
+    <string name="search_platform_empty">Nhập nội dung tìm kiếm và chọn nền tảng nhạc</string>
+    <string name="search_platform_no_results">Không tìm thấy bài hát cho “%1$s” trên các nền tảng đã chọn</string>
+    <string name="home_good_morning">Chào buổi sáng</string>
+    <string name="home_good_afternoon">Chào buổi chiều</string>
+    <string name="home_good_evening">Chào buổi tối</string>
+    <string name="music">Âm nhạc</string>
+    <string name="yandex_music">Yandex Music</string>
+    <string name="yandex_music_sign_in">Đăng nhập Yandex Music</string>
+    <string name="yandex_music_login_failed">Đăng nhập Yandex Music thất bại: %1$s</string>
+    <string name="yandex_music_connected_plus">%1$s · Plus</string>
+    <string name="yandex_music_connected_free">%1$s · Không có Plus</string>
+    <string name="yandex_music_sync_presence">Đồng bộ bài hát hiện tại</string>
+    <string name="yandex_music_integration_footer">Đọc trạng thái phát trực tiếp qua Yandex Music Connect và gửi các bài hát hợp lệ tới Rich Presence. Không vượt qua giới hạn đăng ký; quảng cáo và bài hát không khả dụng sẽ không bao giờ được chia sẻ.</string>
+    <string name="yandex_music_status_connecting">Đang kết nối…</string>
+    <string name="yandex_music_status_reconnecting">Mất kết nối · đang thử lại…</string>
+    <string name="yandex_music_status_waiting">Đang chờ phát nhạc trên thiết bị Yandex Music</string>
+    <string name="yandex_music_status_paused">Đã tạm dừng phát</string>
+    <string name="yandex_music_status_advertisement">Quảng cáo · đã tạm dừng chia sẻ trạng thái</string>
+    <string name="yandex_music_status_restricted">Bài hát không khả dụng · đã tạm dừng chia sẻ trạng thái</string>
+    <string name="yandex_music_status_auth_expired">Ủy quyền đã hết hạn · đăng nhập lại</string>
+    <string name="yandex_music_status_disabled">Đồng bộ đang tắt</string>
+    <string name="yandex_music_listen_button">Nghe trên Yandex Music</string>
+    <string name="yandex_music_sync_title">Đồng bộ trạng thái Yandex Music</string>
+    <string name="yandex_music_sync_channel">Đồng bộ Yandex Music</string>
+    <string name="yandex_music_sync_channel_description">Giữ bài hát Yandex Music hiện tại trong RX Playa và Rich Presence</string>
+    <string name="yandex_import_title">Nhập từ Yandex Music</string>
+    <string name="yandex_import_description">Dán liên kết danh sách phát hoặc chọn một danh sách bên dưới. Các bài hát sẽ được đối chiếu trên YouTube Music và lưu vào RX Playa.</string>
+    <string name="yandex_import_loading">Đang tải danh sách phát Yandex Music…</string>
+    <string name="yandex_import_empty">Không tìm thấy danh sách phát trong tài khoản Yandex Music này.</string>
+    <string name="yandex_import_select">Chọn danh sách phát để nhập.</string>
+    <string name="yandex_import_reading">Đang đọc danh sách phát Yandex Music…</string>
+    <string name="yandex_import_link_hint">music.yandex.ru/users/…/playlists/…</string>
+    <string name="yandex_import_invalid_link">Đây không phải liên kết danh sách phát Yandex Music.</string>
+    <string name="soundcloud">SoundCloud</string>
+    <string name="soundcloud_import_title">Nhập từ SoundCloud</string>
+    <string name="soundcloud_import_description">Paste a public SoundCloud playlist link. Public tracks are saved locally and played directly from SoundCloud.</string>
+    <string name="soundcloud_import_hint">soundcloud.com/artist/sets/…</string>
+    <string name="soundcloud_import_invalid">Đây không phải liên kết danh sách phát SoundCloud.</string>
+    <string name="soundcloud_import_fetching">Đang đọc danh sách phát SoundCloud…</string>
+    <string name="soundcloud_import_footer">Imports complete public playlists without a SoundCloud account. Private, removed and Go+ tracks remain unavailable.</string>
+    <string name="guest_profile">Hồ sơ khách</string>
+    <string name="guest_profile_subtitle">Đặt biệt danh và ảnh đại diện cục bộ</string>
+    <string name="local_profile">Hồ sơ cục bộ</string>
+    <string name="guest_name">Biệt danh</string>
+    <string name="choose_avatar">Chọn ảnh đại diện</string>
+    <string name="remove_avatar">Xóa ảnh đại diện</string>
+    <string name="delete_guest_profile">Xóa hồ sơ khách</string>
+    <string name="guest_profile_help">Chỉ được lưu trên thiết bị này và không mở khóa tính năng tài khoản Google.</string>
+    <string name="guest_avatar_failed">Không thể lưu hình ảnh đã chọn</string>
+    <string name="stop">Dừng</string>
     <string name="artist_signatures">Chữ ký nghệ sĩ</string>
     <string name="artist_signatures_subtitle">Hiển thị chữ ký tay khi Apple Music không có logo tiêu đề</string>
     <string name="artist_signatures_url">URL API chữ ký</string>
@@ -1243,7 +1308,7 @@
     <string name="replay_period_monthly">Tháng</string>
     <string name="replay_period_yearly">Năm</string>
     <string name="replay_period_lifetime">Mọi lúc</string>
-    <string name="onboarding_title">Hàng triệu bài hát, phát trực tuyến trên BitChord</string>
+    <string name="onboarding_title">Hàng triệu bài hát, phát trực tuyến trên RX Playa</string>
     <string name="onboarding_name_prompt">Chúng tôi nên gọi bạn là gì?</string>
     <string name="onboarding_name_hint">Tên của bạn</string>
     <string name="onboarding_name_footer">Bạn bè sẽ thấy tên này khi bạn dùng Nghe cùng nhau. Bạn có thể đổi sau trong Cài đặt.</string>
@@ -1253,7 +1318,7 @@
     <string name="onboarding_sign_in_google">Đăng nhập bằng Google</string>
     <string name="onboarding_skip_sign_in">Bỏ qua đăng nhập</string>
     <string name="onboarding_back">Quay lại</string>
-    <string name="wear_os_section">BitChord cho Wear OS</string>
+    <string name="wear_os_section">RX Playa cho Wear OS</string>
     <string name="wear_os_page_title">Wear OS</string>
     <string name="wear_os_your_watches">Đồng hồ của bạn</string>
     <string name="wear_os_value_none">Không có đồng hồ</string>
@@ -1263,7 +1328,7 @@
     <string name="wear_os_no_watch">Chưa kết nối đồng hồ nào</string>
     <string name="wear_os_no_watch_subtitle">Trước tiên hãy ghép nối đồng hồ Wear OS với điện thoại này trong ứng dụng đồng hành của đồng hồ.</string>
     <string name="wear_os_checking">Đang kiểm tra…</string>
-    <string name="wear_os_not_installed">BitChord chưa có trên đồng hồ này</string>
+    <string name="wear_os_not_installed">RX Playa chưa có trên đồng hồ này</string>
     <string name="wear_os_up_to_date">Mới nhất · %1$s</string>
     <string name="wear_os_update_available">Có bản cập nhật</string>
     <string name="wear_os_unknown">Đã cài đặt · không thể kiểm tra phiên bản</string>
@@ -1280,7 +1345,7 @@
     <string name="wear_os_searching">Đang tìm đồng hồ của bạn trên Wi-Fi…</string>
     <string name="wear_os_found">Đã tìm thấy đồng hồ của bạn</string>
     <string name="wear_os_pairing">Đang ghép nối…</string>
-    <string name="wear_os_installing">Đang cài BitChord lên đồng hồ của bạn…</string>
+    <string name="wear_os_installing">Đang cài RX Playa lên đồng hồ của bạn…</string>
     <string name="wear_os_installed">Đã cài đặt. Bạn có thể tắt lại Gỡ lỗi không dây.</string>
     <string name="wear_os_failed">Không thành công (%1$s). Hãy kiểm tra mã và thử lại.</string>
     <string name="wear_os_unsupported">Cài đặt trên đồng hồ cần điện thoại này chạy Android 11 trở lên.</string>
@@ -1328,8 +1393,8 @@
     <string name="font_footer">Cổ điển mang lại kiểu chữ dày và khít hơn mà ứng dụng từng dùng trước khi được đồng bộ với Apple Music.</string>
     <string name="bit_perfect_output">Đầu ra bit-perfect</string>
     <string name="bit_perfect_bypassed_footer">Đầu ra bit-perfect đã sẵn sàng nên các cài đặt bị làm mờ sẽ được bỏ qua và các phiên bản Dolby Atmos không được yêu cầu. Chúng hoạt động lại khi ngắt kết nối DAC hoặc tắt chế độ này.</string>
-    <string name="bit_perfect_sheet_warning">Gửi bản nhạc đến DAC mà không thay đổi. Bộ chỉnh âm, chuẩn hóa âm lượng, chuyển bài mượt, Automix, tốc độ phát và âm lượng của BitChord được bỏ qua.</string>
-    <string name="bit_perfect_mode_off_subtitle">Âm thanh đi qua bộ trộn của Android và các hiệu ứng của BitChord.</string>
+    <string name="bit_perfect_sheet_warning">Gửi bản nhạc đến DAC mà không thay đổi. Bộ chỉnh âm, chuẩn hóa âm lượng, chuyển bài mượt, Automix, tốc độ phát và âm lượng của RX Playa được bỏ qua.</string>
+    <string name="bit_perfect_mode_off_subtitle">Âm thanh đi qua bộ trộn của Android và các hiệu ứng của RX Playa.</string>
     <string name="bit_perfect_mode_usb_android">DAC USB</string>
     <string name="bit_perfect_mode_usb_android_subtitle">Android 14 mở DAC ở tần số và độ sâu bit của từng bản nhạc, không trộn và không lấy mẫu lại.</string>
     <string name="bit_perfect_requires_android_14">Yêu cầu Android 14 trở lên</string>
@@ -1337,13 +1402,13 @@
     <string name="bit_perfect_mode_dap_exclusive_subtitle">Dành cho máy nghe nhạc có DAC riêng. Mở đầu ra tai nghe hoặc line độc quyền ở tần số của từng bản nhạc. Không phải thiết bị nào cũng cho phép chế độ độc quyền.</string>
     <string name="bit_perfect_requires_android_8_1">Yêu cầu Android 8.1 trở lên</string>
     <string name="bit_perfect_mode_usb_direct">DAC USB (trình điều khiển trực tiếp)</string>
-    <string name="bit_perfect_mode_usb_direct_subtitle">BitChord tự điều khiển DAC trên mọi phiên bản Android và đặt âm lượng ngay trên DAC. Cần quyền USB. Có thể to hơn nhiều so với đầu ra thông thường.</string>
+    <string name="bit_perfect_mode_usb_direct_subtitle">RX Playa tự điều khiển DAC trên mọi phiên bản Android và đặt âm lượng ngay trên DAC. Cần quyền USB. Có thể to hơn nhiều so với đầu ra thông thường.</string>
     <string name="dac_volume">Âm lượng DAC</string>
     <string name="dac_volume_subtitle">Đặt trên chính DAC; nhạc không bị co giãn mức tín hiệu</string>
     <string name="usb_allow_fixed_volume">Cho phép DAC không có điều khiển âm lượng</string>
     <string name="usb_allow_fixed_volume_subtitle">Nếu không, DAC như vậy sẽ phát qua đầu ra thông thường</string>
     <string name="usb_allow_fixed_volume_confirm_title">Phát ở mức tối đa?</string>
-    <string name="usb_allow_fixed_volume_confirm_message">BitChord không thể đặt âm lượng cho loại DAC này, nên nó phát ở mức tối đa và chỉ núm vặn của chính DAC, nếu có, mới điều chỉnh độ to. Âm thanh có thể to đến mức nguy hiểm với tai nghe nhạy.</string>
+    <string name="usb_allow_fixed_volume_confirm_message">RX Playa không thể đặt âm lượng cho loại DAC này, nên nó phát ở mức tối đa và chỉ núm vặn của chính DAC, nếu có, mới điều chỉnh độ to. Âm thanh có thể to đến mức nguy hiểm với tai nghe nhạy.</string>
     <string name="convert_for_limited_dac">Chuyển đổi cho DAC cấu hình thấp</string>
     <string name="convert_for_limited_dac_subtitle">Chuyển đổi các bản nhạc vượt giới hạn của DAC sang định dạng cao nhất của nó. Bản nhạc có thể mất nhiều thời gian hơn để bắt đầu và sẽ không bit-perfect so với bản gốc.</string>
     <string name="bit_perfect_confirm_title">Bật đầu ra bit-perfect?</string>
@@ -1353,4 +1418,48 @@
     <string name="bit_perfect_status_inexact">%1$s · không chính xác: nguồn này không phải PCM lossless</string>
     <string name="bit_perfect_status_waiting">Đang chờ bản nhạc lossless trên đầu ra được hỗ trợ</string>
     <string name="bit_perfect_status_unavailable">Không khả dụng cho bản nhạc này (%1$s)</string>
+    <string name="personalized_for_you">Dành cho bạn</string>
+    <string name="personalized_recent_likes">Đã thích gần đây</string>
+    <string name="personalized_artist_format">Nghệ sĩ yêu thích: %1$s</string>
+    <string name="personalized_source_format">%1$s · Lựa chọn của bạn</string>
+    <string name="personalized_empty">Thích nhạc, nghe nhạc hoặc nhập danh sách phát để tạo hồ sơ sở thích.</string>
+    <string name="personalized_updating">Đang cập nhật hồ sơ sở thích…</string>
+    <string name="personalized_unavailable_format">Một số dữ liệu không khả dụng: %1$s. Kéo xuống để thử lại.</string>
+    <string name="personalized_limitations_notice">SoundCloud và tiện ích: dùng dữ liệu nhập và hoạt động trong RX Playa, không dùng lượt thích của tài khoản.</string>
+
+    <string name="spotify_direct_playback_unavailable">RX Playa cannot access Spotify’s full audio stream. Open the track in Spotify or search for a copy on another platform.</string>
+    <string name="soundcloud_track_unavailable">No public stream was found for this SoundCloud track. You can search for a copy on another platform.</string>
+    <string name="dpi_bypass_title">Bypass provider throttling (experimental)</string>
+    <string name="dpi_bypass_subtitle">Routes this app\'s music traffic through a local proxy that splits the TLS handshake. Helps where YouTube Music, Spotify or SoundCloud are slowed by the access provider. It is not a VPN: a service blocked by address or unavailable in your region stays unavailable.</string>
+    <string name="zapret_title">Root DPI bypass (zapret)</string>
+    <string name="zapret_subtitle">Controls an installed nfqws: diverts this app music traffic to NFQUEUE and runs the chosen fake/split strategy. Needs root and a zapret binary on the device.</string>
+    <string name="zapret_check">Check</string>
+    <string name="zapret_start">Start</string>
+    <string name="zapret_stop">Stop</string>
+    <string name="zapret_import">Import nfqws binary</string>
+    <string name="zapret_log">Journal</string>
+    <string name="zapret_arguments">Custom arguments</string>
+    <string name="zapret_autostart">Start on boot</string>
+    <string name="zapret_save">Save</string>
+    <string name="accent_colour">Accent colour</string>
+    <string name="vless_title">Your VLESS key</string>
+    <string name="vless_subtitle">Routes this app music traffic through your own VLESS server. Paste a vless:// link with security=tls and type=tcp; Reality, WebSocket and flow keys are refused with a reason.</string>
+    <string name="vless_add">Paste key</string>
+    <string name="vless_save">Save</string>
+    <string name="google_signin_blocked_notice">Google refuses sign-in inside an embedded browser. Sign in with a normal browser on this device, then paste the Cookie header here.</string>
+    <string name="vless_clear">Remove key</string>
+    <string name="vless_test">Test key</string>
+    <string name="vless_state_on">On · %1$s</string>
+    <string name="vless_state_saved">Saved · %1$s</string>
+    <string name="zapret_not_checked">Not checked</string>
+    <string name="liquid_glass_title">Liquid Glass</string>
+    <string name="liquid_glass_subtitle">Refracting frosted chrome on the bars, the mini player and the top bar. Falls back to plain frosting on devices without the required GPU features.</string>
+    <string name="ui_style_title">Giao diện</string>
+    <string name="ui_style_subtitle">RX là giao diện theo phong cách Apple Music; Material 3 là ngôn ngữ thành phần của Google.</string>
+    <string name="material_you_title">Màu từ hình nền</string>
+    <string name="material_you_subtitle">Material You lấy bảng màu từ hình nền. Chỉ Android 12 trở lên.</string>
+    <string name="custom_accent_title">Màu nhấn riêng</string>
+    <string name="custom_accent_hint">Kéo để chọn màu bất kỳ</string>
+    <string name="custom_accent_reset">Mặc định</string>
+    <string name="playing_from_source">Đang phát từ %1$s</string>
 </resources>

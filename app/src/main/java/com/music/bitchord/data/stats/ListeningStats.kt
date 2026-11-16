@@ -7,6 +7,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -54,6 +56,9 @@ import java.util.Locale
  * goes anywhere.
  */
 object ListeningStats {
+    private val mutableChanges = MutableStateFlow(0L)
+    /** Qualified listens and restored history, not each progress tick. */
+    val changes = mutableChanges.asStateFlow()
 
     private lateinit var directory: File
 
@@ -233,6 +238,7 @@ object ListeningStats {
             val day = at.dayOfMonth
             bucket.days[day] = (bucket.days[day] ?: 0L) + playedMs
             dirty = true
+            if (countsAsPlay) mutableChanges.value += 1L
         }
     }
 
@@ -450,6 +456,7 @@ object ListeningStats {
             directory.mkdirs()
             version++
             cached = null
+            mutableChanges.value += 1L
             buckets.forEach { bucket ->
                 val key = runCatching { YearMonth.parse(bucket.month).toString() }.getOrNull()
                     ?: return@forEach

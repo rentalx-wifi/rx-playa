@@ -1,18 +1,32 @@
 package com.music.bitchord.playback
 
+import com.music.bitchord.data.TrackRatingStore
 import com.music.bitchord.data.YtMusicRepository
+import com.music.bitchord.data.importing.BasicExternalPlaylistTrack
+import com.music.bitchord.data.importing.ExternalPlaylistImporter
 import com.music.bitchord.data.listentogether.ListenTogether
-import com.music.bitchord.data.model.SearchFilter
-import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.QueueTier
 import com.music.bitchord.data.model.Song
-import com.music.bitchord.data.sources.SourceRegistry
-import com.music.bitchord.data.sources.TrackMatcher
+import com.music.bitchord.data.model.durationMillis
+import com.music.bitchord.data.model.normalizedArtistName
+import com.music.bitchord.data.personalization.TasteProfile
+import com.music.bitchord.playback.TrackText
 import com.music.bitchord.playback.QueueCoordinator.asQueueEntry
 import kotlinx.coroutines.CancellationException
 
 /** Most AutoPlay-suggested tracks kept queued ahead of the current one at once. */
 const val MAX_QUEUED_AUTOPLAY = 10
+
+/** How many of the listener's own tracks seed the RX Wave station. */
+private const val PERSONAL_WAVE_SEEDS = 3
+
+/** How many tracks the RX Wave station is built from before the queue trims it. */
+private const val PERSONAL_WAVE_TRACKS = 40
+
+/** How many rows one artist may take in the station. */
+private const val PERSONAL_WAVE_PER_ARTIST = 2
+
+private val YOUTUBE_VIDEO_ID = Regex("[A-Za-z0-9_-]{11}")
 
 /**
  * Whether AutoPlay is on for the music this device is playing.
@@ -75,20 +89,25 @@ fun autoplayQueueNeedsRefresh(
     currentIndex >= 0 &&
     currentIndex == itemCount - 1
 
+/** True only for a real YouTube upload id, never an external provider identity. */
+internal fun isYouTubeVideoId(id: String): Boolean = YOUTUBE_VIDEO_ID.matches(id)
+
 /**
- * Finds the YouTube id that should seed AutoPlay for a song. Module tracks do not
- * carry YouTube ids, so they are matched on YouTube before the radio request.
+ * Finds the strict YouTube recording that can seed AutoPlay. SoundCloud, Spotify,
+ * VK, addon and device identities are metadata ids, not YouTube video ids; sending
+ * one directly to `next` yields an empty/broken RX Wave.
  */
 suspend fun youtubeSeedFor(song: Song): String? {
-    if (SourceRegistry.parseTrackKey(song.videoId) == null) return song.videoId
-    val target = TrackMatcher.targetOf(song)
-    val query = TrackMatcher.queries(target).firstOrNull() ?: return null
-    return YtMusicRepository.search(query, SearchFilter.SONGS)
-        .getOrNull()
-        ?.filterIsInstance<SearchResult.Track>()
-        ?.map { it.song }
-        ?.let { TrackMatcher.best(it, target) }
-        ?.videoId
+    if (isYouTubeVideoId(song.videoId)) return song.videoId
+    return ExternalPlaylistImporter.match(
+        BasicExternalPlaylistTrack(
+            title = song.title,
+            artist = song.artist,
+            album = song.albumName,
+            durationMs = song.durationMillis(),
+            coverUrl = song.thumbnailUrl,
+        ),
+    )?.videoId
 }
 
 /**
@@ -105,7 +124,14 @@ suspend fun loadAutoplayTracks(
     // A music video plays on with music videos, as YouTube Music does.
     val videos = seedSong.isVideo && seed == seedSong.videoId
     val related = YtMusicRepository.radio(seed, preferVideo = videos).getOrElse { return Result.failure(it) }
-    val extra = QueueBuilder.extend(existing, related, limit, preferVideos = videos)
+        .let { QueueBuilder.rankRelated(seedSong, it) }
+    val extra = QueueBuilder.extend(
+        existing = existing,
+        candidates = related,
+        limit = limit,
+        preferVideos = videos,
+        excluded = TrackRatingStore.dislikedSongs(),
+    )
     if (extra.isEmpty()) return Result.success(emptyList())
 
     return Result.success(extra.map {
@@ -116,4 +142,124 @@ suspend fun loadAutoplayTracks(
             playbackSourceId = seedSong.playbackSourceId,
         ).asQueueEntry(QueueTier.AUTOPLAY)
     })
+}
+
+/**
+ * The station behind the "RX Wave" pill, built from what the listener liked.
+ *
+ * It used to start from YouTube's My Supermix, and that is the mix's problem:
+ * it is rebuilt for the *signed-in account* of the session the app happens to
+ * hold, which is not necessarily the person holding the phone — a guest
+ * session's Supermix is the same bland selection for everybody, and it read as
+ * the app recommending music nobody had asked for.
+ *
+ * This asks the taste profile three questions, in this order: what did I like
+ * lately, what do I play most, and — through each seed's YouTube radio — what
+ * is next to that. The answers are filtered hard, because a station that drops
+ * a stranger's slowed cover in the middle of someone's music is worse than a
+ * shorter station:
+ *
+ *  * an artist the profile knows comes first, strongest first;
+ *  * a track already in the profile is left out — a station that plays the
+ *    library back is not a station;
+ *  * a disliked artist, or a disliked recording, never appears;
+ *  * a stranger's upload whose title advertises itself as a slowed, sped-up,
+ *    karaoke, cover or 8D edit is dropped. The listener's own taste may be full
+ *    of edits — this only rejects them from an artist they have never played;
+ *  * one recording appears once, however many uploads of it the radio returned;
+ *  * no artist takes more than [PERSONAL_WAVE_PER_ARTIST] rows, and no artist
+ *    twice in a row, so the station does not become one back catalogue.
+ *
+ * Only from a phone that has played nothing yet is the catalogue mix used —
+ * [MainActivity] falls back to it when this returns nothing.
+ */
+suspend fun loadPersonalWave(
+    profile: TasteProfile,
+    disliked: List<Song> = TrackRatingStore.dislikedSongs(),
+    limit: Int = PERSONAL_WAVE_TRACKS,
+): Result<List<Song>> {
+    if (profile.isEmpty) return Result.success(emptyList())
+
+    // Likes first, then whatever is played most — one track per artist, so the
+    // seeds are three different corners of what they listen to.
+    val likedSeeds = (profile.recentLikes.map { it.song } +
+        profile.tracks.filter { it.liked }.sortedByDescending { it.score }.map { it.song })
+    val seeds = (likedSeeds + profile.tracks.sortedByDescending { it.score }.map { it.song })
+        .filter { it.videoId.isNotBlank() && it.title.isNotBlank() && it.artist.isNotBlank() }
+        .distinctBy { normalizedArtistName(it.artist) }
+        .take(PERSONAL_WAVE_SEEDS)
+    if (seeds.isEmpty()) return Result.success(emptyList())
+
+    val artistWeight = profile.artists
+        .mapNotNull { artist ->
+            normalizedArtistName(artist.artist.name).takeIf { it.isNotEmpty() }?.let { it to artist.score }
+        }
+        .toMap()
+    val knownRecordings = profile.tracks
+        .map { normalizedArtistName(it.song.artist) to TrackText.titleKey(it.song.title) }
+        .toHashSet()
+    val likedTitles = profile.tracks.filter { it.liked }
+        .map { TrackText.titleKey(it.song.title) }
+        .toHashSet()
+    val dislikedArtists = disliked.mapTo(HashSet()) { normalizedArtistName(it.artist) }
+    val dislikedTitles = disliked.mapTo(HashSet()) { TrackText.titleKey(it.title) }
+
+    // The edits nobody wants from an artist they never chose. Applied only to
+    // strangers: a listener whose taste *is* slowed edits gets them from the
+    // artists the profile already names.
+    val strangerEdit = Regex(
+        """\b(karaoke|cover|tribute|nightcore|8d|sped ?up|speed ?up|slowed|reverb|""" +
+            """instrumental|ringtone|mashup|reaction|lyrics? video)\b""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    val candidates = mutableListOf<Song>()
+    for (seed in seeds) {
+        val videoId = youtubeSeedFor(seed) ?: continue
+        candidates += YtMusicRepository.radio(videoId, preferVideo = seed.isVideo).getOrNull().orEmpty()
+    }
+    if (candidates.isEmpty()) return Result.success(emptyList())
+
+    val seenIds = HashSet<String>()
+    val seenTitles = HashSet<String>()
+    val scored = mutableListOf<Pair<Song, Double>>()
+    for (song in candidates) {
+        if (song.videoId.isBlank() || song.title.isBlank() || song.artist.isBlank()) continue
+        val artist = normalizedArtistName(song.artist)
+        val title = TrackText.titleKey(song.title)
+        val knownArtist = artistWeight[artist] ?: 0.0
+        if (artist in dislikedArtists) continue
+        if (title in dislikedTitles) continue
+        if (artist to title in knownRecordings) continue
+        if (!seenIds.add(song.videoId) || !seenTitles.add(title)) continue
+        // A stranger advertising an edit, or an edit of a track they liked.
+        if ((knownArtist <= 0.0 || title in likedTitles) && strangerEdit.containsMatchIn(song.title)) continue
+        scored += song to knownArtist
+    }
+    if (scored.isEmpty()) return Result.success(emptyList())
+
+    // Everything the profile knows comes first, strongest artist first; the
+    // rest of the radio follows in a shuffled tail, so a station is not the
+    // same order on every tap.
+    val preferred = scored.filter { it.second > 0.0 }.sortedByDescending { it.second }.map { it.first }
+    val rest = scored.filter { it.second <= 0.0 }.map { it.first }.shuffled()
+    val ordered = preferred + rest
+
+    val picked = mutableListOf<Song>()
+    val perArtist = HashMap<String, Int>()
+    var lastArtist = ""
+    for (song in ordered) {
+        if (picked.size >= limit) break
+        val artist = normalizedArtistName(song.artist)
+        val used = perArtist[artist] ?: 0
+        if (used >= PERSONAL_WAVE_PER_ARTIST) continue
+        // Two rows by the same artist in a row reads as a mistake, not a
+        // station. The cap above still allows a second one later.
+        if (artist == lastArtist) continue
+        picked += song
+        perArtist[artist] = used + 1
+        lastArtist = artist
+    }
+    if (picked.isEmpty()) return Result.success(emptyList())
+    return Result.success(picked)
 }

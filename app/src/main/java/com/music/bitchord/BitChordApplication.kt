@@ -16,6 +16,8 @@ import coil3.request.crossfade
 import coil3.svg.SvgDecoder
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import okhttp3.OkHttpClient
+import com.music.bitchord.data.ResilientServiceDns
+import com.music.bitchord.net.DesyncProxy
 import com.music.bitchord.auth.AuthStore
 import com.music.bitchord.data.DebugLog
 import com.music.bitchord.data.lyrics.LyricsTranslation
@@ -26,6 +28,7 @@ import com.music.bitchord.data.canvas.CanvasCache
 import com.music.bitchord.data.smb.SmbCoverFetcher
 import com.music.bitchord.data.webdav.WebDavCoilAuth
 import com.music.bitchord.data.canvas.SpotifyToken
+import com.music.bitchord.data.discord.DiscordPresenceCoordinator
 import com.music.bitchord.data.spotify.SpotifyLibrary
 import com.music.bitchord.playback.AudioCache
 import com.music.bitchord.playback.LastPlayed
@@ -40,6 +43,7 @@ import com.music.bitchord.data.settings.SearchHistory
 import com.music.bitchord.data.sources.SourceRegistry
 import com.music.bitchord.data.stats.ArtistFacts
 import com.music.bitchord.data.stats.ListeningStats
+import com.music.bitchord.data.TrackRatingStore
 import com.music.bitchord.download.Downloads
 import com.music.bitchord.download.PlaylistSync
 import androidx.work.Configuration
@@ -95,6 +99,7 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory, Configu
         SpotifyLibrary.auth = SpotifyLibrary.Auth {
             SpotifyToken.accessToken()?.let { SpotifyLibrary.Tokens(it, SpotifyToken.clientToken()) }
         }
+        SpotifyLibrary.invalidateAuth = SpotifyToken::invalidate
         // The per-app language picker, which YouTube Music's `hl` follows.
         // Full tag (zh-Hant / zh-Hans preserved); Innertube maps to hl/gl.
         Innertube.appLanguage = { AppCompatDelegate.getApplicationLocales().get(0)?.toLanguageTag() }
@@ -142,6 +147,12 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory, Configu
             CoroutineScope(Dispatchers.IO).launch { Innertube.ensureSessionScope() }
         }
         AppSettings.init(this, authStore)
+        // Started only when the listener already opted in; idle otherwise.
+        // The proxy's on/off state belongs to VlessStore below, which is the
+        // only surface that can configure it now.
+        com.music.bitchord.data.net.VlessStore.init(this)
+        TrackRatingStore.init(this)
+        DiscordPresenceCoordinator.init(this)
         // Before anything resolves a track: an addon with `checkValidLossless`
         // is gated on this, and the gate reads "no" until it has looked.
         com.music.bitchord.playback.audio.LosslessOutput.init(this)
@@ -195,8 +206,6 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory, Configu
         }
         // Initialize LastFM with saved settings if available
         initLastfm()
-        // The public "apps open right now" count; see Presence.
-        com.music.bitchord.data.presence.AndroidPresence.install(this)
         backgroundInit.join()
     }
 
@@ -210,12 +219,14 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory, Configu
      */
     private val coilHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
+            .dns(ResilientServiceDns)
+            .proxySelector(DesyncProxy.proxySelector())
             .addInterceptor { chain ->
                 chain.proceed(
                     chain.request().newBuilder()
                         .header(
                             "User-Agent",
-                            "BitChord/${BuildConfig.VERSION_NAME} (Android; +https://github.com/kushagrasinghx/BitChord)",
+                            "RXMusic/${BuildConfig.VERSION_NAME} (Android)",
                         )
                         .build(),
                 )

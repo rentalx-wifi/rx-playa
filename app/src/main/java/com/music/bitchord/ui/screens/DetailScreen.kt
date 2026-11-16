@@ -7,6 +7,10 @@ import com.music.bitchord.R
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -150,6 +154,7 @@ import com.music.bitchord.data.model.CARD_ART_PX
 import com.music.bitchord.data.model.HEADER_ART_PX
 import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.HomeShelf
+import com.music.bitchord.data.model.HomeSource
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.settings.SongSort
 import com.music.bitchord.data.model.Song
@@ -163,6 +168,7 @@ import com.music.bitchord.ui.components.DownloadedBadge
 import com.music.bitchord.ui.components.ExplicitSongTitle
 import com.music.bitchord.ui.components.LIBRARY_GRID_SPACING
 import com.music.bitchord.ui.components.MessageState
+import com.music.bitchord.ui.components.HomeSourceBadges
 import com.music.bitchord.ui.components.PAGE_GUTTER
 import com.music.bitchord.ui.components.NUMBERED_ROW_DIVIDER_INSET
 import com.music.bitchord.ui.components.RowMoreButton
@@ -179,6 +185,7 @@ import com.music.bitchord.ui.components.trackColumnWidth
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
 import com.music.bitchord.ui.icons.BitChordIcons
+import com.music.bitchord.ui.icons.SfIcons
 import com.music.bitchord.ui.player.CanvasArtworkPlayer
 import com.music.bitchord.ui.theme.ArtworkPalette
 import com.music.bitchord.ui.theme.rememberArtworkPalette
@@ -290,6 +297,7 @@ fun DetailScreen(
     onSongLongPress: (Song) -> Unit,
     onSongSwipe: (Song) -> Unit,
     onShuffle: (List<Song>) -> Unit,
+    onStartRadio: (() -> Unit)? = null,
     onSectionItemClick: (ShelfItem) -> Unit,
     onArtistClick: (String, String) -> Unit,
     onAddSuggested: (Song) -> Unit,
@@ -606,6 +614,7 @@ fun DetailScreen(
                     ActionRow(
                         onPlay = { onSongClick(songs, 0) },
                         onShuffle = { onShuffle(songs) },
+                        onRadio = onStartRadio,
                         subscription = page.subscription?.takeIf { onToggleSubscription != null },
                         onToggleSubscription = onToggleSubscription,
                         bottomSpace = 22.dp,
@@ -757,6 +766,11 @@ fun DetailScreen(
                     ) { position, entry ->
                         val song = entry.value
                         val isCurrent = isCurrentRow(song)
+                        val sourceBadge = when {
+                            song.videoId.startsWith("spotify-track:") || song.playbackSource == "Spotify" -> HomeSource.SPOTIFY
+                            song.videoId.startsWith("soundcloud:") || song.playbackSource == "SoundCloud" -> HomeSource.SOUNDCLOUD
+                            else -> null
+                        }
                         SongRow(
                             song = if (numbered) {
                                 song
@@ -778,6 +792,9 @@ fun DetailScreen(
                             isPlaying = isCurrent && isPlaying,
                             activeTint = palette.accent,
                             searchPlayingStyle = true,
+                            trailing = sourceBadge?.let { source ->
+                                { HomeSourceBadges(setOf(source)) }
+                            },
                         )
                         if (position < matches.lastIndex) {
                             HorizontalDivider(
@@ -1508,6 +1525,7 @@ private val SOFT_FOOT_BLUR = 48.dp
 private fun ActionRow(
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
+    onRadio: (() -> Unit)? = null,
     bottomSpace: Dp = 22.dp,
     /** The artist header's subscribe state, or null where it isn't offered. */
     subscription: SubscriptionState? = null,
@@ -1557,6 +1575,19 @@ private fun ActionRow(
             )
         }
     }
+    if (onRadio != null) {
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            ActionPill(
+                icon = SfIcons.Radio,
+                label = stringResource(R.string.bitwave),
+                onClick = onRadio,
+                filled = false,
+                animated = true,
+                modifier = Modifier.widthIn(max = 260.dp),
+            )
+        }
+    }
     Spacer(Modifier.height(bottomSpace))
 }
 
@@ -1574,13 +1605,31 @@ private fun ActionPill(
     filled: Boolean,
     modifier: Modifier = Modifier,
     size: Dp = 50.dp,
+    animated: Boolean = false,
 ) {
     // Resume rather than a flat tap: both start a queue, and the rising pair
     // says so.
     val haptics = rememberHaptics()
     val content = if (filled) Color.Black else MaterialTheme.colorScheme.onSurface
+    val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val breath = if (animated && !reduceAnimation) {
+        val transition = rememberInfiniteTransition(label = "rxWaveAction")
+        val value by transition.animateFloat(
+            initialValue = 0.99f,
+            targetValue = 1.025f,
+            animationSpec = infiniteRepeatable(tween(1_700), RepeatMode.Reverse),
+            label = "rxWaveActionScale",
+        )
+        value
+    } else {
+        1f
+    }
     Row(
         modifier = modifier
+            .graphicsLayer {
+                scaleX = breath
+                scaleY = breath
+            }
             .height(size)
             .clip(CircleShape)
             .then(

@@ -184,7 +184,15 @@ object AppSettings {
 
     private lateinit var prefs: SharedPreferences
 
-    /** Only for the Discord, WebDAV and SMB secrets — everything else on here is plain prefs. */
+    /**
+     * True on a device the platform itself calls low-RAM — a 1 GB phone, or a
+     * 2 GB one running a heavy ROM. Kept so the defaults can be cheap there
+     * without asking the user to find the switch: the frosted bars and the
+     * animation are exactly what drops frames on hardware like that.
+     */
+    private var lowRamDevice = false
+
+    /** Only for account/password secrets — everything else on here is plain prefs. */
     private lateinit var authStore: AuthStore
 
     /**
@@ -437,13 +445,13 @@ object AppSettings {
     val onboardingComplete = MutableStateFlow(false)
 
     /** Requests a sustained high-refresh UI. Off keeps Android's automatic policy. */
-    val highPerformanceMode = MutableStateFlow(false)
+    val highPerformanceMode = MutableStateFlow(true)
 
     /** Preferred UI refresh rate while [highPerformanceMode] is enabled. */
     val performanceRefreshRate = MutableStateFlow(DEFAULT_PERFORMANCE_REFRESH_RATE)
 
     /** Stop playback when the app is swiped away from the recent apps screen. */
-    val stopOnTaskRemoved = MutableStateFlow(true)
+    val stopOnTaskRemoved = MutableStateFlow(false)
 
     /** Hides the volume slider on the main player, leaving the rest of the layout to reflow. */
     val hideVolumeBar = MutableStateFlow(false)
@@ -468,14 +476,67 @@ object AppSettings {
     /** Drops haze blur (status bar, mini player, bottom fade, lyrics focus) for a solid-fill look. */
     val reduceDynamicBlur = MutableStateFlow(false)
 
-    /** Real backdrop-sampled glass (blur, lens refraction) on the floating nav bar, Android 12+ only. */
-    val liquidGlass = MutableStateFlow(false)
+    /**
+     * Routes this app's own music traffic through the local TLS-split proxy.
+     *
+     * Off by default. It is a DPI workaround for throttled music hosts, not a
+     * VPN: the destination is unchanged and a blocked service stays blocked.
+     */
+    val dpiBypass = MutableStateFlow(false)
+    /** Frosted refraction on the floating chrome, where the device supports it. */
+    val liquidGlassEnabled = MutableStateFlow(false)
+
+    /** Accent role for the ordinary themes; Nothing mode ignores it. */
+    val accentKey = MutableStateFlow("default")
+
+    /**
+     * Which component language the app draws itself in.
+     *
+     * `classic` is the Apple-Music-like appearance the app shipped with and
+     * remains the default; `material3` is Google's own language, drawn from the
+     * same screens — see `UiStyle`. A skin, not a second app: every screen reads
+     * the same state, only the primitives change.
+     */
+    val uiStyleKey = MutableStateFlow("material3")
+
+    /** Material You: the wallpaper's colours as the palette, where the system offers them. */
+    val materialYou = MutableStateFlow(false)
+
+    /**
+     * A listener-picked accent as `0xFFRRGGBB`, or null for the preset list.
+     *
+     * Stored as a plain ARGB number rather than a named colour so the picker can
+     * offer the whole wheel: the presets are five opinions, and someone who wants
+     * their album cover's exact teal should not have to pick the nearest one.
+     */
+    val customAccent = MutableStateFlow<Long?>(null)
+
+    /** Which handshake disturbance the no-root proxy applies. */
+    val dpiStrategy = MutableStateFlow("split")
+
+    /** Where a root-installed nfqws lives, when discovery cannot find it. */
+    val zapretPath = MutableStateFlow("")
+
+    /** Which nfqws strategy the root mode launches. */
+    val zapretStrategy = MutableStateFlow("fake_split")
+
+    /** Free-form nfqws arguments, used when the strategy is CUSTOM. */
+    val zapretArgs = MutableStateFlow("")
+
+    /** Relaunches the root strategy after a reboot, when the listener opted in. */
+    val zapretAutoStart = MutableStateFlow(false)
+
+    /**
+     * App-wide Nothing-inspired skin: monochrome cards, dot details, red focus
+     * and bounded blurred chrome. Previous appearance modes migrate into it so
+     * an enabled design switch does not silently turn itself off on upgrade.
+     */
 
     /**
      * Blurs what scrolls under the status bar and the top controls, easing out
-     * just below them, instead of fading it to the page colour. A Liquid Glass
-     * option, honoured only while [liquidGlass] is on. Off by default: it costs
-     * frames. Reduce dynamic blur overrides it.
+     * just below them, instead of fading it to the page colour. Kept as a
+     * standalone rendering preference for existing installs even though the old
+     * Liquid Glass switch that exposed it has been replaced.
      */
     val progressiveBlur = MutableStateFlow(false)
 
@@ -720,12 +781,41 @@ object AppSettings {
     val listenBrainzPrimaryArtistOnly = MutableStateFlow(false)
     val spotifySpdcToken = MutableStateFlow("")
 
+    // ── Yandex Music ─────────────────────────────────────────────────────
+
+    /** Encrypted persisted copy lives in [AuthStore]; this is the live mirror. */
+    val yandexMusicToken = MutableStateFlow("")
+    val yandexMusicAccountName = MutableStateFlow("")
+    val yandexMusicHasPlus = MutableStateFlow(false)
+    val yandexMusicSyncEnabled = MutableStateFlow(true)
+
+    // ── SoundCloud account ────────────────────────────────────────────────
+
+    /** Access token mirror only; persisted credentials live in [AuthStore]. */
+    val soundCloudAccessToken = MutableStateFlow("")
+    val soundCloudAccountId = MutableStateFlow("")
+    val soundCloudAccountName = MutableStateFlow("")
+    val soundCloudAccountAvatar = MutableStateFlow("")
+
+    // ── VK ID / VK Music ─────────────────────────────────────────────────
+
+    val vkAccessToken = MutableStateFlow("")
+    val vkAccountId = MutableStateFlow("")
+    val vkAccountName = MutableStateFlow("")
+    val vkAccountAvatar = MutableStateFlow("")
+
+    // ── Local guest profile ──────────────────────────────────────────────
+
+    val guestProfileEnabled = MutableStateFlow(false)
+    val guestProfileName = MutableStateFlow("")
+    val guestProfileAvatar = MutableStateFlow("")
+
     // ── Discord Rich Presence ───────────────────────────────────────────
 
     /**
      * The connected Discord account's token, mirrored out of [AuthStore] so
-     * [PlaybackService][com.music.bitchord.playback.PlaybackService] can pick
-     * up a login without polling for one. Empty means not connected.
+     * the process-wide presence coordinator can pick up a login without
+     * polling for one. Empty means not connected.
      *
      * Only the mirror is here — the persisted copy is encrypted, because unlike
      * a scrobbler key this one is the account itself.
@@ -882,6 +972,8 @@ object AppSettings {
     fun init(context: Context, authStore: AuthStore) {
         prefs = context.getSharedPreferences("bitchord_settings", Context.MODE_PRIVATE)
         this.authStore = authStore
+        lowRamDevice = (context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager)
+            ?.isLowRamDevice == true
         com.music.bitchord.data.spotify.LocalPlaylistStore.init(context)
         com.music.bitchord.data.OfflinePlaylists.init(
             context,
@@ -969,11 +1061,11 @@ object AppSettings {
         showListenTogetherButton.value = prefs.getBoolean(KEY_LISTEN_TOGETHER_BUTTON, false)
         reduceAnimation.value = prefs.getBoolean(KEY_REDUCE_ANIMATION, false)
         onboardingComplete.value = prefs.getBoolean(KEY_ONBOARDING_COMPLETE, false)
-        highPerformanceMode.value = prefs.getBoolean(KEY_HIGH_PERFORMANCE_MODE, false)
+        highPerformanceMode.value = prefs.getBoolean(KEY_HIGH_PERFORMANCE_MODE, true)
         performanceRefreshRate.value = normalizePerformanceRefreshRate(
             prefs.getInt(KEY_PERFORMANCE_REFRESH_RATE, DEFAULT_PERFORMANCE_REFRESH_RATE),
         )
-        stopOnTaskRemoved.value = prefs.getBoolean(KEY_STOP_ON_TASK_REMOVED, true)
+        stopOnTaskRemoved.value = prefs.getBoolean(KEY_STOP_ON_TASK_REMOVED, false)
         hideVolumeBar.value = prefs.getBoolean(KEY_HIDE_VOLUME_BAR, false)
         hideStatusBarInPlayer.value = prefs.getBoolean(KEY_HIDE_STATUS_BAR_IN_PLAYER, false)
         hideSongStatus.value = prefs.getBoolean(KEY_HIDE_SONG_STATUS, false)
@@ -981,8 +1073,18 @@ object AppSettings {
         swipeToPlayNext.value = prefs.getBoolean(KEY_SWIPE_TO_PLAY_NEXT, false)
         dontRepeatSuggestions.value = prefs.getBoolean(KEY_DONT_REPEAT_SUGGESTIONS, false)
         smartVersionAlignment.value = prefs.getBoolean(KEY_SMART_VERSION_ALIGNMENT, true)
-        reduceDynamicBlur.value = prefs.getBoolean(KEY_REDUCE_BLUR, false)
-        liquidGlass.value = prefs.getBoolean(KEY_LIQUID_GLASS, false)
+        reduceDynamicBlur.value = prefs.getBoolean(KEY_REDUCE_BLUR, lowRamDevice)
+        dpiBypass.value = prefs.getBoolean(KEY_DPI_BYPASS, false)
+        dpiStrategy.value = prefs.getString(KEY_DPI_STRATEGY, "split").orEmpty()
+        accentKey.value = prefs.getString(KEY_ACCENT, "default").orEmpty()
+        uiStyleKey.value = prefs.getString(KEY_UI_STYLE, "material3").orEmpty()
+        materialYou.value = prefs.getBoolean(KEY_MATERIAL_YOU, false)
+        customAccent.value = prefs.getLong(KEY_CUSTOM_ACCENT, 0L).takeIf { it != 0L }
+        liquidGlassEnabled.value = prefs.getBoolean(KEY_LIQUID_GLASS_ENABLED, false)
+        zapretPath.value = prefs.getString(KEY_ZAPRET_PATH, "").orEmpty()
+        zapretStrategy.value = prefs.getString(KEY_ZAPRET_STRATEGY, "fake_split").orEmpty()
+        zapretArgs.value = prefs.getString(KEY_ZAPRET_ARGS, "").orEmpty()
+        zapretAutoStart.value = prefs.getBoolean(KEY_ZAPRET_AUTOSTART, false)
         progressiveBlur.value = prefs.getBoolean(KEY_PROGRESSIVE_BLUR, false)
         lyricsBlur.value = prefs.getBoolean(KEY_LYRICS_BLUR, true)
         lyricsOffsetMs.value = prefs.getInt(KEY_LYRICS_OFFSET_MS, 0)
@@ -990,7 +1092,9 @@ object AppSettings {
         translationLanguage.value = prefs.getString(KEY_TRANSLATION_LANGUAGE, "").orEmpty()
         if (highPerformanceMode.value) {
             reduceAnimation.value = false
-            reduceDynamicBlur.value = false
+            // A low-RAM phone keeps its blur off whatever the frame-rate mode
+            // says: the blur is the cost, and its refresh rate is not.
+            if (!lowRamDevice) reduceDynamicBlur.value = false
         }
         animatedCanvas.value = prefs.getBoolean(KEY_ANIMATED_CANVAS, true)
         canvasOverCellular.value = prefs.getBoolean(KEY_CANVAS_OVER_CELLULAR, false)
@@ -1029,6 +1133,21 @@ object AppSettings {
         listenBrainzToken.value = prefs.getString(KEY_LISTENBRAINZ_TOKEN, "").orEmpty()
         listenBrainzPrimaryArtistOnly.value = prefs.getBoolean(KEY_LISTENBRAINZ_PRIMARY_ARTIST_ONLY, false)
         spotifySpdcToken.value = prefs.getString(KEY_SPOTIFY_SPDC_TOKEN, "").orEmpty()
+        yandexMusicToken.value = authStore.yandexMusicToken.orEmpty()
+        yandexMusicAccountName.value = prefs.getString(KEY_YANDEX_MUSIC_ACCOUNT_NAME, "").orEmpty()
+        yandexMusicHasPlus.value = prefs.getBoolean(KEY_YANDEX_MUSIC_HAS_PLUS, false)
+        yandexMusicSyncEnabled.value = prefs.getBoolean(KEY_YANDEX_MUSIC_SYNC_ENABLED, true)
+        soundCloudAccessToken.value = authStore.soundCloudAccessToken.orEmpty()
+        soundCloudAccountId.value = prefs.getString(KEY_SOUNDCLOUD_ACCOUNT_ID, "").orEmpty()
+        soundCloudAccountName.value = prefs.getString(KEY_SOUNDCLOUD_ACCOUNT_NAME, "").orEmpty()
+        soundCloudAccountAvatar.value = prefs.getString(KEY_SOUNDCLOUD_ACCOUNT_AVATAR, "").orEmpty()
+        vkAccessToken.value = authStore.vkAccessToken.orEmpty()
+        vkAccountId.value = prefs.getString(KEY_VK_ACCOUNT_ID, "").orEmpty()
+        vkAccountName.value = prefs.getString(KEY_VK_ACCOUNT_NAME, "").orEmpty()
+        vkAccountAvatar.value = prefs.getString(KEY_VK_ACCOUNT_AVATAR, "").orEmpty()
+        guestProfileEnabled.value = prefs.getBoolean(KEY_GUEST_PROFILE_ENABLED, false)
+        guestProfileName.value = prefs.getString(KEY_GUEST_PROFILE_NAME, "").orEmpty()
+        guestProfileAvatar.value = prefs.getString(KEY_GUEST_PROFILE_AVATAR, "").orEmpty()
         replayGenres.value = prefs.getBoolean(KEY_REPLAY_GENRES, true)
         filterNonMusicAudio.value = prefs.getBoolean(KEY_FILTER_NON_MUSIC_AUDIO, true)
         localMusicSort.value = readLocalMusicSort(KEY_LOCAL_MUSIC_SORT)
@@ -1396,6 +1515,66 @@ object AppSettings {
         prefs.edit().putBoolean(KEY_SMART_VERSION_ALIGNMENT, value).apply()
     }
 
+    fun setLiquidGlassEnabled(value: Boolean) {
+        liquidGlassEnabled.value = value
+        prefs.edit().putBoolean(KEY_LIQUID_GLASS_ENABLED, value).apply()
+    }
+
+    fun setAccentKey(value: String) {
+        accentKey.value = value
+        prefs.edit().putString(KEY_ACCENT, value).apply()
+    }
+
+    fun setUiStyleKey(value: String) {
+        uiStyleKey.value = value
+        prefs.edit().putString(KEY_UI_STYLE, value).apply()
+    }
+
+    fun setMaterialYou(value: Boolean) {
+        materialYou.value = value
+        prefs.edit().putBoolean(KEY_MATERIAL_YOU, value).apply()
+    }
+
+    /** @param argb `0xFFRRGGBB`, or null to go back to the preset accents. */
+    fun setCustomAccent(argb: Long?) {
+        customAccent.value = argb
+        prefs.edit().putLong(KEY_CUSTOM_ACCENT, argb ?: 0L).apply()
+    }
+
+    fun setDpiStrategy(value: String) {
+        dpiStrategy.value = value
+        prefs.edit().putString(KEY_DPI_STRATEGY, value).apply()
+        com.music.bitchord.net.DesyncProxy.selectStrategy(
+            com.music.bitchord.net.DesyncProxy.Strategy.of(value),
+        )
+    }
+
+    fun setZapretArgs(value: String) {
+        zapretArgs.value = value
+        prefs.edit().putString(KEY_ZAPRET_ARGS, value).apply()
+    }
+
+    fun setZapretAutoStart(value: Boolean) {
+        zapretAutoStart.value = value
+        prefs.edit().putBoolean(KEY_ZAPRET_AUTOSTART, value).apply()
+    }
+
+    fun setZapretPath(value: String) {
+        zapretPath.value = value.trim()
+        prefs.edit().putString(KEY_ZAPRET_PATH, zapretPath.value).apply()
+    }
+
+    fun setZapretStrategy(value: String) {
+        zapretStrategy.value = value
+        prefs.edit().putString(KEY_ZAPRET_STRATEGY, value).apply()
+    }
+
+    fun setDpiBypass(value: Boolean) {
+        dpiBypass.value = value
+        prefs.edit().putBoolean(KEY_DPI_BYPASS, value).apply()
+        com.music.bitchord.net.DesyncProxy.setEnabled(value)
+    }
+
     fun setReduceDynamicBlur(value: Boolean) {
         reduceDynamicBlur.value = value
         if (value) highPerformanceMode.value = false
@@ -1404,10 +1583,7 @@ object AppSettings {
         editor.apply()
     }
 
-    fun setLiquidGlass(value: Boolean) {
-        liquidGlass.value = value
-        prefs.edit().putBoolean(KEY_LIQUID_GLASS, value).apply()
-    }
+
 
     fun setProgressiveBlur(value: Boolean) {
         progressiveBlur.value = value
@@ -1418,7 +1594,7 @@ object AppSettings {
         highPerformanceMode.value = value
         if (value) {
             reduceAnimation.value = false
-            reduceDynamicBlur.value = false
+            if (!lowRamDevice) reduceDynamicBlur.value = false
         }
         val editor = prefs.edit().putBoolean(KEY_HIGH_PERFORMANCE_MODE, value)
         if (value) {
@@ -1656,6 +1832,107 @@ object AppSettings {
         spotifySpdcToken.value = value
         prefs.edit().putString(KEY_SPOTIFY_SPDC_TOKEN, value).apply()
         SpotifyToken.invalidate()
+    }
+
+    /** Writes through to EncryptedSharedPreferences; pass an empty value to disconnect. */
+    fun setYandexMusicToken(value: String) {
+        yandexMusicToken.value = value
+        authStore.yandexMusicToken = value.ifEmpty { null }
+    }
+
+    fun setYandexMusicAccount(name: String, hasPlus: Boolean) {
+        yandexMusicAccountName.value = name
+        yandexMusicHasPlus.value = hasPlus
+        prefs.edit()
+            .putString(KEY_YANDEX_MUSIC_ACCOUNT_NAME, name)
+            .putBoolean(KEY_YANDEX_MUSIC_HAS_PLUS, hasPlus)
+            .apply()
+    }
+
+    fun setYandexMusicSyncEnabled(value: Boolean) {
+        yandexMusicSyncEnabled.value = value
+        prefs.edit().putBoolean(KEY_YANDEX_MUSIC_SYNC_ENABLED, value).apply()
+    }
+
+    fun setSoundCloudSession(accessToken: String, refreshToken: String, expiresAtMs: Long) {
+        soundCloudAccessToken.value = accessToken
+        authStore.soundCloudAccessToken = accessToken.ifBlank { null }
+        authStore.soundCloudRefreshToken = refreshToken.ifBlank { null }
+        authStore.soundCloudTokenExpiresAtMs = expiresAtMs
+    }
+
+    fun setSoundCloudAccount(id: String, name: String, avatar: String?) {
+        soundCloudAccountId.value = id
+        soundCloudAccountName.value = name
+        soundCloudAccountAvatar.value = avatar.orEmpty()
+        prefs.edit()
+            .putString(KEY_SOUNDCLOUD_ACCOUNT_ID, id)
+            .putString(KEY_SOUNDCLOUD_ACCOUNT_NAME, name)
+            .putString(KEY_SOUNDCLOUD_ACCOUNT_AVATAR, avatar.orEmpty())
+            .apply()
+    }
+
+    fun clearSoundCloudAccount() {
+        setSoundCloudSession("", "", 0L)
+        setSoundCloudAccount("", "", null)
+    }
+
+    fun setVkSession(
+        accessToken: String,
+        refreshToken: String,
+        idToken: String,
+        deviceId: String,
+        expiresAtMs: Long,
+    ) {
+        vkAccessToken.value = accessToken
+        authStore.vkAccessToken = accessToken.ifBlank { null }
+        authStore.vkRefreshToken = refreshToken.ifBlank { null }
+        authStore.vkIdToken = idToken.ifBlank { null }
+        authStore.vkDeviceId = deviceId.ifBlank { null }
+        authStore.vkTokenExpiresAtMs = expiresAtMs
+    }
+
+    fun setVkAccount(id: String, name: String, avatar: String?) {
+        vkAccountId.value = id
+        vkAccountName.value = name
+        vkAccountAvatar.value = avatar.orEmpty()
+        prefs.edit()
+            .putString(KEY_VK_ACCOUNT_ID, id)
+            .putString(KEY_VK_ACCOUNT_NAME, name)
+            .putString(KEY_VK_ACCOUNT_AVATAR, avatar.orEmpty())
+            .apply()
+    }
+
+    fun clearVkAccount() {
+        setVkSession("", "", "", "", 0L)
+        setVkAccount("", "", null)
+    }
+
+    fun setGuestProfile(name: String, avatar: String = guestProfileAvatar.value) {
+        guestProfileEnabled.value = true
+        guestProfileName.value = name.trim()
+        guestProfileAvatar.value = avatar
+        prefs.edit()
+            .putBoolean(KEY_GUEST_PROFILE_ENABLED, true)
+            .putString(KEY_GUEST_PROFILE_NAME, guestProfileName.value)
+            .putString(KEY_GUEST_PROFILE_AVATAR, avatar)
+            .apply()
+    }
+
+    fun setGuestProfileAvatar(value: String) {
+        guestProfileAvatar.value = value
+        prefs.edit().putString(KEY_GUEST_PROFILE_AVATAR, value).apply()
+    }
+
+    fun clearGuestProfile() {
+        guestProfileEnabled.value = false
+        guestProfileName.value = ""
+        guestProfileAvatar.value = ""
+        prefs.edit()
+            .remove(KEY_GUEST_PROFILE_ENABLED)
+            .remove(KEY_GUEST_PROFILE_NAME)
+            .remove(KEY_GUEST_PROFILE_AVATAR)
+            .apply()
     }
 
     fun setLastfmScrobbleEnabled(value: Boolean) {
@@ -2020,6 +2297,12 @@ object AppSettings {
         setDiscordAccount("", "", null)
     }
 
+    fun clearYandexMusicAccount() {
+        setYandexMusicToken("")
+        setYandexMusicAccount("", false)
+        setYandexMusicSyncEnabled(false)
+    }
+
     // ── Backup ──────────────────────────────────────────────────────────────
 
     /**
@@ -2103,6 +2386,7 @@ object AppSettings {
         "downloaded_tracks_metadata",
         "downloaded_collections",
         KEY_LOCAL_MUSIC_FOLDER_URI,
+        KEY_GUEST_PROFILE_AVATAR,
         KEY_LAST_VERSION_CODE,
         KEY_ONBOARDING_COMPLETE,
     )
@@ -2179,7 +2463,21 @@ object AppSettings {
     private const val KEY_DONT_REPEAT_SUGGESTIONS = "dont_repeat_suggestions"
     private const val KEY_SMART_VERSION_ALIGNMENT = "smart_version_alignment"
     private const val KEY_REDUCE_BLUR = "reduce_dynamic_blur"
+    private const val KEY_DPI_BYPASS = "dpi_bypass"
+    private const val KEY_ZAPRET_PATH = "zapret_path"
+    private const val KEY_ZAPRET_STRATEGY = "zapret_strategy"
+    private const val KEY_DPI_STRATEGY = "dpi_strategy"
+    private const val KEY_ACCENT = "accent_key"
+    private const val KEY_UI_STYLE = "ui_style"
+    private const val KEY_MATERIAL_YOU = "material_you"
+    private const val KEY_CUSTOM_ACCENT = "custom_accent"
+    private const val KEY_LIQUID_GLASS_ENABLED = "liquid_glass_enabled"
+    private const val KEY_ZAPRET_ARGS = "zapret_args"
+    private const val KEY_ZAPRET_AUTOSTART = "zapret_autostart"
+    /** Read only for one-time migration; never written by current builds. */
     private const val KEY_LIQUID_GLASS = "liquid_glass"
+    /** Read only for migration from v13/v14. */
+    private const val KEY_CYBER_LAIN_MODE = "cyber_lain_mode"
     private const val KEY_PROGRESSIVE_BLUR = "progressive_blur"
     private const val KEY_LYRICS_BLUR = "lyrics_blur"
     private const val KEY_LYRICS_OFFSET_MS = "lyrics_offset_ms"
@@ -2234,6 +2532,22 @@ object AppSettings {
     private const val KEY_LISTENBRAINZ_PRIMARY_ARTIST_ONLY = "listenbrainz_primary_artist_only"
     private const val KEY_SPOTIFY_SPDC_TOKEN = "spotify_spdc_token"
 
+    private const val KEY_YANDEX_MUSIC_ACCOUNT_NAME = "yandex_music_account_name"
+    private const val KEY_YANDEX_MUSIC_HAS_PLUS = "yandex_music_has_plus"
+    private const val KEY_YANDEX_MUSIC_SYNC_ENABLED = "yandex_music_sync_enabled"
+
+    private const val KEY_SOUNDCLOUD_ACCOUNT_ID = "soundcloud_account_id"
+    private const val KEY_SOUNDCLOUD_ACCOUNT_NAME = "soundcloud_account_name"
+    private const val KEY_SOUNDCLOUD_ACCOUNT_AVATAR = "soundcloud_account_avatar"
+
+    private const val KEY_VK_ACCOUNT_ID = "vk_account_id"
+    private const val KEY_VK_ACCOUNT_NAME = "vk_account_name"
+    private const val KEY_VK_ACCOUNT_AVATAR = "vk_account_avatar"
+
+    private const val KEY_GUEST_PROFILE_ENABLED = "guest_profile_enabled"
+    private const val KEY_GUEST_PROFILE_NAME = "guest_profile_name"
+    private const val KEY_GUEST_PROFILE_AVATAR = "guest_profile_avatar"
+
     private const val KEY_DISCORD_USERNAME = "discord_username"
     private const val KEY_DISCORD_NAME = "discord_name"
     private const val KEY_DISCORD_AVATAR = "discord_avatar"
@@ -2251,6 +2565,3 @@ object AppSettings {
     private const val KEY_DISCORD_INFO_DISMISSED = "discord_info_dismissed"
     private const val KEY_LAST_VERSION_CODE = "last_version_code"
 }
-
-
-

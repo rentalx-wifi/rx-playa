@@ -178,6 +178,11 @@ object StreamResolver {
 
     private val init by lazy { NewPipe.init(OkHttpDownloader()) }
 
+    /** Shares the already hardened downloader with non-YouTube extractors such as SoundCloud import. */
+    fun ensureNewPipeInitialized() {
+        init
+    }
+
     /**
      * The extractor's own leash on [Http.client].
      *

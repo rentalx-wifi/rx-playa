@@ -51,6 +51,22 @@ val listenTogetherServer: String = (
         ?: System.getenv("LISTEN_TOGETHER_SERVER")
         ?: "https://bitchord-listen-together.onrender.com"
     ).trim().trimEnd('/')
+val integrationServer: String = (
+    localProps.getProperty("RX_MUSIC_BACKEND")
+        ?: System.getenv("RX_MUSIC_BACKEND")
+        ?: listenTogetherServer
+    ).trim().trimEnd('/')
+val vkIdClientId: String = (
+    localProps.getProperty("VK_ID_CLIENT_ID")
+        ?: System.getenv("VK_ID_CLIENT_ID")
+        ?: ""
+    ).trim()
+val vkAudioScopeApproved: Boolean = (
+    localProps.getProperty("VK_AUDIO_SCOPE_APPROVED")
+        ?: System.getenv("VK_AUDIO_SCOPE_APPROVED")
+        ?: "false"
+    ).trim().toBooleanStrictOrNull() ?: false
+val vkRedirectScheme = vkIdClientId.takeIf(String::isNotBlank)?.let { "vk$it" } ?: "vk0000000"
 
 /*
  * Bump this by hand before cutting each sideloaded test build ("beta2",
@@ -95,11 +111,19 @@ android {
             "LISTEN_TOGETHER_SERVER",
             "\"${listenTogetherServer.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
         )
+        buildConfigField(
+            "String",
+            "RX_MUSIC_BACKEND",
+            "\"${integrationServer.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
+        )
+        buildConfigField("String", "VK_ID_CLIENT_ID", "\"${vkIdClientId.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
+        buildConfigField("boolean", "VK_AUDIO_SCOPE_APPROVED", vkAudioScopeApproved.toString())
+        buildConfigField("String", "VK_ID_REDIRECT_SCHEME", "\"$vkRedirectScheme\"")
         // The TV APKs share a GitHub release with the phone ones and are told
         // apart by name (BitChordTV-v1.8.apk, BitChordTV-v1.8_x86_64.apk), so
         // the updater installs the TV app here, never the phone app. See
         // AppUpdateChecker.apkAssetUrl.
-        buildConfigField("String", "UPDATE_APK_PREFIX", "\"BitChordTV-\"")
+        buildConfigField("String", "UPDATE_APK_PREFIX", "\"RXMusicTV-\"")
     }
 
     splits {
@@ -148,11 +172,11 @@ android {
         create("dev") {
             dimension = "env"
             applicationId = "com.dev.bitchord.tv"
-            resValue("string", "app_name", "BitChord TV")
+            resValue("string", "app_name", "RX Music TV")
         }
         create("prod") {
             dimension = "env"
-            resValue("string", "app_name", "BitChord TV")
+            resValue("string", "app_name", "RX Music TV")
         }
     }
 
