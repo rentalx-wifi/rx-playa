@@ -19,14 +19,31 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # The runner image already carries the Android SDK; what it does not
+      # carry is platform 37, which this project compiles against. The action
+      # this step used to call (`android-actions/setup-android`) failed on its
+      # own `tools` package and took the build down with it, so the packages are
+      # installed directly. Failure here is tolerated: if the platform is
+      # already present the command has nothing to do, and if it is missing the
+      # Gradle build says so in its own words.
+      - name: Install Android SDK packages
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          MANAGER="$(find "$SDK" -path '*cmdline-tools*/bin/sdkmanager' 2>/dev/null | head -1)"
+          if [ -n "$MANAGER" ]; then
+            yes | "$MANAGER" --licenses > /dev/null 2>&1 || true
+            yes | "$MANAGER" "platforms;android-37" "build-tools;37.0.0" || true
+          fi
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
       - name: Build dev debug APK
-        run: ./gradlew :app:assembleDevDebug
+        run: ./gradlew :app:assembleDevDebug -Pbitchord.bundleWear=false --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: BitChord-YandexMusic-debug
+          name: rx-playa-debug
           path: app/build/outputs/apk/dev/debug/*.apk
+          if-no-files-found: warn
