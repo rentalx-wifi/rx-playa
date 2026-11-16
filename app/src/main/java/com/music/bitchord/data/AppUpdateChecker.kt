@@ -6,17 +6,24 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import com.music.bitchord.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import okhttp3.Request
 import java.io.File
 
 /**
- * Compatibility surface for the phone/TV update dialogs inherited from upstream.
- * This fork never populates [available], never contacts the upstream repository,
- * and therefore cannot offer or install an upstream APK.
+ * The update that this fork's own GitHub releases offer, if it is newer.
+ *
+ * Upstream's checker pointed at BitChord's repository; this fork must never
+ * offer an upstream APK, so it was silenced when the fork started. It now reads
+ * this project's own `releases/latest` instead: one request at launch, the tag
+ * compared with the running version, and an APK asset if the release carries
+ * one. A listener who never opens GitHub still gets told there is a new build,
+ * and installs it from here.
  */
 object AppUpdateChecker {
 
@@ -48,10 +55,63 @@ object AppUpdateChecker {
     @Volatile
     private var downloadCancelled = false
 
-    /** This fork must never offer upstream APKs, including through the shared TV UI. */
+    /** The repository this fork publishes to; nothing upstream is ever fetched. */
+    private const val RELEASES_API =
+        "https://api.github.com/repos/rentalx-wifi/rx-playa/releases/latest"
+
+    /**
+     * Asks GitHub for the latest release of this fork and offers it when its
+     * version is newer than the one running.
+     *
+     * Nothing here is fatal: a phone with no network, a rate-limited API or a
+     * repository that has no release yet simply leaves no update on offer.
+     */
     suspend fun check() {
+        val json = runCatching {
+            withContext(Dispatchers.IO) {
+                val request = Request.Builder()
+                    .url(RELEASES_API)
+                    .header("Accept", "application/vnd.github+json")
+                    .build()
+                Http.client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) null else response.body?.string()
+                }
+            }
+        }.getOrNull() ?: return
+
+        val release = runCatching { JSONObject(json) }.getOrNull() ?: return
+        val tag = release.optString("tag_name").ifBlank { return }
+        if (versionOrdinal(tag) <= versionOrdinal(BuildConfig.VERSION_NAME)) return
+
+        val assets = release.optJSONArray("assets")
+        var apkUrl: String? = null
+        for (index in 0 until (assets?.length() ?: 0)) {
+            val asset = assets?.optJSONObject(index) ?: continue
+            if (asset.optString("name").endsWith(".apk", ignoreCase = true)) {
+                apkUrl = asset.optString("browser_download_url").ifBlank { null }
+                break
+            }
+        }
+        _available.value = UpdateInfo(
+            version = tag,
+            releaseUrl = release.optString("html_url"),
+            apkUrl = apkUrl,
+            notes = release.optString("body").takeIf { it.isNotBlank() },
+        )
+    }
+
+    /** "Remind me later", or the release page has been opened instead. */
+    fun dismiss() {
         _available.value = null
     }
+
+    /**
+     * The number at the end of a version name: `1.9-rx-playa-v35` and `v35` both
+     * answer 35. Releases are tagged `vNN`, and only that number decides whether
+     * an update is newer, so a rename of the display name cannot break it.
+     */
+    private fun versionOrdinal(name: String): Int =
+        Regex("""v?(\d+)\s*$""").find(name.trim())?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
 
     /**
      * Wipes any APK left over from a previous run. Called once at cold start

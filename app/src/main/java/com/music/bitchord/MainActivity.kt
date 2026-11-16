@@ -140,6 +140,7 @@ import com.music.bitchord.data.LocalMediaRepository
 import com.music.bitchord.data.listentogether.JamInviteLink
 import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.listentogether.partyQueueIndexOf
+import com.music.bitchord.data.AppUpdateChecker
 import com.music.bitchord.data.NerdStats
 import com.music.bitchord.data.TrackLog
 import com.music.bitchord.data.TrackRatingStore
@@ -179,6 +180,7 @@ import com.music.bitchord.data.settings.ThemeMode
 import com.music.bitchord.data.yandex.YandexMusicIntegration
 import com.music.bitchord.data.yandex.YandexMusicApi
 import com.music.bitchord.data.yandex.YandexMusicApiException
+import com.music.bitchord.ui.components.UpdatePromptHost
 import com.music.bitchord.ui.components.AccountProfileSelector
 import com.music.bitchord.ui.components.DacVolumeHud
 import com.music.bitchord.ui.components.DacVolumeKeys
@@ -1447,6 +1449,10 @@ private fun BitChordApp(
     }
 
     val scope = rememberCoroutineScope()
+    // One request at launch; a phone with no network just gets no update offer.
+    LaunchedEffect(Unit) {
+        runCatching { AppUpdateChecker.check() }
+    }
     val oauthRedirect by OAuthRedirect.pending.collectAsStateWithLifecycle()
     LaunchedEffect(oauthRedirect) {
         val callback = oauthRedirect ?: return@LaunchedEffect
@@ -2011,13 +2017,9 @@ private fun BitChordApp(
             if (request != playRequestGeneration) return@launch
             val activeController = controller
             if (wave.isEmpty() || activeController == null) {
-                // Nothing of their own to build on, or nowhere to put it: the
-                // mix card first, then the current track's radio.
-                val personal = topPicks?.firstOrNull { it.kind == TopPickKind.PERSONAL_STATION }
-                if (personal != null) {
-                    openTopPick(personal, bitWaveLabel)
-                    return@launch
-                }
+                // Nothing of their own to build on, or nowhere to put it: a
+                // station from their strongest track, never the catalogue mix —
+                // that mix is what this whole path exists to get away from.
                 val seed = profile.tracks.firstOrNull { track ->
                     track.song.videoId.isNotBlank() && track.song.title.isNotBlank() &&
                         track.song.artist.isNotBlank()
@@ -6510,6 +6512,8 @@ private fun BitChordApp(
                 onNavigateUp = { showSpotifyCanvasAuth = false }
             )
         }
+
+        UpdatePromptHost(hazeState = hazeState)
 
         soundCloudUnavailableAction?.let { song ->
             AlertDialog(
