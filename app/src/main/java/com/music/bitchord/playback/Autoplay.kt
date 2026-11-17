@@ -19,30 +19,12 @@ import kotlinx.coroutines.CancellationException
 /** Most AutoPlay-suggested tracks kept queued ahead of the current one at once. */
 const val MAX_QUEUED_AUTOPLAY = 10
 
-/** How many of the listener's own tracks seed the RX Wave station. */
-private const val PERSONAL_WAVE_SEEDS = 3
+/** Most liked artists whose radios one wave asks, before it gives up. */
+private const val MAX_PERSONAL_WAVE_SEEDS = 24
 
 /** How many tracks the RX Wave station is built from before the queue trims it. */
 private const val PERSONAL_WAVE_TRACKS = 40
 
-/** How many rows one artist may take in the station. */
-private const val PERSONAL_WAVE_PER_ARTIST = 2
-
-/** Below this, strangers top the station up rather than leaving it short. */
-private const val MIN_PERSONAL_WAVE_TRACKS = 6
-
-/** Every fifth row of a station may be an artist the profile has never named. */
-private const val DISCOVERY_EVERY = 5
-
-/** What one more radio agreeing on an artist is worth next to a profile score. */
-private const val RADIO_CONSENSUS_BONUS = 0.6
-
-/** One like is worth this many ordinary plays when ranking an artist. */
-private const val LIKE_WEIGHT = 4.0
-
-/** Below a minute it is an interlude; above fifteen it is not a song. */
-private const val MIN_STATION_TRACK_MS = 60_000L
-private const val MAX_STATION_TRACK_MS = 15 * 60_000L
 
 private val YOUTUBE_VIDEO_ID = Regex("[A-Za-z0-9_-]{11}")
 
@@ -186,189 +168,64 @@ suspend fun loadAutoplayTracks(
     })
 }
 
-/**
- * Folds one unknown artist into every [DISCOVERY_EVERY]th row of [known].
- *
- * Discovery is a share, not an accident: the owner asked for new music by
- * *similar* artists, and a station built only from names the profile already
- * knows can never do that. A stranger from the same radio is exactly that
- * neighbour — the rule only stops them from taking the station over, which is
- * what made it feel random. The tail of a short station is topped up with them
- * so it is not cut off early.
- */
-private fun interleaveDiscovery(known: List<Song>, strangers: List<Song>, limit: Int): List<Song> {
-    if (strangers.isEmpty()) return known.take(limit)
-    val out = ArrayList<Song>(minOf(limit, known.size + strangers.size))
-    val pool = ArrayDeque(strangers)
-    for (song in known) {
-        if (out.size >= limit) break
-        out += song
-        if (out.size % DISCOVERY_EVERY == 0 && pool.isNotEmpty()) {
-            out += pool.removeFirst()
-        }
-    }
-    while (out.size < limit && pool.isNotEmpty()) {
-        out += pool.removeFirst()
-    }
-    return out
-}
 
 /**
- * The station behind the "RX Wave" pill, built from what the listener liked.
+ * The station behind the "RX Wave" pill.
  *
- * The catalogue's My Supermix was the wrong answer here: it belongs to the
- * account of the session the app holds, and for a guest it is the same bland
- * selection for everybody — which read as the app recommending music nobody had
- * asked for. This asks the local taste profile instead: up to four liked tracks
- * of theirs, one per artist, and each one's YouTube radio.
+ * This is only the wiring: likes in, a radio per seed, the planner's answer
+ * out. Every rule about what is allowed lives in [PersonalWavePlanner], which
+ * is pure and self-tested — see `PersonalWavePlannerTest`, which prints the
+ * exact list and the reason for each row.
  *
- * The radio answers are then filtered, and the filter is the whole point. A
- * station is judged by its worst row, not its best: one stranger's slowed cover
- * in the middle of someone's music is enough to make the whole thing feel like
- * a random playlist. So a candidate is kept only when its artist is one the
- * profile actually knows — anything else is dropped outright, however well the
- * radio ranked it. If that leaves too short a station, the answer is *more
- * seeds*, not looser rules: the loop below keeps asking the radios of further
- * liked tracks before it ever accepts an unknown artist, and a short station is
- * preferred to a padded one.
- *
- * Also, no matter the stage: a disliked artist or recording never appears; a
- * track the profile already holds is left out (a station that plays the library
- * back is not a station); a stranger's upload advertising itself as slowed,
- * sped up, karaoke, cover or 8D is dropped; one recording appears once; no
- * artist takes more than [PERSONAL_WAVE_PER_ARTIST] rows and none twice in a row.
+ * One thing deliberately absent: a fallback. There is no branch here that
+ * returns the catalogue's mix, an unfiltered radio list, or "the top tracks"
+ * when the filtered pool runs dry. A wave that cannot be built from the
+ * listener's own liked artists is short, and a short station is honest.
  */
 suspend fun loadPersonalWave(
     profile: TasteProfile,
     disliked: List<Song> = TrackRatingStore.dislikedSongs(),
     limit: Int = PERSONAL_WAVE_TRACKS,
 ): Result<List<Song>> {
-    if (profile.isEmpty) return Result.success(emptyList())
+    val liked = profile.tracks.filter { it.liked && it.song.videoId.isNotBlank() }
+    if (liked.isEmpty()) return Result.success(emptyList())
 
-    // What counts as taste here is what they said they like, not everything the
-    // app has ever played. The profile's history is a record of what reached the
-    // speakers — including whatever a previous radio pushed on them — and using
-    // it as the definition of "good" is how a station keeps recommending its own
-    // junk. So: liked tracks, and tracks they chose to play again, and nothing
-    // else. The fallback only exists for a profile with neither.
-    // Likes only. A play count cannot tell a track the listener chose from one
-    // a radio pushed on them and they left running — and treating those as
-    // taste is exactly how a station feeds its own junk back: the phonk a
-    // previous wave played became "known", and the next wave served more of it.
-    val tasteTracks = profile.tracks.filter { it.liked }
-        .ifEmpty { profile.tracks.sortedByDescending { it.score }.take(PERSONAL_WAVE_SEEDS) }
-
-    val likedSeeds = (profile.recentLikes.map { it.song } +
-        tasteTracks.filter { it.liked }.sortedByDescending { it.score }.map { it.song })
-    val seeds = (likedSeeds + tasteTracks.sortedByDescending { it.score }.map { it.song })
+    val seeds = (profile.recentLikes.map { it.song } +
+        liked.sortedByDescending { it.score }.map { it.song })
         .filter { it.videoId.isNotBlank() && it.title.isNotBlank() && it.artist.isNotBlank() }
         .distinctBy { normalizedArtistName(it.artist) }
+        .take(MAX_PERSONAL_WAVE_SEEDS)
     if (seeds.isEmpty()) return Result.success(emptyList())
 
-    // Weight by what the listener actually did with each artist: a like is
-    // worth a few ordinary plays, and an artist merely present in the history
-    // is worth nothing at all.
-    val artistWeight = tasteTracks
-        .mapNotNull { track ->
-            normalizedArtistName(track.song.artist).takeIf { it.isNotEmpty() }?.let { it to track }
-        }
-        .groupBy({ it.first }, { it.second })
-        .mapValues { (_, tracks) -> tracks.sumOf { if (it.liked) LIKE_WEIGHT else 1.0 } }
-    val knownRecordings = profile.tracks
-        .map { normalizedArtistName(it.song.artist) to TrackText.titleKey(it.song.title) }
-        .toHashSet()
-    val likedTitles = profile.tracks.filter { it.liked }
-        .map { TrackText.titleKey(it.song.title) }
-        .toHashSet()
-    val dislikedArtists = disliked.mapTo(HashSet()) { normalizedArtistName(it.artist) }
-    val dislikedTitles = disliked.mapTo(HashSet()) { TrackText.titleKey(it.title) }
+    val likedArtists = liked
+        .groupBy({ normalizedArtistName(it.song.artist) }, { it })
+        .filterKeys { it.isNotEmpty() }
+        .mapValues { (_, tracks) -> tracks.size.toDouble() }
+    val historyArtists = profile.tracks
+        .filterNot { it.liked }
+        .map { normalizedArtistName(it.song.artist) }
+        .filter { it.isNotEmpty() }
+        .toSet()
 
-    // The edits nobody wants from an artist they never chose. Applied only to
-    // strangers: a listener whose taste *is* slowed edits gets them from the
-    // artists the profile already names.
-    val seenIds = HashSet<String>()
-    val seenTitles = HashSet<String>()
-    val known = mutableListOf<Pair<Song, Double>>()
-    val strangers = mutableListOf<Song>()
-    // How many of the seeds' radios carried each artist. A name two of them
-    // agree on is a neighbour of the taste; one that a single radio put in one
-    // slot is the part that felt random, and this is the cheapest way to tell
-    // the two apart without a model.
-    val artistHits = HashMap<String, Int>()
-
-    // More seeds than the first pass needs, because a strict filter empties a
-    // three-seed station quickly. Each round asks the next liked artist's radio
-    // until the station is long enough or the seeds run out.
-    for (seed in seeds) {
-        if (known.size >= limit) break
-        val videoId = youtubeSeedFor(seed) ?: continue
-        val candidates = runCatching {
+    val plan = PersonalWavePlanner.plan(
+        input = PersonalWavePlanner.Input(
+            seeds = seeds.map { PersonalWavePlanner.Seed(it, liked = true) },
+            likedRecordings = liked.mapTo(HashSet()) { PersonalWavePlanner.recordingKey(it.song) },
+            likedArtists = likedArtists,
+            historyArtists = historyArtists,
+            dislikedArtists = disliked.mapTo(HashSet()) { normalizedArtistName(it.artist) },
+            dislikedRecordings = disliked.mapTo(HashSet()) { PersonalWavePlanner.recordingKey(it) },
+            limit = limit,
+        ),
+        radio = { seed ->
+            val videoId = youtubeSeedFor(seed) ?: return@plan emptyList()
             YtMusicRepository.radio(videoId, preferVideo = seed.isVideo).getOrNull().orEmpty()
-        }.getOrNull().orEmpty()
-        candidates.mapTo(HashSet()) { normalizedArtistName(it.artist) }
-            .forEach { artist -> artistHits[artist] = (artistHits[artist] ?: 0) + 1 }
-        for (song in candidates) {
-            if (song.videoId.isBlank() || song.title.isBlank() || song.artist.isBlank()) continue
-            val artist = normalizedArtistName(song.artist)
-            val title = TrackText.titleKey(song.title)
-            val weight = artistWeight[artist] ?: 0.0
-            if (artist in dislikedArtists) continue
-            if (title in dislikedTitles) continue
-            if (artist to title in knownRecordings) continue
-            if (!seenIds.add(song.videoId) || !seenTitles.add(title)) continue
-            // A 30-second interlude, an hour-long "mix" or a radio rip: neither
-            // is what a station is for, and both come out of a radio sometimes.
-            val runtime = song.durationMillis()
-            if (runtime in 1..MIN_STATION_TRACK_MS) continue
-            if (runtime > MAX_STATION_TRACK_MS) continue
-            // A stranger advertising an edit, or an edit of a track they liked.
-            // The genre/edition filter is for artists outside the taste; a
-            // liked artist's own edit is their music, however it is titled.
-            if (weight <= 0.0 && isStrangerEdit(song, seed)) continue
-            if (weight > 0.0) {
-                // Artists the radios agree on outrank a single radio's pick.
-                known += song to (weight + (artistHits[artist] ?: 1) * RADIO_CONSENSUS_BONUS)
-            } else {
-                strangers += song
-            }
-        }
-    }
-
-    // Known artists first, strongest first, with a stranger folded in every
-    // [DISCOVERY_EVERY] rows: a station that never introduces anyone is a
-    // playlist of what they already have, and the whole point of radio is to
-    // open the next artist. The strangers come from the same radios, so they
-    // are the neighbours of what they like, not a chart pick.
-    val preferred = known.sortedByDescending { it.second }.map { it.first }
-    // A stranger is only worth introducing when more than one radio asked the
-    // listener's taste about them; when the radios disagree with each other
-    // there is no such name and any stranger will do, briefly.
-    val agreed = strangers.filter { (artistHits[normalizedArtistName(it.artist)] ?: 0) >= 2 }
-    val ordered = interleaveDiscovery(
-        known = preferred,
-        strangers = (agreed.ifEmpty { strangers }).distinctBy { TrackText.titleKey(it.title) },
-        limit = limit,
+        },
     )
-    if (ordered.isEmpty()) return Result.success(emptyList())
-
-    val picked = mutableListOf<Song>()
-    val perArtist = HashMap<String, Int>()
-    var lastArtist = ""
-    for (song in ordered) {
-        if (picked.size >= limit) break
-        val artist = normalizedArtistName(song.artist)
-        val used = perArtist[artist] ?: 0
-        if (used >= PERSONAL_WAVE_PER_ARTIST) continue
-        if (artist == lastArtist) continue
-        picked += song
-        perArtist[artist] = used + 1
-        lastArtist = artist
-    }
     TrackLog.d(
         "BitChord",
-        "wave: ${seeds.size} seeds, ${known.size} known artists' tracks, " +
-            "${strangers.size} strangers, ${picked.size} queued",
+        "wave: ${plan.seedsAsked.size} seeds asked, ${plan.picks.size} picked, " +
+            "${plan.rejects.size} rejected",
     )
-    if (picked.isEmpty()) return Result.success(emptyList())
-    return Result.success(picked)
+    return Result.success(plan.picks.map { it.song })
 }
