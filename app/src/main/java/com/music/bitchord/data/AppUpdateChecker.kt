@@ -71,13 +71,12 @@ object AppUpdateChecker {
             prefs = app.getSharedPreferences("bitchord_settings", Context.MODE_PRIVATE)
             dismissedTag = prefs?.getString(KEY_DISMISSED_UPDATE, null)
         }
-        // Once an hour at most unless asked for. The check runs on every return
-        // to the foreground, and without this a flapping connection would mean a
-        // GitHub request per resume.
+        // Once a quarter of an hour at most unless asked for. The check runs on
+        // every return to the foreground, and without this a flapping connection
+        // would mean a GitHub request per resume.
         val now = System.currentTimeMillis()
         val last = prefs?.getLong(KEY_LAST_CHECK, 0L) ?: 0L
         if (!force && now - last < CHECK_INTERVAL_MS) return
-        prefs?.edit()?.putLong(KEY_LAST_CHECK, now)?.apply()
         val json = runCatching {
             withContext(Dispatchers.IO) {
                 val request = Request.Builder()
@@ -91,6 +90,10 @@ object AppUpdateChecker {
         }.getOrNull() ?: return
 
         val release = runCatching { JSONObject(json) }.getOrNull() ?: return
+        // Only a successful answer counts as a check. Recording the attempt made
+        // a launch without a connection look like an up-to-date phone, and the
+        // next attempt was an hour away.
+        prefs?.edit()?.putLong(KEY_LAST_CHECK, now)?.apply()
         val tag = release.optString("tag_name").ifBlank { return }
         if (tag == dismissedTag) return
         if (versionOrdinal(tag) <= versionOrdinal(BuildConfig.VERSION_NAME)) return
@@ -139,7 +142,7 @@ object AppUpdateChecker {
     private var prefs: android.content.SharedPreferences? = null
     private const val KEY_DISMISSED_UPDATE = "dismissed_update_tag"
     private const val KEY_LAST_CHECK = "last_update_check_at"
-    private const val CHECK_INTERVAL_MS = 60 * 60 * 1000L
+    private const val CHECK_INTERVAL_MS = 15 * 60 * 1000L
 
     /**
      * What this phone's architecture is called in release asset names.
