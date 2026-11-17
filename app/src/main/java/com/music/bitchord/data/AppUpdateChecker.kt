@@ -89,24 +89,25 @@ object AppUpdateChecker {
         if (versionOrdinal(tag) <= versionOrdinal(BuildConfig.VERSION_NAME)) return
 
         val assets = release.optJSONArray("assets")
-        // More than one APK can hang off a release (ABI splits, a TV build), and
-        // installing the wrong one is an INSTALL_FAILED_NO_MATCHING_ABIS at the
-        // end of the download. The phone's own architecture wins, the first APK
-        // is only the fallback.
-        var apkUrl: String? = null
-        var fallbackApkUrl: String? = null
+        // More than one APK can hang off a release, and installing the wrong one
+        // is an INSTALL_FAILED_NO_MATCHING_ABIS at the end of the download. The
+        // release names its files by architecture ("...-arm64.apk",
+        // "...-arm32.apk"), not by the ABI string the platform reports
+        // ("arm64-v8a"), so the match is made on the short names. A universal
+        // build is the next best answer, and only then anything at all.
+        var byAbi: String? = null
+        var universal: String? = null
+        var firstApk: String? = null
         for (index in 0 until (assets?.length() ?: 0)) {
             val asset = assets?.optJSONObject(index) ?: continue
             val name = asset.optString("name")
             if (!name.endsWith(".apk", ignoreCase = true)) continue
             val url = asset.optString("browser_download_url").ifBlank { null } ?: continue
-            if (fallbackApkUrl == null) fallbackApkUrl = url
-            if (name.contains(Build.SUPPORTED_ABIS.first(), ignoreCase = true)) {
-                apkUrl = url
-                break
-            }
+            if (firstApk == null) firstApk = url
+            if (universal == null && name.contains("universal", ignoreCase = true)) universal = url
+            if (byAbi == null && abiTokens().any { name.contains(it, ignoreCase = true) }) byAbi = url
         }
-        apkUrl = apkUrl ?: fallbackApkUrl
+        val apkUrl = byAbi ?: universal ?: firstApk
         _available.value = UpdateInfo(
             version = tag,
             releaseUrl = release.optString("html_url"),
@@ -130,6 +131,24 @@ object AppUpdateChecker {
     private var dismissedTag: String? = null
     private var prefs: android.content.SharedPreferences? = null
     private const val KEY_DISMISSED_UPDATE = "dismissed_update_tag"
+
+    /**
+     * What this phone's architecture is called in release asset names.
+     *
+     * `Build.SUPPORTED_ABIS` answers `arm64-v8a`; a release file is called
+     * `...-arm64.apk`. The first entry is the primary ABI, and that is what the
+     * APK to download has to match.
+     */
+    private fun abiTokens(): List<String> {
+        val primary = Build.SUPPORTED_ABIS.firstOrNull().orEmpty()
+        return when {
+            primary.startsWith("arm64") -> listOf("arm64")
+            primary.startsWith("armeabi") -> listOf("armeabi", "arm32", "armv7")
+            primary.startsWith("x86_64") -> listOf("x86_64", "x64")
+            primary.startsWith("x86") -> listOf("x86")
+            else -> emptyList()
+        }
+    }
 
     /**
      * The number at the end of a version name: `1.9-rx-playa-v35` and `v35` both
