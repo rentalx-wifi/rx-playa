@@ -176,6 +176,13 @@ android {
                 storePassword = signing.getProperty("storePassword")
                 keyAlias = signing.getProperty("keyAlias")
                 keyPassword = signing.getProperty("keyPassword")
+                // All three schemes, not just v2. A phone on an older ROM
+                // checks v1 first, and a newer one prefers v3 for key rotation;
+                // signing with v2 alone is what made the APK "not install" on
+                // some OEM builds instead of opening the installer.
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
