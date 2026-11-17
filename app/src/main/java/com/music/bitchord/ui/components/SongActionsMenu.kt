@@ -200,7 +200,10 @@ fun SongActionsMenu(
         // group is empty doesn't end on a stray line.
         var drawnAny = false
         fun startsGroup(): Boolean = drawnAny.also { drawnAny = true }
-        val canRate = isOffline || signedIn
+        // Ratings are RX Playa's durable preference first. Connected providers
+        // may mirror a like remotely, but a guest and an external catalogue row
+        // still get the same local Favorites/dislike behaviour.
+        val canRate = true
         val shareAction = onShare?.takeIf { !isOffline }
 
         // Leads with the actions it is opened for most, as tiles: the rating
@@ -216,9 +219,7 @@ fun SongActionsMenu(
                         onClick = onToggleLike,
                     )
                 }
-                // No dislike for a device file: there is no recommendation
-                // feed on the device for one to steer.
-                if (signedIn && !isOffline) {
+                if (!isOffline) {
                     IosMenuQuickAction(
                         icon = if (disliked) BrokenHeart.Fill else BrokenHeart.Outline,
                         label = stringResource(R.string.dislike),

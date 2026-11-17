@@ -15,6 +15,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -74,6 +75,10 @@ import kotlinx.coroutines.launch
 import com.music.bitchord.R
 import com.music.bitchord.data.model.Account
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.ui.theme.NothingPanelShape
+import com.music.bitchord.ui.theme.LocalNothingStyleEnabled
+import com.music.bitchord.ui.theme.NothingRed
+import com.music.bitchord.ui.theme.nothingPanelChrome
 import com.music.bitchord.ui.theme.stableStatusBarInsets
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
@@ -182,8 +187,14 @@ fun FrostedTopBar(
     actions: @Composable () -> Unit = {},
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    val useFloatingChrome = artworkPageChrome ||
-        (LocalLiquidGlassEnabled.current && isGlassSupported())
+    // The skin is flat by design: its bars are solid surfaces with the page
+    // behind them, so no haze and no detached pills are drawn while it is on.
+    val material3 = com.music.bitchord.ui.theme.LocalMaterial3StyleEnabled.current
+    val useFloatingChrome = !material3 && (
+        artworkPageChrome ||
+            (LocalLiquidGlassEnabled.current && isGlassSupported()) ||
+            LocalNothingStyleEnabled.current
+        )
     val titleAlpha by animateFloatAsState(
         targetValue = if (scrolled() || trailingTitle != null) 1f else 0f,
         animationSpec = tween(220),
@@ -195,6 +206,7 @@ fun FrostedTopBar(
         targetValue = MaterialTheme.colorScheme.outline.copy(
             alpha = when {
                 transparentBackdrop -> 0f
+                material3 -> 0f
                 else -> 0.6f
             },
         ),
@@ -206,9 +218,12 @@ fun FrostedTopBar(
         modifier = modifier
             .fillMaxWidth()
             .then(
-                if (reduceDynamicBlur && !transparentBackdrop) {
-                    Modifier.background(MaterialTheme.colorScheme.surface)
-                } else Modifier,
+                when {
+                    transparentBackdrop -> Modifier
+                    material3 -> Modifier.background(MaterialTheme.colorScheme.background)
+                    reduceDynamicBlur -> Modifier.background(MaterialTheme.colorScheme.surface)
+                    else -> Modifier
+                },
             ),
     ) {
         Box(
@@ -360,10 +375,11 @@ private fun ArtworkPageBackButton(
     val shape = CircleShape
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val useLiquidGlass = LocalLiquidGlassEnabled.current && isGlassSupported()
-    val contentColor = if (useLiquidGlass && !reduceDynamicBlur) {
-        glassContentColor()
-    } else {
-        MaterialTheme.colorScheme.onSurface
+    val nothing = LocalNothingStyleEnabled.current
+    val contentColor = when {
+        nothing -> MaterialTheme.colorScheme.onSurface
+        useLiquidGlass && !reduceDynamicBlur -> glassContentColor()
+        else -> MaterialTheme.colorScheme.onSurface
     }
 
     IconButton(
@@ -525,23 +541,34 @@ private fun artworkPageSurface(
     val container = MaterialTheme.colorScheme.surface
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val useLiquidGlass = LocalLiquidGlassEnabled.current && isGlassSupported()
+    val nothing = LocalNothingStyleEnabled.current
+    val effectiveShape = if (nothing) NothingPanelShape else shape
 
     return Modifier
-        .clip(shape)
+        .clip(effectiveShape)
         .then(
             when {
-                useLiquidGlass -> Modifier.liquidGlass(shape)
+                nothing && !reduceDynamicBlur && hazeState != null -> Modifier.optimizedHazeEffect(
+                    state = hazeState,
+                    style = barFrost(container, alpha = 0.58f),
+                )
+                useLiquidGlass -> Modifier.liquidGlass(effectiveShape)
                 reduceDynamicBlur || hazeState == null -> Modifier.background(container)
                 else -> Modifier.optimizedHazeEffect(
                     state = hazeState,
-                    style = HazeMaterials.regular(container),
+                    style = barFrost(container, alpha = 0.7f),
                 )
             },
         )
         // Keep the same explicit hairline as FloatingBottomBar. Liquid glass
         // also has its refractive highlight, but the navbar retains this edge
         // so these surfaces do as well.
-        .border(GLASS_EDGE_WIDTH, GLASS_EDGE_COLOR, shape)
+        .border(
+            width = if (nothing) 1.dp else GLASS_EDGE_WIDTH,
+            color = if (nothing) NothingRed.copy(alpha = 0.42f) else GLASS_EDGE_COLOR,
+            shape = effectiveShape,
+        )
+        .nothingPanelChrome(nothing)
 }
 
 /**

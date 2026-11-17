@@ -2,6 +2,7 @@ package com.music.bitchord.auth
 
 import android.webkit.CookieManager
 import com.music.bitchord.data.DebugLog as Log
+import java.util.concurrent.atomic.AtomicInteger
 
 /** What the in-app browser is being opened for. */
 enum class WebSessionMode {
@@ -68,22 +69,26 @@ object BrowserSession {
      * happened to sign in most recently. Replace the local jar with that
      * account's snapshot before loading YouTube Music.
      */
-    fun installGoogleCookies(cookieHeader: String) {
-        clearGoogleCookies()
-        val manager = runCatching { CookieManager.getInstance() }.getOrElse {
-            Log.w("BitChord", "no cookie manager to restore: ${it.message}")
-            return
+    fun installGoogleCookies(cookieHeader: String, onComplete: () -> Unit = {}) {
+        clearGoogleCookies {
+            val manager = runCatching { CookieManager.getInstance() }.getOrElse {
+                Log.w("BitChord", "no cookie manager to restore: ${it.message}")
+                onComplete()
+                return@clearGoogleCookies
+            }
+            val entries = cookieHeader.split(';').mapNotNull { entry ->
+                val name = entry.substringBefore('=').trim()
+                val value = entry.substringAfter('=', "").trim()
+                if (name.isEmpty() || value.isEmpty()) null else "$name=$value; Path=/; Secure"
+            }
+            val writes = YOUTUBE_ORIGINS.flatMap { origin ->
+                entries.map { cookie -> origin to cookie }
+            }
+            writeCookies(manager, writes) {
+                Log.d("BitChord", "restored ${entries.size} browser cookies for the selected account")
+                onComplete()
+            }
         }
-        val entries = cookieHeader.split(';').mapNotNull { entry ->
-            val name = entry.substringBefore('=').trim()
-            val value = entry.substringAfter('=', "").trim()
-            if (name.isEmpty() || value.isEmpty()) null else "$name=$value; Path=/; Secure"
-        }
-        YOUTUBE_ORIGINS.forEach { origin ->
-            entries.forEach { cookie -> manager.setCookie(origin, cookie) }
-        }
-        runCatching { manager.flush() }
-        Log.d("BitChord", "restored ${entries.size} browser cookies for the selected account")
     }
 
     /**
@@ -95,40 +100,67 @@ object BrowserSession {
      * those. There is no per-domain removal in the API, so each cookie is
      * overwritten with an expired one of the same name.
      */
-    fun clearGoogleCookies() {
+    fun clearGoogleCookies(onComplete: () -> Unit = {}) {
         // Best effort throughout. CookieManager needs a WebView provider, and
         // on a device that is mid-update or has none there isn't one — which is
         // a reason for the next sign-in to be less convenient, not a reason for
         // signing out to crash.
         val manager = runCatching { CookieManager.getInstance() }.getOrElse {
             Log.w("BitChord", "no cookie manager to clear: ${it.message}")
+            onComplete()
             return
         }
-        var cleared = 0
-        GOOGLE_ORIGINS.forEach { origin ->
-            val jar = manager.getCookie(origin) ?: return@forEach
-            val host = origin.substringAfter("://")
-            jar.split(';').forEach { entry ->
-                val name = entry.substringBefore('=').trim()
-                if (name.isEmpty()) return@forEach
-                // Both the host-only and the domain-wide form: a cookie set on
-                // `.google.com` is not removed by expiring it on the host, and
-                // which of the two a given cookie used is not recorded here.
-                val expired = "$name=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0"
-                manager.setCookie(origin, "$expired; Path=/")
-                manager.setCookie(origin, "$expired; Path=/; Domain=$host")
-                manager.setCookie(origin, "$expired; Path=/; Domain=.$host")
-                manager.setCookie(origin, "$expired; Path=/accounts")
-                manager.setCookie(origin, "$expired; Path=/ServiceLogin")
-                cleared++
+        val writes = buildList {
+            GOOGLE_ORIGINS.forEach { origin ->
+                val jar = manager.getCookie(origin) ?: return@forEach
+                val host = origin.substringAfter("://")
+                jar.split(';').forEach { entry ->
+                    val name = entry.substringBefore('=').trim()
+                    if (name.isEmpty()) return@forEach
+                    // Both the host-only and the domain-wide form: a cookie set on
+                    // `.google.com` is not removed by expiring it on the host, and
+                    // which of the two a given cookie used is not recorded here.
+                    val expired = "$name=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0"
+                    add(origin to "$expired; Path=/")
+                    add(origin to "$expired; Path=/; Domain=$host")
+                    add(origin to "$expired; Path=/; Domain=.$host")
+                    add(origin to "$expired; Path=/accounts")
+                    add(origin to "$expired; Path=/ServiceLogin")
+                }
             }
         }
         runCatching {
             val storage = android.webkit.WebStorage.getInstance()
             GOOGLE_ORIGINS.forEach { origin -> storage.deleteOrigin(origin) }
-            manager.flush()
         }
-        Log.d("BitChord", "cleared $cleared browser cookies for Google")
+        writeCookies(manager, writes) {
+            Log.d("BitChord", "cleared ${writes.size / 5} browser cookies for Google")
+            onComplete()
+        }
+    }
+
+    /** Loads the page only after CookieManager has committed every ordered write. */
+    private fun writeCookies(
+        manager: CookieManager,
+        writes: List<Pair<String, String>>,
+        onComplete: () -> Unit,
+    ) {
+        if (writes.isEmpty()) {
+            runCatching { manager.flush() }
+            onComplete()
+            return
+        }
+        val remaining = AtomicInteger(writes.size)
+        fun finishedOne() {
+            if (remaining.decrementAndGet() == 0) {
+                runCatching { manager.flush() }
+                onComplete()
+            }
+        }
+        writes.forEach { (origin, cookie) ->
+            runCatching { manager.setCookie(origin, cookie) { finishedOne() } }
+                .onFailure { finishedOne() }
+        }
     }
 
     private val GOOGLE_ORIGINS = listOf(

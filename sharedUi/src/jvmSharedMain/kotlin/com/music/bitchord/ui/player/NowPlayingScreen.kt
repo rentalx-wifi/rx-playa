@@ -69,6 +69,8 @@ import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.ThumbDown
+import androidx.compose.material.icons.rounded.ThumbDownOffAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -709,6 +711,8 @@ fun NowPlayingScreen(
     accountName: String?,
     likeStatus: LikeStatus,
     onToggleLike: () -> Unit,
+    onToggleDislike: () -> Unit,
+    dislikeLabel: String,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
@@ -916,8 +920,12 @@ fun NowPlayingScreen(
     val meshRefreshMs = MESH_REFRESH_MS.takeIf { legacyMesh }
 
     val scrub = rememberPlayerScrub(song.videoId, position, durationMs)
+    // The bar interpolates between the player's position samples, so it slides
+    // at the rate of the music instead of stepping a few times a second. A drag
+    // still overrides it — see [PlayerScrub.shown].
+    val smoothFraction = rememberSmoothFraction(position.positionMs, isPlaying, durationMs)
     // Read by the scrubber itself — see [PlayerScrubber.shown].
-    val shown: () -> Float = { scrub.shown(position.positionMs, durationMs) }
+    val shown: () -> Float = { scrub.shown(smoothFraction()) }
     // Back restarts the track rather than stepping back once it is a few
     // seconds in. Derived, so this scope hears about the playhead once, when
     // it crosses that point, rather than on every tick.
@@ -2098,6 +2106,8 @@ fun NowPlayingScreen(
                                     likeStatus = likeStatus,
                                     showRevertCue = showRevertCue,
                                     onToggleLike = onToggleLike,
+                                    onToggleDislike = onToggleDislike,
+                                    dislikeLabel = dislikeLabel,
                                     onOpenMenu = onOpenMenu,
                                     onOpenAlbum = onOpenAlbum,
                                     onOpenArtist = onOpenArtist,
@@ -3609,25 +3619,31 @@ fun NowPlayingScreen(
                                 }
                             }
                             Spacer(Modifier.width(10.dp))
-                            // Beside the credits rather than down in the toggle row:
-                            // liking is about *this song*, and the row below is about
-                            // how the queue plays. Guests get nothing to tap, since
-                            // there's no account to record it against — except on a
-                            // local file or a finished download, whose star is the
-                            // device's own Liked playlist and needs no account.
-                            if (signedIn || song.localUri != null) {
-                                val liked = likeStatus == LikeStatus.LIKE
-                                CircleGlyph(
-                                    icon = if (liked) BitChordIcons.StarFilled else BitChordIcons.Star,
-                                    contentDescription = stringResource(
-                                        if (liked) Res.string.remove_from_liked else Res.string.like,
-                                    ),
-                                    onClick = onToggleLike,
-                                    active = liked,
-                                    haptic = if (liked) Haptic.ToggleOff else Haptic.ToggleOn,
-                                )
-                                Spacer(Modifier.width(8.dp))
-                            }
+                            // A matched pair rather than a like hidden here and a
+                            // dislike hidden in ⋯. Ratings are provider-neutral in
+                            // RX Playa, so a guest and a SoundCloud/VK row can use
+                            // the same quiet controls without pretending the source
+                            // accepted an account-side write.
+                            val liked = likeStatus == LikeStatus.LIKE
+                            val disliked = likeStatus == LikeStatus.DISLIKE
+                            CircleGlyph(
+                                icon = if (disliked) Icons.Rounded.ThumbDown else Icons.Rounded.ThumbDownOffAlt,
+                                contentDescription = dislikeLabel,
+                                onClick = onToggleDislike,
+                                active = disliked,
+                                haptic = if (disliked) Haptic.ToggleOff else Haptic.ToggleOn,
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            CircleGlyph(
+                                icon = if (liked) BitChordIcons.StarFilled else BitChordIcons.Star,
+                                contentDescription = stringResource(
+                                    if (liked) Res.string.remove_from_liked else Res.string.like,
+                                ),
+                                onClick = onToggleLike,
+                                active = liked,
+                                haptic = if (liked) Haptic.ToggleOff else Haptic.ToggleOn,
+                            )
+                            Spacer(Modifier.width(8.dp))
                             // While the lyrics are up the menu glyph becomes the share
                             // entry: the same pick mode a long-press on a line opens,
                             // only on phones where a card can actually be made. While

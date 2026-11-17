@@ -67,6 +67,8 @@ class DiscordRPC(
         activityType: String = "listening",
         activityName: String = "",
         audioQuality: String? = null,
+        listenUrl: String = watchUrl(song),
+        defaultButton1Text: String = DEFAULT_BUTTON_1,
     ) = runCatching {
         val currentTime = System.currentTimeMillis()
 
@@ -85,17 +87,10 @@ class DiscordRPC(
         val buttonsList = mutableListOf<Pair<String, String>>()
         if (button1Visible) {
             val resolvedText = resolveVariables(
-                button1Text.ifEmpty { DEFAULT_BUTTON_1 },
+                button1Text.ifEmpty { defaultButton1Text },
                 song,
             )
-            buttonsList.add(resolvedText to watchUrl(song))
-        }
-        if (button2Visible) {
-            val resolvedText = resolveVariables(
-                button2Text.ifEmpty { DEFAULT_BUTTON_2 },
-                song,
-            )
-            buttonsList.add(resolvedText to PROJECT_URL)
+            buttonsList.add(resolvedText to listenUrl)
         }
 
         val type = when (activityType) {
@@ -111,7 +106,7 @@ class DiscordRPC(
             name = name,
             details = songTitleWithRate,
             state = song.artist,
-            detailsUrl = watchUrl(song),
+            detailsUrl = listenUrl,
             // Asked for at a size Discord's own card actually draws — the row
             // thumbnail our lists use is 160px and reads soft blown up to the
             // 96dp sleeve in a presence card.
@@ -149,16 +144,16 @@ class DiscordRPC(
         context.getString(R.string.app_name).removeSuffix(" Dev")
 
     companion object {
-        const val PROJECT_URL = "https://github.com/kushagrasinghx/BitChord"
-
         const val DEFAULT_BUTTON_1 = "Listen on YouTube Music"
-        const val DEFAULT_BUTTON_2 = "Visit BitChord"
+        const val DEFAULT_BUTTON_2 = "RX Playa"
 
         /** Discord draws the sleeve at roughly 96dp; 480px covers it on any density. */
         private const val ART_PX = 480
 
         fun watchUrl(song: Song): String =
-            "https://music.youtube.com/watch?v=${song.videoId}"
+            song.playbackSourceId
+                ?.takeIf { song.playbackSource == "SoundCloud" && it.startsWith("https://") }
+                ?: "https://music.youtube.com/watch?v=${song.videoId}"
 
         /**
          * Resolves template variables in text.

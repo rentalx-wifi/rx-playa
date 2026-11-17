@@ -486,7 +486,7 @@ object AudioCache {
                     val base = if (stereo) "$source|$track#stereo" else "$source|$track"
                     QualityUpgrade.cacheTag(uri)?.let { "$base#$it" } ?: base
                 } else {
-                    null
+                    uri.getQueryParameter("id")?.let { "external|$it#youtube" }
                 }
             }
             ?: spec.key
@@ -1196,7 +1196,14 @@ object AudioCache {
 
             override fun open(dataSpec: DataSpec): Long {
                 val scheme = dataSpec.uri.scheme
-                activeDs = if (scheme == "file" || scheme == "content") {
+                val soundCloudHls = (scheme == "bitchord" && dataSpec.uri.authority == "soundcloud") ||
+                    isSoundCloudMediaHost(dataSpec.uri.host)
+                activeDs = if (scheme == "file" || scheme == "content" || soundCloudHls) {
+                    // A SoundCloud playlist embeds short-lived signed segment
+                    // URLs. Caching that manifest under the durable custom URI
+                    // serves expired URLs on the next play; caching its signed
+                    // segment URLs is equally useless. Stream both through the
+                    // bounded-range transport and always resolve a fresh list.
                     upstreamDs
                 } else {
                     settleDirectEntry(dataSpec.uri)

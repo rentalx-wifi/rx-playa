@@ -312,9 +312,12 @@ class QueueWindow(
     fun upcoming(
         count: Int = WINDOW_AHEAD,
         repeatAll: Boolean = false,
+        excludedCanonicalIndices: Set<Int> = emptySet(),
     ): List<QueueWindowEntry> {
         val boundedCount = count.coerceAtMost(WINDOW_AHEAD)
-        if (boundedCount <= 0 || currentIndex == null || logicalOrder.isEmpty()) return emptyList()
+        if (boundedCount <= 0 || currentIndex == null || logicalOrder.isEmpty() ||
+            excludedCanonicalIndices.size >= canonicalCount
+        ) return emptyList()
 
         val result = ArrayList<QueueWindowEntry>(boundedCount)
         var cycle = activeCycleId
@@ -324,7 +327,9 @@ class QueueWindow(
         while (result.size < boundedCount && orderForCycle.isNotEmpty()) {
             while (position < orderForCycle.size && result.size < boundedCount) {
                 val canonical = orderForCycle[position]
-                if (cycle != activeCycleId || !shuffled || canonical !in consumed) {
+                if (canonical !in excludedCanonicalIndices &&
+                    (cycle != activeCycleId || !shuffled || canonical !in consumed)
+                ) {
                     result += QueueWindowEntry(canonical, cycle)
                 }
                 position += 1
@@ -343,7 +348,8 @@ class QueueWindow(
     fun upcomingContext(
         count: Int = WINDOW_AHEAD,
         repeatAll: Boolean = false,
-    ): List<QueueWindowEntry> = upcoming(count, repeatAll)
+        excludedCanonicalIndices: Set<Int> = emptySet(),
+    ): List<QueueWindowEntry> = upcoming(count, repeatAll, excludedCanonicalIndices)
 
     /** Number of entries currently available to [upcoming] without changing state. */
     fun upcomingCount(repeatAll: Boolean = false): Int = upcoming(WINDOW_AHEAD, repeatAll).size

@@ -3,8 +3,15 @@ package com.music.bitchord.data.stats
 import android.content.Context
 import android.net.Uri
 import com.music.bitchord.BuildConfig
+import com.music.bitchord.data.StoredTrackRating
+import com.music.bitchord.data.TrackRatingStore
+import com.music.bitchord.data.model.HomeSource
+import com.music.bitchord.data.model.LikeStatus
+import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.SearchHistory
+import com.music.bitchord.data.spotify.LocalPlaylist
+import com.music.bitchord.data.spotify.LocalPlaylistStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -70,6 +77,15 @@ object Backup {
                     PrefValue.of(value)?.let { key to it }
                 }.toMap(),
                 listening = buckets,
+                favorites = TrackRatingStore.all(),
+                playlists = LocalPlaylistStore.playlists.value.map { playlist ->
+                    BackupPlaylist(
+                        id = playlist.id,
+                        title = playlist.title,
+                        source = playlist.source.name,
+                        tracks = playlist.songs.map { it.asBackupTrack() },
+                    )
+                },
             )
             val text = json.encodeToString(BackupFile.serializer(), file)
             context.contentResolver.openOutputStream(target, "wt")
@@ -93,20 +109,26 @@ object Backup {
                 ?.use { it.readBytes().decodeToString() }
                 ?: error("Couldn't open that file")
             val file = runCatching { json.decodeFromString(BackupFile.serializer(), text) }
-                .getOrElse { error("That doesn't look like a BitChord backup") }
+                .getOrElse { error("That doesn't look like an RX Playa backup") }
             require(file.app == APP_TAG) { "That backup is from another app" }
             require(file.version <= SCHEMA_VERSION) {
-                "That backup was written by a newer version of BitChord"
+                "That backup was written by a newer version of RX Playa"
             }
 
             ListeningStats.importAll(file.listening)
             AppSettings.importPrefs(file.settings.mapValues { it.value.decoded() })
+            if (file.favorites.isNotEmpty()) TrackRatingStore.replaceAll(file.favorites)
+            if (file.playlists.isNotEmpty()) {
+                LocalPlaylistStore.importAll(file.playlists.map { it.toLocalPlaylist() })
+            }
             // Shares AppSettings' preference file, so it has already been
             // overwritten by the line above — it just doesn't know yet.
             SearchHistory.reload()
             Summary(
                 months = file.listening.size,
                 settings = file.settings.size,
+                favorites = file.favorites.size,
+                playlists = file.playlists.size,
                 from = file.versionName,
                 at = file.exportedAt,
             )
@@ -117,6 +139,8 @@ object Backup {
     data class Summary(
         val months: Int,
         val settings: Int,
+        val favorites: Int = 0,
+        val playlists: Int = 0,
         val from: String,
         val at: String,
     )
@@ -128,7 +152,7 @@ object Backup {
      * from a *newer* schema is refused rather than partially read; one from an
      * older schema is read as-is, since every field has a default.
      */
-    private const val SCHEMA_VERSION = 1
+    private const val SCHEMA_VERSION = 2
 
     @Serializable
     data class BackupFile(
@@ -139,6 +163,46 @@ object Backup {
         val exportedAt: String = "",
         val settings: Map<String, PrefValue> = emptyMap(),
         val listening: List<StoredBucket> = emptyList(),
+        /** Likes and dislikes, which used to live only on this device. */
+        val favorites: List<StoredTrackRating> = emptyList(),
+        /** Local playlists, so imported and saved collections move with them. */
+        val playlists: List<BackupPlaylist> = emptyList(),
+    )
+
+    /**
+     * A playlist as a backup carries it.
+     *
+     * [Song] is a rich, non-serialisable model, while [StoredTrackRating] already
+     * knows how to turn itself back into one. Reusing it keeps one conversion
+     * instead of a second, subtly different mapping.
+     */
+    @Serializable
+    data class BackupPlaylist(
+        val id: String,
+        val title: String,
+        val source: String = HomeSource.LOCAL.name,
+        val tracks: List<StoredTrackRating> = emptyList(),
+    )
+
+    private fun Song.asBackupTrack() = StoredTrackRating(
+        id = videoId,
+        status = LikeStatus.INDIFFERENT.name,
+        changedAtMs = 0L,
+        title = title,
+        artist = artist,
+        artwork = thumbnailUrl,
+        duration = durationText,
+        album = albumName,
+        localUri = localUri,
+        playbackSource = playbackSource,
+        playbackSourceId = playbackSourceId,
+    )
+
+    private fun BackupPlaylist.toLocalPlaylist() = LocalPlaylist(
+        id = id,
+        title = title,
+        songs = tracks.map { it.song() },
+        source = runCatching { HomeSource.valueOf(source) }.getOrDefault(HomeSource.LOCAL),
     )
 
     /** One preference, with the type it has to be restored as. */

@@ -12,18 +12,18 @@ class JamInviteTest {
 
     @Test
     fun `it reads the code out of an invite url`() {
-        assertEquals("ABC123", JamInvite.parse("${JamInvite.ORIGIN}/invite/ABC123"))
+        assertEquals("ABC123", JamInvite.parse("${JamInvite.ORIGIN}/ABC123"))
     }
 
     @Test
     fun `a code is normalised to upper case`() {
-        assertEquals("ABC123", JamInvite.parse("${JamInvite.ORIGIN}/invite/abc123"))
+        assertEquals("ABC123", JamInvite.parse("${JamInvite.ORIGIN}/abc123"))
     }
 
     @Test
     fun `query and fragment are ignored`() {
-        assertEquals("ABC123", JamInvite.parse("${JamInvite.ORIGIN}/invite/ABC123?utm=x"))
-        assertEquals("ABC123", JamInvite.parse("${JamInvite.ORIGIN}/invite/ABC123#top"))
+        assertEquals("ABC123", JamInvite.parse("${JamInvite.ORIGIN}/ABC123?utm=x"))
+        assertEquals("ABC123", JamInvite.parse("${JamInvite.ORIGIN}/ABC123#top"))
     }
 
     @Test
@@ -33,13 +33,13 @@ class JamInviteTest {
 
     @Test
     fun `plain http is refused`() {
-        assertNull(JamInvite.parse("http://bitchord.kushagrasingh.in/invite/ABC123"))
+        assertNull(JamInvite.parse("http://rxmusic.example/invite/ABC123"))
     }
 
     @Test
     fun `a wrong-length code is refused`() {
-        assertNull(JamInvite.parse("${JamInvite.ORIGIN}/invite/ABC12"))
-        assertNull(JamInvite.parse("${JamInvite.ORIGIN}/invite/ABC1234"))
+        assertNull(JamInvite.parse("${JamInvite.ORIGIN}/ABC12"))
+        assertNull(JamInvite.parse("${JamInvite.ORIGIN}/ABC1234"))
     }
 
     @Test

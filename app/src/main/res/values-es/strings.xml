@@ -1,5 +1,19 @@
 <resources>
-    <string name="app_name">BitChord</string>
+    <string name="google_cookie_import_title">Import YouTube Music session</string>
+    <string name="google_cookie_import_subtitle">Use your own browser session if Google blocks embedded sign-in</string>
+    <string name="google_cookie_import_description">Sign in to music.youtube.com in your normal browser. Copy its Cookie request header from browser developer tools and paste it here. Cookies grant account access: use only your own session and never share them. Confirm the profile on the next screen.</string>
+    <string name="google_cookie_import_invalid">Paste a complete, current YouTube Music Cookie header, not a password, Set-Cookie, or all request headers.</string>
+    <string name="google_cookie_import_button">Open my session</string>
+    <string name="vk_import_title">Import VK track list</string>
+    <string name="vk_import_subtitle">Paste track names or choose your TXT, CSV/TSV, or JSON export</string>
+    <string name="vk_import_description">Use one Artist — Title per line, or your own TXT, CSV/TSV, or VK JSON export. Matching YouTube recordings are saved in RX Playa. This imports metadata, not VK credentials or private audio.</string>
+    <string name="vk_import_hint">Artist — Title\nArtist — Another title</string>
+    <string name="vk_import_reading">Reading the track list…</string>
+    <string name="vk_import_invalid">Could not read or match that list. Use Artist — Title, CSV/TSV with artist/title columns, or a VK JSON track array.</string>
+    <string name="vk_public_import_subtitle">Without VK API keys you can import your track list, but not access a private VK library.</string>
+    <string name="soundcloud_public_choose">Choose public liked tracks or a playlist</string>
+    <string name="soundcloud_public_import_subtitle">Public playlists and liked tracks, without signing in</string>
+    <string name="app_name">RX Playa</string>
     <string name="playback_channel_name">Reproduciendo</string>
     <string name="download_channel_name">Descargas</string>
     <string name="download_channel_description">Canciones guardadas en tu carpeta Música</string>
@@ -105,10 +119,10 @@
     <string name="dolby_atmos_open_failed">No se pudieron abrir los ajustes de Dolby Atmos</string>
     <string name="update_available">Actualización disponible: v%1$s</string>
     <string name="software_update">Actualización de software</string>
-    <string name="update_available_body">bitchord %1$s está disponible para descargar.</string>
-    <string name="update_downloading_body">Descargando bitchord %1$s…</string>
-    <string name="update_ready_body">bitchord %1$s está listo para instalar.</string>
-    <string name="update_failed_body">No se pudo descargar bitchord %1$s.</string>
+    <string name="update_available_body">RX Playa %1$s está disponible para descargar.</string>
+    <string name="update_downloading_body">Descargando RX Playa %1$s…</string>
+    <string name="update_ready_body">RX Playa %1$s está listo para instalar.</string>
+    <string name="update_failed_body">No se pudo descargar RX Playa %1$s.</string>
     <string name="download_now">Descargar ahora</string>
     <string name="install_now">Instalar ahora</string>
     <string name="later">Más tarde</string>
@@ -136,7 +150,7 @@
     <string name="widget_previous">Anterior</string>
     <string name="widget_artwork">Portada del álbum</string>
     <string name="widget_nothing_played">Aún no se ha reproducido nada</string>
-    <string name="widget_open_bitchord">Abrir BitChord</string>
+    <string name="widget_open_bitchord">Abrir RX Playa</string>
     <string name="widget_preview_title">Título de la canción</string>
     <string name="widget_preview_artist">Artista</string>
     <string name="widget_pill_label">Reproduciendo 4×1</string>
@@ -163,7 +177,7 @@
     <string name="cancel_all">Cancelar todo</string>
     <string name="language">Idioma</string>
     <string name="app_language">Idioma de la aplicación</string>
-    <string name="app_language_description">Elige el idioma que usa BitChord.</string>
+    <string name="app_language_description">Elige el idioma que usa RX Playa.</string>
     <string name="english">Inglés</string>
     <string name="spanish">Español</string>
     <string name="french">Francés</string>
@@ -223,7 +237,6 @@
     <string name="reduce_dynamic_blur">Reducir desenfoque dinámico</string>
     <string name="reduce_dynamic_blur_subtitle">Cambia el cristal esmerilado por fondos sólidos</string>
     <string name="liquid_glass">Liquid Glass</string>
-    <string name="liquid_glass_subtitle">Cristal refractante real en la barra de navegación flotante. Solo Android 12+; usa más GPU.</string>
     <string name="liquid_glass_unavailable">Requiere Android 12 o posterior</string>
     <string name="full_screen_cover_art">Portada a pantalla completa</string>
     <string name="animated_cover_art">Portada animada</string>
@@ -267,10 +280,10 @@
     <string name="beta">Beta</string>
     <string name="refresh_rate">Frecuencia de actualización</string>
     <string name="high_performance_before_enabling">Antes de activarlo</string>
-    <string name="high_performance_battery_warning">Primero configura el uso de batería de BitChord como Sin restricciones. Las frecuencias altas usan más batería, CPU y GPU, y pueden calentar el dispositivo.</string>
+    <string name="high_performance_battery_warning">Primero configura el uso de batería de RX Playa como Sin restricciones. Las frecuencias altas usan más batería, CPU y GPU, y pueden calentar el dispositivo.</string>
     <string name="open_battery_settings">Abrir ajustes de batería</string>
     <string name="enable_high_performance_title">¿Activar el modo de alto rendimiento?</string>
-    <string name="enable_high_performance_confirmation">Actívalo solo si el uso de batería de BitChord está configurado como Sin restricciones. Android aún puede limitar la frecuencia si el dispositivo está caliente o tiene poca batería.</string>
+    <string name="enable_high_performance_confirmation">Actívalo solo si el uso de batería de RX Playa está configurado como Sin restricciones. Android aún puede limitar la frecuencia si el dispositivo está caliente o tiene poca batería.</string>
     <string name="enable">Activar</string>
     <string name="not_yet">Ahora no</string>
     <string name="activity">Actividad</string>
@@ -305,7 +318,7 @@
     <string name="discord_presence_footer">La tarjeta se actualiza al cambiar la canción, la posición o el estado de reproducción. Se borra cuando la reproducción se detiene.</string>
     <string name="discord_show_audio_quality">Mostrar calidad de audio</string>
     <string name="discord_show_audio_quality_subtitle">Especificaciones Hi-Res, sin pérdida y Dolby en la tarjeta de estado</string>
-    <string name="discord_sign_in_footer">El inicio de sesión abre la página de Discord. No se escribe nada dentro de BitChord.</string>
+    <string name="discord_sign_in_footer">El inicio de sesión abre la página de Discord. No se escribe nada dentro de RX Playa.</string>
     <string name="discord_token">Token de Discord</string>
     <string name="discord_token_description">Pega el token de tu cuenta de Discord. Se guarda cifrado en este dispositivo y solo se envía a Discord.</string>
     <string name="discord_token_rejected">Discord rechazó ese token.</string>
@@ -340,7 +353,7 @@
     <string name="downloads_finished">Descargas · finalizadas</string>
     <string name="downloading_progress">Descargando · %1$d%%</string>
     <string name="starting">Iniciando</string>
-    <string name="saved_to_bitchord_folder">Guardada en Music/BitChord</string>
+    <string name="saved_to_bitchord_folder">Guardada en Music/RX Playa</string>
     <string name="nothing_downloading">No hay descargas activas</string>
     <string name="nothing_to_explore">No hay nada para explorar ahora</string>
     <string name="no_youtube_music_results">No hay resultados de YouTube Music</string>
@@ -468,7 +481,7 @@
     <string name="sleep_timer_custom">Personalizado</string>
     <string name="start_sleep_timer">Iniciar temporizador</string>
     <string name="sources_no_lossless">Ninguna fuente activa ofrece audio sin pérdida. Agrega un módulo personalizado para reproducir archivos sin pérdida disponibles sin transcodificarlos.</string>
-    <string name="sources_order_footer">Si una fuente no tiene una canción o no responde, BitChord prueba la siguiente. Las fuentes situadas antes de YouTube pueden reemplazar su grabación si devuelven una versión mejor.</string>
+    <string name="sources_order_footer">Si una fuente no tiene una canción o no responde, RX Playa prueba la siguiente. Las fuentes situadas antes de YouTube pueden reemplazar su grabación si devuelven una versión mejor.</string>
     <string name="sources_order_header">Fuentes, en orden de prioridad</string>
     <string name="sources_quality_capped">Esta conexión está configurada por debajo de calidad Alta, así que el audio se transcodifica para respetar ese límite. Las descargas no cambian.</string>
     <string name="jiosaavn_mismatch_warning">Puede elegir la versión equivocada de una canción. Actívalo bajo tu propio riesgo.</string>
@@ -514,7 +527,7 @@
     <string name="biggest_day_note">Tu día con más actividad fue el %1$s, con %2$s de reproducción.</string>
     <string name="close_replay">Cerrar Replay</string>
     <string name="couldnt_draw_picture">No se pudo crear la imagen</string>
-    <string name="default_replay_holder">Oyente de BitChord</string>
+    <string name="default_replay_holder">Oyente de RX Playa</string>
     <string name="different_albums">Álbumes diferentes</string>
     <string name="genres_pending">Los géneros aparecerán cuando aumente tu historial de reproducción</string>
     <string name="hour_am">%1$d a. m.</string>
@@ -544,7 +557,7 @@
     <string name="replay_artist_end"> no dejó de aparecer.</string>
     <string name="replay_artist_focus">Un artista</string>
     <string name="replay_artist_start">Durante todo el mes, </string>
-    <string name="replay_empty_description">Escucha un poco más y BitChord convertirá tu historial en un Replay.</string>
+    <string name="replay_empty_description">Escucha un poco más y RX Playa convertirá tu historial en un Replay.</string>
     <string name="replay_genre_end"> definieron tu sonido.</string>
     <string name="replay_genre_focus">Tus géneros</string>
     <string name="replay_genre_start">En conjunto, </string>
@@ -609,7 +622,7 @@
     <string name="webdav_subtitle">Música en tu servidor</string>
     <string name="webdav_not_configured">Conecta un servidor en Fuentes</string>
     <string name="webdav_empty">No se encontraron archivos de audio en el servidor WebDAV. Revisa la URL en Ajustes.</string>
-    <string name="webdav_description">Conecta BitChord a una carpeta de música WebDAV: tu directorio de música de Nextcloud o cualquier servidor compatible con WebDAV.</string>
+    <string name="webdav_description">Conecta RX Playa a una carpeta de música WebDAV: tu directorio de música de Nextcloud o cualquier servidor compatible con WebDAV.</string>
     <string name="webdav_server_url">URL del servidor</string>
     <string name="webdav_server_url_hint">https://cloud.example.com/remote.php/dav/files/user/Music</string>
     <string name="webdav_disconnect">Desconectar</string>
@@ -626,7 +639,7 @@
     <string name="smb_subtitle">Música en una carpeta compartida</string>
     <string name="smb_not_configured">Conecta una carpeta compartida en Fuentes</string>
     <string name="smb_empty">No se encontraron archivos de audio en la carpeta SMB. Revisa el servidor en Fuentes.</string>
-    <string name="smb_description">Conecta BitChord a una carpeta de música compartida: un NAS o una carpeta compartida de Windows por SMB.</string>
+    <string name="smb_description">Conecta RX Playa a una carpeta de música compartida: un NAS o una carpeta compartida de Windows por SMB.</string>
     <string name="smb_server_hint">nas.local or 192.168.1.10:4445</string>
     <string name="smb_share_hint">Nombre del recurso, p. ej. Music</string>
     <string name="smb_folder_hint">Carpeta (opcional)</string>
@@ -675,7 +688,7 @@
     </plurals>
     <string name="no_local_albums">Todavía no hay archivos asociados a un álbum o playlist. Descarga un álbum o una playlist completa para que aparezca aquí.</string>
     <string name="play_your_replay">Reproducir tu Replay</string>
-    <string name="counted_on_device_with_bitchord">Calculado en este dispositivo con BitChord</string>
+    <string name="counted_on_device_with_bitchord">Calculado en este dispositivo con RX Playa</string>
     <string name="this_month">Este mes</string>
     <string name="this_year">Este año</string>
     <string name="all_time">Todo el tiempo</string>
@@ -743,7 +756,7 @@
     <string name="listen_together_code">Código de la fiesta</string>
     <string name="listen_together_code_footer">Dilo en voz alta o envíalo. La O y la I no se usan, así que una «o» siempre es un cero.</string>
     <string name="copy_code">Copiar código</string>
-    <string name="listen_together_share_text">Escucha conmigo en BitChord — código de fiesta %1$s</string>
+    <string name="listen_together_share_text">Escucha conmigo en RX Playa — código de fiesta %1$s</string>
     <string name="listen_together_now_playing">Reproduciendo</string>
     <string name="listen_together_nothing_playing">Todavía no suena nada</string>
     <string name="listen_together_listening">Escuchando · %1$d de %2$d</string>
@@ -780,7 +793,7 @@
     <string name="listen_together_custom_server_dialog_message">Esta fiesta está alojada en un servidor externo:\n\n%1$s\n\n¿Quieres cambiar tu servidor de fiestas y unirte a la fiesta %2$s?</string>
     <string name="listen_together_custom_server_switch_and_join">Cambiar y unirse</string>
     <string name="listen_together_official_server_dialog_title">¿Cambiar al servidor oficial?</string>
-    <string name="listen_together_official_server_dialog_message">Esta fiesta está alojada en el servidor oficial de BitChord.\n\n¿Quieres volver al servidor oficial y unirte a la fiesta %1$s?</string>
+    <string name="listen_together_official_server_dialog_message">Esta fiesta está alojada en el servidor oficial de RX Playa.\n\n¿Quieres volver al servidor oficial y unirte a la fiesta %1$s?</string>
     <string name="listen_together_switch_failed_stayed_in_party">No se pudo unir a la fiesta: %1$s. Sigues en la fiesta %2$s.</string>
     <string name="listen_together_switch_failed">No se pudo unir a la fiesta: %1$s.</string>
     <string name="listen_together_ping">%1$d ms</string>
@@ -811,9 +824,9 @@
 
     <string name="add_addon">Añadir un complemento</string>
 
-    <string name="add_addon_detail">Apunta BitChord a un servidor de complementos que alojes o te hayan compartido</string>
+    <string name="add_addon_detail">Apunta RX Playa a un servidor de complementos que alojes o te hayan compartido</string>
 
-    <string name="addon_url_description">Pega la URL del complemento, ya sea la raíz o manifest.json. BitChord leerá qué puede buscar y reproducir.</string>
+    <string name="addon_url_description">Pega la URL del complemento, ya sea la raíz o manifest.json. RX Playa leerá qué puede buscar y reproducir.</string>
 
     <string name="advanced_options">Opciones avanzadas</string>
 
@@ -955,7 +968,7 @@
 
     <string name="source_skipped_by_quality">No usado en %1$s · la calidad está establecida en %2$s</string>
 
-    <string name="source_unrecognised">BitChord no pudo reconocer ese enlace</string>
+    <string name="source_unrecognised">RX Playa no pudo reconocer ese enlace</string>
 
     <string name="revert_to_original">Revertir al original</string>
 
@@ -1004,11 +1017,12 @@
 
     <string name="auto_recents">Recent</string>
 
-    <string name="auto_liked">Liked songs</string>
+    <string name="favorites_tab">Favoritos</string>
+    <string name="auto_liked">Canciones favoritas</string>
 
     <string name="auto_login_title">Sign in to YouTube on your phone</string>
 
-    <string name="auto_login_subtitle">Open BitChord on your phone to sign in</string>
+    <string name="auto_login_subtitle">Open RX Playa on your phone to sign in</string>
 
     <string name="auto_empty_recents_title">No recent songs</string>
 
@@ -1022,9 +1036,9 @@
 
     <string name="auto_empty_playlists_subtitle">Check your connection and try again</string>
 
-    <string name="auto_empty_liked_title">No liked songs</string>
+    <string name="auto_empty_liked_title">Aún no hay canciones favoritas</string>
 
-    <string name="auto_empty_liked_subtitle">Tap the heart on a song to save it here</string>
+    <string name="auto_empty_liked_subtitle">Toca la estrella de una canción para guardarla aquí</string>
 
     <string name="auto_empty_offline_title">No offline songs</string>
 
@@ -1042,7 +1056,7 @@
     <string name="smart_version_alignment">Alineación de audio inteligente</string>
     <string name="smart_version_alignment_subtitle">Analiza las formas de onda para encontrar el momento exacto de reproducción correspondiente</string>
 
-    <string name="equalizer_footer">Shapes the sound inside BitChord, before it reaches the system.</string>
+    <string name="equalizer_footer">Shapes the sound inside RX Playa, before it reaches the system.</string>
 
     <string name="equalizer_dynamic">Dynamic</string>
 
@@ -1085,7 +1099,7 @@
 
     <string name="system_equalizer_subtitle">Your device\'s own panel</string>
 
-    <string name="system_equalizer_footer">Runs after BitChord\'s, on the whole audio session. Using both applies both.</string>
+    <string name="system_equalizer_footer">Runs after RX Playa\'s, on the whole audio session. Using both applies both.</string>
 
     <string name="eq_preset_flat">Flat</string>
 
@@ -1277,6 +1291,57 @@
     <string name="spotify_sign_in">Iniciar sesión con Spotify</string>
     <string name="spotify_use_spdc_token">Usar token sp_dc</string>
     <string name="spotify_track_unavailable">No se encontró esa canción en YouTube Music</string>
+    <string name="search_source_all">Todas las plataformas</string>
+    <string name="search_platform_empty">Escribe una búsqueda y elige una plataforma musical</string>
+    <string name="search_platform_no_results">No se encontraron pistas para «%1$s» en las plataformas seleccionadas</string>
+    <string name="home_good_morning">Buenos días</string>
+    <string name="home_good_afternoon">Buenas tardes</string>
+    <string name="home_good_evening">Buenas noches</string>
+    <string name="music">Música</string>
+    <string name="yandex_music">Yandex Music</string>
+    <string name="yandex_music_sign_in">Iniciar sesión en Yandex Music</string>
+    <string name="yandex_music_login_failed">Error al iniciar sesión en Yandex Music: %1$s</string>
+    <string name="yandex_music_connected_plus">%1$s · Plus</string>
+    <string name="yandex_music_connected_free">%1$s · Sin Plus</string>
+    <string name="yandex_music_sync_presence">Sincronizar pista actual</string>
+    <string name="yandex_music_integration_footer">Lee la reproducción en directo mediante Yandex Music Connect y envía las pistas válidas a Rich Presence. No elude los límites de la suscripción; los anuncios y las pistas no disponibles nunca se comparten.</string>
+    <string name="yandex_music_status_connecting">Conectando…</string>
+    <string name="yandex_music_status_reconnecting">Conexión perdida · reintentando…</string>
+    <string name="yandex_music_status_waiting">Esperando reproducción en un dispositivo de Yandex Music</string>
+    <string name="yandex_music_status_paused">Reproducción en pausa</string>
+    <string name="yandex_music_status_advertisement">Anuncio · uso compartido del estado en pausa</string>
+    <string name="yandex_music_status_restricted">Pista no disponible · uso compartido del estado en pausa</string>
+    <string name="yandex_music_status_auth_expired">La autorización caducó · vuelve a iniciar sesión</string>
+    <string name="yandex_music_status_disabled">La sincronización está desactivada</string>
+    <string name="yandex_music_listen_button">Escuchar en Yandex Music</string>
+    <string name="yandex_music_sync_title">Sincronización del estado de Yandex Music</string>
+    <string name="yandex_music_sync_channel">Sincronización de Yandex Music</string>
+    <string name="yandex_music_sync_channel_description">Mantiene la pista actual de Yandex Music en RX Playa y Rich Presence</string>
+    <string name="yandex_import_title">Importar desde Yandex Music</string>
+    <string name="yandex_import_description">Pega un enlace de lista o elige una abajo. Las pistas se buscarán en YouTube Music y se guardarán en RX Playa.</string>
+    <string name="yandex_import_loading">Cargando listas de Yandex Music…</string>
+    <string name="yandex_import_empty">No se encontraron listas en esta cuenta de Yandex Music.</string>
+    <string name="yandex_import_select">Elige una lista para importar.</string>
+    <string name="yandex_import_reading">Leyendo la lista de Yandex Music…</string>
+    <string name="yandex_import_link_hint">music.yandex.ru/users/…/playlists/…</string>
+    <string name="yandex_import_invalid_link">Ese enlace no pertenece a una lista de Yandex Music.</string>
+    <string name="soundcloud">SoundCloud</string>
+    <string name="soundcloud_import_title">Importar desde SoundCloud</string>
+    <string name="soundcloud_import_description">Paste a public SoundCloud playlist link. Public tracks are saved locally and played directly from SoundCloud.</string>
+    <string name="soundcloud_import_hint">soundcloud.com/artist/sets/…</string>
+    <string name="soundcloud_import_invalid">Ese enlace no pertenece a una lista de SoundCloud.</string>
+    <string name="soundcloud_import_fetching">Leyendo la lista de SoundCloud…</string>
+    <string name="soundcloud_import_footer">Imports complete public playlists without a SoundCloud account. Private, removed and Go+ tracks remain unavailable.</string>
+    <string name="guest_profile">Perfil de invitado</string>
+    <string name="guest_profile_subtitle">Configura un apodo y un avatar locales</string>
+    <string name="local_profile">Perfil local</string>
+    <string name="guest_name">Apodo</string>
+    <string name="choose_avatar">Elegir avatar</string>
+    <string name="remove_avatar">Eliminar avatar</string>
+    <string name="delete_guest_profile">Eliminar perfil de invitado</string>
+    <string name="guest_profile_help">Se guarda solo en este dispositivo. No desbloquea funciones de la cuenta de Google.</string>
+    <string name="guest_avatar_failed">No se pudo guardar la imagen seleccionada</string>
+    <string name="stop">Detener</string>
     <string name="artist_signatures">Firmas de artistas</string>
     <string name="artist_signatures_subtitle">Muestra una firma manuscrita cuando Apple Music no tiene logotipo de título</string>
     <string name="artist_signatures_url">URL de la API de firmas</string>
@@ -1298,7 +1363,7 @@
     <string name="replay_period_monthly">Mensual</string>
     <string name="replay_period_yearly">Anual</string>
     <string name="replay_period_lifetime">De siempre</string>
-    <string name="onboarding_title">Millones de canciones, en streaming en BitChord</string>
+    <string name="onboarding_title">Millones de canciones, en streaming en RX Playa</string>
     <string name="onboarding_name_prompt">¿Cómo quieres que te llamemos?</string>
     <string name="onboarding_name_hint">Tu nombre</string>
     <string name="onboarding_name_footer">Tus amigos lo ven cuando usas Escuchar juntos. Puedes cambiarlo más tarde en Ajustes.</string>
@@ -1308,7 +1373,7 @@
     <string name="onboarding_sign_in_google">Iniciar sesión con Google</string>
     <string name="onboarding_skip_sign_in">Omitir inicio de sesión</string>
     <string name="onboarding_back">Atrás</string>
-    <string name="wear_os_section">BitChord para Wear OS</string>
+    <string name="wear_os_section">RX Playa para Wear OS</string>
     <string name="wear_os_page_title">Wear OS</string>
     <string name="wear_os_your_watches">Tus relojes</string>
     <string name="wear_os_value_none">Sin reloj</string>
@@ -1318,7 +1383,7 @@
     <string name="wear_os_no_watch">Ningún reloj conectado</string>
     <string name="wear_os_no_watch_subtitle">Primero vincula un reloj Wear OS con este teléfono desde su app complementaria.</string>
     <string name="wear_os_checking">Comprobando…</string>
-    <string name="wear_os_not_installed">BitChord no está en este reloj</string>
+    <string name="wear_os_not_installed">RX Playa no está en este reloj</string>
     <string name="wear_os_up_to_date">Actualizado · %1$s</string>
     <string name="wear_os_update_available">Actualización disponible</string>
     <string name="wear_os_unknown">Instalado · no se pudo comprobar la versión</string>
@@ -1335,7 +1400,7 @@
     <string name="wear_os_searching">Buscando tu reloj en la red Wi-Fi…</string>
     <string name="wear_os_found">Reloj encontrado</string>
     <string name="wear_os_pairing">Vinculando…</string>
-    <string name="wear_os_installing">Instalando BitChord en tu reloj…</string>
+    <string name="wear_os_installing">Instalando RX Playa en tu reloj…</string>
     <string name="wear_os_installed">Instalado. Ya puedes desactivar de nuevo la depuración inalámbrica.</string>
     <string name="wear_os_failed">No ha funcionado (%1$s). Comprueba el código e inténtalo de nuevo.</string>
     <string name="wear_os_unsupported">Instalar en un reloj requiere Android 11 o posterior en este teléfono.</string>
@@ -1383,8 +1448,8 @@
     <string name="font_footer">Clásica recupera la tipografía más gruesa y compacta que usaba la app antes de adaptarla a Apple Music.</string>
     <string name="bit_perfect_output">Salida bit-perfect</string>
     <string name="bit_perfect_bypassed_footer">La salida bit-perfect está lista, por lo que se omiten los ajustes atenuados y no se solicitan versiones Dolby Atmos. Vuelven a funcionar al desconectar el DAC o desactivar el modo.</string>
-    <string name="bit_perfect_sheet_warning">Envía la pista al DAC sin cambios. Se omiten el ecualizador, la normalización de volumen, el fundido cruzado, la mezcla automática, la velocidad de reproducción y el volumen de BitChord.</string>
-    <string name="bit_perfect_mode_off_subtitle">El audio pasa por el mezclador de Android y los efectos de BitChord.</string>
+    <string name="bit_perfect_sheet_warning">Envía la pista al DAC sin cambios. Se omiten el ecualizador, la normalización de volumen, el fundido cruzado, la mezcla automática, la velocidad de reproducción y el volumen de RX Playa.</string>
+    <string name="bit_perfect_mode_off_subtitle">El audio pasa por el mezclador de Android y los efectos de RX Playa.</string>
     <string name="bit_perfect_mode_usb_android">DAC USB</string>
     <string name="bit_perfect_mode_usb_android_subtitle">Android 14 abre el DAC con la frecuencia y la profundidad de bits de cada pista, sin mezclar ni remuestrear.</string>
     <string name="bit_perfect_requires_android_14">Requiere Android 14 o posterior</string>
@@ -1392,13 +1457,13 @@
     <string name="bit_perfect_mode_dap_exclusive_subtitle">Para reproductores de música con DAC propio. Abre la salida de auriculares o de línea en exclusiva con la frecuencia de cada pista. No todos los dispositivos conceden el modo exclusivo.</string>
     <string name="bit_perfect_requires_android_8_1">Requiere Android 8.1 o posterior</string>
     <string name="bit_perfect_mode_usb_direct">DAC USB (controlador directo)</string>
-    <string name="bit_perfect_mode_usb_direct_subtitle">BitChord controla el DAC directamente, en cualquier versión de Android, y ajusta el volumen en el DAC. Pide permiso USB. Puede sonar mucho más alto que la salida normal.</string>
+    <string name="bit_perfect_mode_usb_direct_subtitle">RX Playa controla el DAC directamente, en cualquier versión de Android, y ajusta el volumen en el DAC. Pide permiso USB. Puede sonar mucho más alto que la salida normal.</string>
     <string name="dac_volume">Volumen del DAC</string>
     <string name="dac_volume_subtitle">Se ajusta en el propio DAC; la música no se escala</string>
     <string name="usb_allow_fixed_volume">Permitir DAC sin control de volumen</string>
     <string name="usb_allow_fixed_volume_subtitle">Si no, ese DAC reproduce por la salida normal</string>
     <string name="usb_allow_fixed_volume_confirm_title">¿Reproducir a escala completa?</string>
-    <string name="usb_allow_fixed_volume_confirm_message">BitChord no puede ajustar el volumen de este tipo de DAC, así que reproduce a escala completa y solo su propio mando, si lo tiene, controla el nivel. Puede sonar peligrosamente alto con auriculares sensibles.</string>
+    <string name="usb_allow_fixed_volume_confirm_message">RX Playa no puede ajustar el volumen de este tipo de DAC, así que reproduce a escala completa y solo su propio mando, si lo tiene, controla el nivel. Puede sonar peligrosamente alto con auriculares sensibles.</string>
     <string name="convert_for_limited_dac">Convertir para DAC más limitados</string>
     <string name="convert_for_limited_dac_subtitle">Convierte las pistas que superan el límite de tu DAC a su formato más alto. Pueden tardar más en empezar y no serán bit-perfect respecto al original.</string>
     <string name="bit_perfect_confirm_title">¿Activar la salida bit-perfect?</string>
@@ -1408,4 +1473,48 @@
     <string name="bit_perfect_status_inexact">%1$s · no exacto: esta fuente no es PCM sin pérdida</string>
     <string name="bit_perfect_status_waiting">Esperando una pista sin pérdida en una salida compatible</string>
     <string name="bit_perfect_status_unavailable">No disponible para esta pista (%1$s)</string>
+    <string name="personalized_for_you">Para ti</string>
+    <string name="personalized_recent_likes">Me gusta recientes</string>
+    <string name="personalized_artist_format">Artistas favoritos: %1$s</string>
+    <string name="personalized_source_format">%1$s · Tus selecciones</string>
+    <string name="personalized_empty">Marca música con Me gusta, escucha o importa una lista para crear tu perfil de gustos.</string>
+    <string name="personalized_updating">Actualizando tu perfil de gustos…</string>
+    <string name="personalized_unavailable_format">Algunos datos no están disponibles: %1$s. Desliza hacia abajo para reintentar.</string>
+    <string name="personalized_limitations_notice">SoundCloud y complementos: importaciones y actividad en RX Playa, no los Me gusta de la cuenta.</string>
+
+    <string name="spotify_direct_playback_unavailable">RX Playa cannot access Spotify’s full audio stream. Open the track in Spotify or search for a copy on another platform.</string>
+    <string name="soundcloud_track_unavailable">No public stream was found for this SoundCloud track. You can search for a copy on another platform.</string>
+    <string name="dpi_bypass_title">Bypass provider throttling (experimental)</string>
+    <string name="dpi_bypass_subtitle">Routes this app\'s music traffic through a local proxy that splits the TLS handshake. Helps where YouTube Music, Spotify or SoundCloud are slowed by the access provider. It is not a VPN: a service blocked by address or unavailable in your region stays unavailable.</string>
+    <string name="zapret_title">Root DPI bypass (zapret)</string>
+    <string name="zapret_subtitle">Controls an installed nfqws: diverts this app music traffic to NFQUEUE and runs the chosen fake/split strategy. Needs root and a zapret binary on the device.</string>
+    <string name="zapret_check">Check</string>
+    <string name="zapret_start">Start</string>
+    <string name="zapret_stop">Stop</string>
+    <string name="zapret_import">Import nfqws binary</string>
+    <string name="zapret_log">Journal</string>
+    <string name="zapret_arguments">Custom arguments</string>
+    <string name="zapret_autostart">Start on boot</string>
+    <string name="zapret_save">Save</string>
+    <string name="accent_colour">Accent colour</string>
+    <string name="vless_title">Your VLESS key</string>
+    <string name="vless_subtitle">Routes this app music traffic through your own VLESS server. Paste a vless:// link with security=tls and type=tcp; Reality, WebSocket and flow keys are refused with a reason.</string>
+    <string name="vless_add">Paste key</string>
+    <string name="vless_save">Save</string>
+    <string name="google_signin_blocked_notice">Google refuses sign-in inside an embedded browser. Sign in with a normal browser on this device, then paste the Cookie header here.</string>
+    <string name="vless_clear">Remove key</string>
+    <string name="vless_test">Test key</string>
+    <string name="vless_state_on">On · %1$s</string>
+    <string name="vless_state_saved">Saved · %1$s</string>
+    <string name="zapret_not_checked">Not checked</string>
+    <string name="liquid_glass_title">Liquid Glass</string>
+    <string name="liquid_glass_subtitle">Refracting frosted chrome on the bars, the mini player and the top bar. Falls back to plain frosting on devices without the required GPU features.</string>
+    <string name="ui_style_title">Diseño</string>
+    <string name="ui_style_subtitle">RX es el aspecto inspirado en Apple Music; Material 3 es el lenguaje de componentes de Google.</string>
+    <string name="material_you_title">Colores del fondo</string>
+    <string name="material_you_subtitle">Material You toma la paleta del fondo. Solo Android 12 o posterior.</string>
+    <string name="custom_accent_title">Acento propio</string>
+    <string name="custom_accent_hint">Arrastra para elegir cualquier color</string>
+    <string name="custom_accent_reset">Predeterminado</string>
+    <string name="playing_from_source">Reproduciendo desde %1$s</string>
 </resources>

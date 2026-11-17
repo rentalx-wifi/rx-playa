@@ -53,8 +53,33 @@ val listenTogetherServer: String = (
         ?: "https://bitchord-listen-together.onrender.com"
     ).trim().trimEnd('/')
 
+// OAuth/token exchange for account integrations lives on the same Go service
+// by default. A separate deployment can be selected without changing source.
+val integrationServer: String = (
+    localProps.getProperty("RX_MUSIC_BACKEND")
+        ?: System.getenv("RX_MUSIC_BACKEND")
+        ?: listenTogetherServer
+    ).trim().trimEnd('/')
+val vkIdClientId: String = (
+    localProps.getProperty("VK_ID_CLIENT_ID")
+        ?: System.getenv("VK_ID_CLIENT_ID")
+        ?: ""
+    ).trim()
+val vkAudioScopeApproved: Boolean = (
+    localProps.getProperty("VK_AUDIO_SCOPE_APPROVED")
+        ?: System.getenv("VK_AUDIO_SCOPE_APPROVED")
+        ?: "false"
+    ).trim().toBooleanStrictOrNull() ?: false
+val vkRedirectScheme = vkIdClientId.takeIf(String::isNotBlank)?.let { "vk$it" } ?: "vk0000000"
+
 // See the root build.gradle.kts: one version for the phone and its watch app.
 val betaSuffix = rootProject.extra["bitchordBetaSuffix"] as String
+val supportedAbis = listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+val requestedAbi = providers.gradleProperty("bitchordAbi").orNull
+require(requestedAbi == null || requestedAbi in supportedAbis) {
+    "bitchordAbi must be one of ${supportedAbis.joinToString()}"
+}
+val packagedAbis = requestedAbi?.let(::listOf) ?: supportedAbis
 
 android {
     namespace = "com.music.bitchord"
@@ -80,18 +105,30 @@ android {
             "LISTEN_TOGETHER_SERVER",
             "\"${listenTogetherServer.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
         )
+        buildConfigField(
+            "String",
+            "RX_MUSIC_BACKEND",
+            "\"${integrationServer.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
+        )
+        buildConfigField("String", "VK_ID_CLIENT_ID", "\"${vkIdClientId.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
+        buildConfigField("boolean", "VK_AUDIO_SCOPE_APPROVED", vkAudioScopeApproved.toString())
+        buildConfigField("String", "VK_ID_REDIRECT_SCHEME", "\"$vkRedirectScheme\"")
+        manifestPlaceholders["vkIdRedirectScheme"] = vkRedirectScheme
         // Which release assets are this app's: the phone and TV APKs ship in
         // the same GitHub release, told apart by file name. See
         // AppUpdateChecker.apkAssetUrl.
-        buildConfigField("String", "UPDATE_APK_PREFIX", "\"BitChord-\"")
+        buildConfigField("String", "UPDATE_APK_PREFIX", "\"RXMusic-\"")
     }
 
     splits {
         abi {
             isEnable = true
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86_64")
-            isUniversalApk = true
+            include(*packagedAbis.toTypedArray())
+            // CI/release still gets every split plus universal. A local phone
+            // build can pass -PbitchordAbi=arm64-v8a and avoid compiling two
+            // unused native trees (and their FetchContent downloads).
+            isUniversalApk = requestedAbi == null
         }
     }
 
@@ -116,7 +153,7 @@ android {
         create("dev") {
             dimension = "env"
             applicationId = "com.dev.bitchord"
-            resValue("string", "app_name", "BitChord Dev")
+            resValue("string", "app_name", "RX Music")
         }
         create("prod") {
             dimension = "env"

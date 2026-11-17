@@ -119,6 +119,9 @@ matching Kotlin's naming keeps `@SerialName` off every field.
 | `POST /api/parties/{code}/join` | Same body. `404` unknown code, `409` full, `422` no identity. The code is normalised first, so lower case, spaces, and `O`/`I`/`L` typed for `0`/`1` all work. |
 | `GET /api/parties/{code}` | Full snapshot. Needs `Authorization: Bearer <token>`. |
 | `POST /api/parties/{code}/leave` | Give up the slot. Needs the bearer token. |
+| `GET /api/integrations/soundcloud/config` | Reports whether official SoundCloud sign-in is configured; returns only the public client id and callback URI. |
+| `POST /api/integrations/soundcloud/exchange` | Exchanges Android's PKCE code without exposing the SoundCloud client secret. |
+| `POST /api/integrations/soundcloud/refresh` | Rotates SoundCloud's single-use refresh token. |
 
 ### WebSocket — `/ws/parties/{code}`
 
@@ -246,7 +249,7 @@ To keep memory, bandwidth, and latency strictly bounded:
 
 ## Deploying to Oracle Cloud (Always Free)
 
-This is what runs `https://api.bitchord.kushagrasingh.in`: one Always Free
+This is what runs `https://api.rxmusic.example`: one Always Free
 `VM.Standard.E2.1.Micro` (1 OCPU, 1 GB) on Ubuntu 24.04 in ap-mumbai-1, with
 Caddy in front for HTTPS and WebSockets. Files are in `deploy/`.
 
@@ -261,7 +264,7 @@ Caddy in front for HTTPS and WebSockets. Files are in `deploy/`.
 4. **Install** (from a copy of `backend/` on the VM):
 
    ```sh
-   sudo DOMAIN=api.bitchord.kushagrasingh.in bash deploy/setup.sh
+   sudo DOMAIN=api.rxmusic.example bash deploy/setup.sh
    ```
 
    It installs Go, builds the server into `/opt/bitchord-jam`, runs it as the
@@ -338,6 +341,10 @@ Every one of these is optional — `config/config.go` carries the same defaults.
 | `JAM_ALLOWED_ORIGINS` | *(none)* | Comma-separated browser Origin allowlist. Native clients send no Origin and remain supported. |
 | `JAM_TRUST_PROXY` | `false` | Read `X-Forwarded-For` for rate limiting only when a trusted proxy terminates requests. |
 | `JAM_PUBLIC_ORIGIN` | *(none)* | Public origin emitted verbatim in invite deep links, e.g. `https://party.example.com`. Set it when TLS terminates upstream and `X-Forwarded-Proto` may be rewritten or dropped along the way. |
+| `SOUNDCLOUD_CLIENT_ID` | *(none)* | Official SoundCloud application client id. Public Android search/playback still works when unset. |
+| `SOUNDCLOUD_CLIENT_SECRET` | *(none)* | Official SoundCloud application secret. Keep only on the backend. |
+| `SOUNDCLOUD_REDIRECT_URI` | `rxmusic://oauth/soundcloud` | Exact redirect registered for the SoundCloud application. |
+| `OAUTH_RATE_PER_MINUTE` | `12` | Per-IP ceiling for token exchange and refresh requests. |
 | `PORT` | `8000` | Port the server listens on. |
 
 ## Layout
@@ -352,4 +359,5 @@ protocol/protocol.go  Action and frame-type names
 main.go               REST routes, the socket loop, the heartbeat ticker
 main_test.go          REST endpoints and WebSocket integration tests
 party/party_test.go   Capacity limits, queue limits, delta moves, step
+oauthbroker/          Secret-safe OAuth code/refresh exchange
 ```

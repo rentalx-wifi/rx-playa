@@ -134,6 +134,23 @@ object TrackMatcher {
         ranked(candidates, target).firstOrNull()
 
     /**
+     * The least wrong copy of [target] among [candidates], for the paths whose
+     * only alternative is a row that does nothing.
+     *
+     * These used to take the first search result, unchecked, and that is how a
+     * liked "All I Need" turned into somebody else's upload of the same name:
+     * the title matched and nobody ever asked who was singing. So the order is
+     * strict first — [best], which will not hand back a different artist unless
+     * the runtime is exact to the second — and then, only then, a row credited
+     * to the same artist with any runtime, because an extended mix or a sped-up
+     * edit by the artist themselves is still their song. A different artist
+     * with a different runtime is refused: silence is the better answer.
+     */
+    fun looseHit(candidates: List<Song>, target: Target): Song? =
+        best(candidates, target)
+            ?: candidates.firstOrNull { sharesArtist(target.artist, it.artist) }
+
+    /**
      * The catalogue counterpart for a music-video upload selected explicitly
      * by the listener.
      *

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The RX mark as a launcher icon: the artwork as the foreground, held to the
+  adaptive icon's safe 72 of 108, on a background of the picture's own average
+  tone (kept in values/colors.xml as rx_icon_background). A launcher mask that
+  shows more than the safe zone shows the mark's field rather than a hex the
+  mark knows nothing about.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/rx_icon_background" />
+    <foreground android:drawable="@drawable/ic_rx_foreground" />
+    <monochrome android:drawable="@mipmap/ic_monochrome_foreground" />
+</adaptive-icon>

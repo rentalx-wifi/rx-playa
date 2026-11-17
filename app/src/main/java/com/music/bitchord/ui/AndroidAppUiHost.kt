@@ -1,5 +1,10 @@
 package com.music.bitchord.ui
 
+import androidx.compose.runtime.mutableStateOf
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -17,10 +22,23 @@ object AndroidAppUiHost : AppUiHost {
     override val pinnedPlaylists = AppSettings.pinnedPlaylists
     override val librarySort = AppSettings.librarySort
 
+    // One collector for the whole app. Every row that shows a "downloaded"
+    // mark used to call this, and each call subscribed to the flow with its own
+    // state and lifecycle observer — a hundred rows, a hundred subscriptions,
+    // all of them on the scroll path.
+    private val cachedIds = mutableStateOf(Downloads.saved.value.keys)
+    private val cacheScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+    private var cacheStarted = false
+
     @Composable
     override fun downloadedIds(): Set<String> {
-        val saved by Downloads.saved.collectAsStateWithLifecycle()
-        return saved.keys
+        if (!cacheStarted) {
+            cacheStarted = true
+            cacheScope.launch {
+                Downloads.saved.collect { saved -> cachedIds.value = saved.keys }
+            }
+        }
+        return cachedIds.value
     }
 
     override suspend fun releaseMotion(album: String, artist: String): CanvasArtwork? {

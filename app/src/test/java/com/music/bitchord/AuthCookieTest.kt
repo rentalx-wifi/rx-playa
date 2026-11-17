@@ -1,6 +1,8 @@
 package com.music.bitchord
 
 import com.music.bitchord.auth.AuthStore
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -53,6 +55,50 @@ class AuthCookieTest {
         // A cleared cookie is not a credential, and signing with the empty
         // string produces a digest Google refuses rather than an obvious error.
         assertFalse(AuthStore.hasApiSid("SID=abc; SAPISID=; HSID=def"))
+    }
+
+    @Test
+    fun `manual cookie accepts the Cookie prefix and normalizes whitespace`() {
+        assertEquals(
+            "SID=fixture; SAPISID=fixture==",
+            AuthStore.normalizeGoogleCookieHeader("  Cookie: SID = fixture; SAPISID = fixture==;  "),
+        )
+    }
+
+    @Test
+    fun `manual cookie accepts a secure signing cookie`() {
+        assertEquals(
+            "__Secure-3PAPISID=fixture",
+            AuthStore.normalizeGoogleCookieHeader("__Secure-3PAPISID=fixture"),
+        )
+    }
+
+    @Test
+    fun `manual cookie refuses headers and Set-Cookie attributes`() {
+        assertNull(AuthStore.normalizeGoogleCookieHeader("SAPISID=fixture\r\nHost: other.example"))
+        assertNull(AuthStore.normalizeGoogleCookieHeader("Set-Cookie: SAPISID=fixture"))
+        assertNull(AuthStore.normalizeGoogleCookieHeader("SAPISID=fixture; Domain=.youtube.com"))
+        assertNull(AuthStore.normalizeGoogleCookieHeader("SAPISID=fixture; Secure"))
+    }
+
+    @Test
+    fun `manual cookie rejects ambiguous duplicates but keeps identical ones`() {
+        assertNull(AuthStore.normalizeGoogleCookieHeader("SAPISID=first; SAPISID=second"))
+        assertEquals("SAPISID=fixture", AuthStore.normalizeGoogleCookieHeader("SAPISID=fixture; SAPISID=fixture"))
+    }
+
+    @Test
+    fun `manual cookie requires a nonempty signer and bounds pasted input`() {
+        assertNull(AuthStore.normalizeGoogleCookieHeader("SID=fixture; SAPISID="))
+        assertNull(AuthStore.normalizeGoogleCookieHeader("SID=fixture"))
+        assertNull(AuthStore.normalizeGoogleCookieHeader("SAPISID=" + "x".repeat(65_536)))
+    }
+
+    @Test
+    fun `manual cookie refuses malformed names and values`() {
+        assertNull(AuthStore.normalizeGoogleCookieHeader("SAPISID=with a space"))
+        assertNull(AuthStore.normalizeGoogleCookieHeader("SAPISID=fixture; bad:name=value"))
+        assertNull(AuthStore.normalizeGoogleCookieHeader("SAPISID=fixture\u0000"))
     }
 
     @Test

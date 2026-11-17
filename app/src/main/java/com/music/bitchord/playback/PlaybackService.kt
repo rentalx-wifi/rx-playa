@@ -13,6 +13,7 @@ import android.net.Uri
 import android.widget.Toast
 import android.os.Bundle
 import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import com.music.bitchord.data.TelemetryProvenance
 import kotlinx.coroutines.sync.Mutex
@@ -122,14 +123,16 @@ import java.util.concurrent.atomic.AtomicLong
 import com.music.bitchord.data.Http
 import com.music.bitchord.auth.SignedIn
 import com.music.bitchord.data.LikeState
+import com.music.bitchord.data.TrackRatingStore
 import com.music.bitchord.data.NerdStats
 import com.music.bitchord.data.TrackLog
-import com.music.bitchord.data.discord.DiscordRPC
+import com.music.bitchord.data.discord.DiscordPresenceCoordinator
 import com.music.bitchord.data.discord.discordAudioQualityLine
 import com.music.bitchord.data.innertube.PlaybackTracker
 import com.music.bitchord.data.stats.ListeningRecorder
 import com.music.bitchord.data.innertube.PlayerClient
 import com.music.bitchord.data.innertube.StreamResolver
+import com.music.bitchord.data.soundcloud.SoundCloudPlayback
 import com.music.bitchord.data.model.LikeStatus
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.isUnresolvedSpotify
@@ -209,6 +212,8 @@ const val EXTRA_BOUNDED_CONTEXT_CONTINUATION = "bitchord.boundedContext.continua
 /** Session command used to smoothly swap the current track's version (film vs release). */
 const val ACTION_SWAP_VERSION = "com.music.bitchord.action.SWAP_VERSION"
 const val EXTRA_SWAP_MEDIA_ITEM = "bitchord.swap.media_item"
+const val ACTION_REMOVE_DISLIKED = "com.music.bitchord.action.REMOVE_DISLIKED"
+const val EXTRA_DISLIKED_SONG = "bitchord.disliked.song"
 
 /** Session command used by the media notification's and the 4×1 widget's Favorite button. */
 /** How long the service may stay in the foreground, paused, while the watch plays. */
@@ -274,6 +279,19 @@ private const val INITIAL_STATION_TRACKS = 24
  * with the bar running. Shared by the two heads, which are fetched in
  * parallel, so it bounds the pair rather than being paid twice.
  */
+/**
+ * How long a row YouTube has refused is given to be found on another source.
+ *
+ * Only runs after YouTube's own walk has already failed, so this is added to a
+ * playback start nobody is waiting on with any patience — long enough for a
+ * module's search and its stream, short enough that a dead row fails while the
+ * listener is still looking at it.
+ */
+private const val RESCUE_TIMEOUT_MS = 6_000L
+
+/** How often a rescue is announced; a queue of them would otherwise chatter. */
+private const val RESCUE_NOTICE_INTERVAL_MS = 180_000L
+
 private const val ALIGNMENT_HEAD_TIMEOUT_MS = 20_000L
 
 /**
@@ -683,31 +701,6 @@ class PlaybackService : MediaLibraryService() {
 
     private var listenBrainzDurationMs: Long? = null
 
-    /**
-     * The gateway connection publishing what's playing to Discord, or null when
-     * the feature is off or no account is connected. See [DiscordRPC].
-     */
-    private var discordRpc: DiscordRPC? = null
-
-    /**
-     * The in-flight presence push. Held so the next one can cancel it: the
-     * pushes hit the network — the artwork has to be mirrored onto Discord's CDN
-     * before the activity can name it — and a skipped-through queue would
-     * otherwise land its presences in whatever order the requests happened to
-     * finish in, leaving the profile on a track the listener passed seconds ago.
-     */
-    private var discordUpdateJob: Job? = null
-
-    /**
-     * Whether a presence has been published and not yet taken down.
-     *
-     * Tracked because [KizzyRPC.close] — which is what clears the card — opens a
-     * gateway connection first if one isn't already up. Clearing unconditionally
-     * would therefore dial Discord for the sole purpose of sending it nothing,
-     * every time playback paused without a presence ever having been set.
-     */
-    private var discordPresenceUp = false
-
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     /** Canonical context owner for the active local bounded album/playlist. */
@@ -743,6 +736,27 @@ class PlaybackService : MediaLibraryService() {
      * receiver can be handed the URL it would have produced — see
      * [resolveForCast]. Null until [onCreate] has built it.
      */
+    /**
+     * When the last "playing from another source" notice was shown.
+     *
+     * A playlist whose rows YouTube refuses could otherwise announce every
+     * single rescue, which is noise. One notice every few minutes says the
+     * thing worth knowing — YouTube had nothing, this is where it came from —
+     * without turning into a running commentary.
+     */
+    private var lastRescueNoticeAtMs = 0L
+
+    /** Tells the listener where a track YouTube refused is playing from. */
+    private fun noticeRescue(by: String) {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastRescueNoticeAtMs < RESCUE_NOTICE_INTERVAL_MS) return
+        lastRescueNoticeAtMs = now
+        val text = getString(R.string.playing_from_source, by)
+        Handler(Looper.getMainLooper()).post {
+            Toast.makeText(applicationContext, text, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private var streamResolver: ResolvingDataSource.Resolver? = null
 
     /**
@@ -791,6 +805,7 @@ class PlaybackService : MediaLibraryService() {
     private val upgradeQualityCommand = SessionCommand(ACTION_UPGRADE_QUALITY, Bundle.EMPTY)
     private val swapVersionCommand = SessionCommand(ACTION_SWAP_VERSION, Bundle.EMPTY)
     private val queueDragCommand = SessionCommand(ACTION_QUEUE_DRAG, Bundle.EMPTY)
+    private val removeDislikedCommand = SessionCommand(ACTION_REMOVE_DISLIKED, Bundle.EMPTY)
 
     private var favoriteActionJob: Job? = null
     private var stationActionJob: Job? = null
@@ -1406,6 +1421,50 @@ class PlaybackService : MediaLibraryService() {
             // [SourceResolver.resolve]. Handled ahead of the YouTube path
             // because these carry no `v` parameter and would otherwise fall
             // straight through unresolved.
+            if (dataSpec.uri.authority == "soundcloud") {
+                val sourceUrl = dataSpec.uri.getQueryParameter("url")
+                    ?: throw java.io.IOException("SoundCloud track URL is missing")
+                val mediaId = dataSpec.uri.getQueryParameter("id")
+                val stream = try {
+                    runBlocking(about) {
+                        withTimeout(SOUNDCLOUD_RESOLVE_TIMEOUT_MS) {
+                            SoundCloudPlayback.resolve(sourceUrl)
+                        }
+                    }
+                } catch (nativeFailure: Exception) {
+                    // On affected routes the official CloudFront playlist can
+                    // still fail before its first complete segment line. Do not
+                    // leave an imported/search row permanently dead: resolve a
+                    // strict title/artist/duration YouTube copy as the last rung,
+                    // and fall back to the top search hit when even that refuses
+                    // the recording — an extended mix of an upload is a match no
+                    // duration check will ever accept.
+                    val target = SourceResolver.targetIn(dataSpec.uri)
+                    val fallback = runBlocking(about) {
+                        withTimeout(RESOLVE_TIMEOUT_MS) {
+                            SourceResolver.youtubeFallback(target)
+                                ?: SourceResolver.youtubeTopHit(target)
+                        }
+                    } ?: throw nativeFailure
+                    TrackLog.w(
+                        "SoundCloud",
+                        "native transport failed for $sourceUrl; using YouTube fallback: " +
+                            nativeFailure.message,
+                    )
+                    NerdStats.onSourceStream(mediaId, fallback.format, "YouTube (SoundCloud fallback)")
+                    NerdStats.recordSource(mediaId, "YouTube (SoundCloud fallback)")
+                    return@Resolver dataSpec.buildUpon()
+                        .setUri(Uri.parse(fallback.url))
+                        .setHttpRequestHeaders(fallback.headers)
+                        .build()
+                }
+                NerdStats.onStreamPicked(mediaId.orEmpty(), stream.bitrateKbps, "SoundCloud")
+                NerdStats.recordSource(mediaId, "SoundCloud")
+                return@Resolver dataSpec.buildUpon()
+                    .setUri(Uri.parse(stream.url))
+                    .setHttpRequestHeaders(stream.headers)
+                    .build()
+            }
             if (dataSpec.uri.authority == "source") {
                 // Direct Source Stream: an addon row is held until it is about
                 // to play, the same as a YouTube one — see [DirectSourceGate].
@@ -1611,13 +1670,42 @@ class PlaybackService : MediaLibraryService() {
             // something actually outranks YouTube; otherwise this is the
             // plain resolve every build before this one made.
             if (!SourceResolver.canSubstituteForYouTube()) {
-                val streamUrl = try {
+                val youtubeTarget = SourceResolver.targetIn(dataSpec.uri)
+                val youtube = runCatching {
                     runBlocking(about) {
                         withTimeout(RESOLVE_TIMEOUT_MS) { StreamResolver.resolve(videoId) }
                     }
-                } catch (e: TimeoutCancellationException) {
-                    throw java.io.IOException("Stream resolution timed out for $videoId", e)
                 }
+                if (youtube.isFailure) {
+                    // YouTube will not serve this row — age-gated, region-locked
+                    // or pulled. Sources ranked below it never get a turn in the
+                    // ordinary path, and for a playlist imported from YouTube
+                    // Music that is where the same recording still plays.
+                    val rescued = runBlocking(about) {
+                        withTimeoutOrNull(RESCUE_TIMEOUT_MS) {
+                            SourceResolver.rescueOnAnySource(youtubeTarget)
+                        }
+                    }
+                    val failure = youtube.exceptionOrNull()
+                    if (rescued == null) {
+                        throw if (failure is TimeoutCancellationException) {
+                            java.io.IOException("Stream resolution timed out for $videoId", failure)
+                        } else {
+                            java.io.IOException("Stream resolution failed for $videoId", failure)
+                        }
+                    }
+                    val rescuedBy = rescued.sourceConfigId
+                        ?.let { SourceRegistry.config(it)?.displayName } ?: "Module"
+                    NerdStats.onSourceStream(videoId, rescued.format, rescuedBy)
+                    NerdStats.recordSource(videoId, rescuedBy)
+                    StreamChoice.remember(videoId, rescued, substituted = true)
+                    noticeRescue(rescuedBy)
+                    return@Resolver dataSpec.buildUpon()
+                        .setUri(Uri.parse(rescued.url))
+                        .setHttpRequestHeaders(rescued.headers)
+                        .build()
+                }
+                val streamUrl = youtube.getOrThrow()
                 // googlevideo names the client that minted the URL inside the
                 // URL itself, and compares it against the request that comes
                 // back for the bytes. A mismatch is answered with a throttled
@@ -1800,6 +1888,7 @@ class PlaybackService : MediaLibraryService() {
             restoreBoundedQueueOrLast(exoPlayer)
         }
         if (restored) {
+            reconcilePersistedDislikes()
             publishWidgetState()
         } else {
             MediaWidgetSnapshot.save(this, MediaWidgetSnapshot.EMPTY)
@@ -2032,8 +2121,7 @@ class PlaybackService : MediaLibraryService() {
      * against, unless it is a local file or a download, which is liked into the
      * device's own Liked playlist instead (see [OfflinePlaylists]).
      */
-    private fun canLike(item: MediaItem?): Boolean =
-        item != null && (item.toSong().localUri != null || SignedIn.state(this).value)
+    private fun canLike(item: MediaItem?): Boolean = item != null
 
     /** Whether [item] is liked, by whichever of the two records owns it. */
     private fun isLiked(item: MediaItem?): Boolean {
@@ -2755,14 +2843,21 @@ class PlaybackService : MediaLibraryService() {
         val from = exoPlayer.currentMediaItemIndex + 1
         if (from < 0) return
         val existing = (from until exoPlayer.mediaItemCount).map(exoPlayer::getMediaItemAt)
-        val users = existing.filter { it.queueTier == QueueTier.USER_QUEUE }
-        val autoplay = existing.filter { it.queueTier == QueueTier.AUTOPLAY }
+        val disliked = TrackRatingStore.dislikedSongs()
+        val users = existing.filter {
+            it.queueTier == QueueTier.USER_QUEUE && !TrackRatingStore.isDisliked(it.toSong(), disliked)
+        }
+        val autoplay = existing.filter {
+            it.queueTier == QueueTier.AUTOPLAY && !TrackRatingStore.isDisliked(it.toSong(), disliked)
+        }
         val existingContext = existing.filter { it.queueTier == QueueTier.CONTEXT }
             .associateBy { QueueWindowEntry(it.canonicalIndex ?: -1, it.contextCycleId ?: window.cycleId) }
+        val excluded = dislikedCanonicalIndices(snapshot)
         val context = BoundedQueuePlanner.physicalUpcoming(
             window = window,
             repeatAll = exoPlayer.repeatMode == Player.REPEAT_MODE_ALL &&
                 BoundedQueuePlanner.canRepeat(snapshot.continuationState),
+            excludedCanonicalIndices = excluded,
         ).map { entry ->
             existingContext[entry] ?: boundedMediaItem(
                 snapshot.songs[entry.canonicalIndex], entry.canonicalIndex, entry.cycleId,
@@ -2793,14 +2888,10 @@ class PlaybackService : MediaLibraryService() {
         boundedEditState = BoundedQueueEdits.invalidateContext(boundedEditState)
 
         val source = request.source
+        val disliked = TrackRatingStore.dislikedSongs()
         val requestedSongs = request.songs
-            .filterNot { it.isUnresolvedSpotify }
-            .map { it.copy(
-                queueTier = QueueTier.CONTEXT,
-                playbackSource = source.title,
-                playbackSourceType = source.type,
-                playbackSourceId = source.id,
-            ) }
+            .filterNot { it.isUnresolvedSpotify || TrackRatingStore.isDisliked(it, disliked) }
+            .map { it.withQueueSource(source).copy(queueTier = QueueTier.CONTEXT) }
         if (requestedSongs.isEmpty()) return
 
         val requestedIndex = request.startIndex
@@ -2842,7 +2933,7 @@ class PlaybackService : MediaLibraryService() {
             contextSnapshot = registered,
             selectedIndex = selectedIndex,
             queueWindow = window,
-            preservedUserQueue = userQueue,
+            preservedUserQueue = userQueue.takeIf { request.preserveUserQueue }.orEmpty(),
             existingAutoplay = if (repeatAll) emptyList() else autoplay,
             repeatAll = repeatAll,
         )
@@ -2924,14 +3015,13 @@ class PlaybackService : MediaLibraryService() {
                 }
                 failures = 0
                 val source = boundedContextSource
-                val songs = page.songs.map { song ->
-                    if (source == null) song else song.copy(
-                        queueTier = QueueTier.CONTEXT,
-                        playbackSource = source.title,
-                        playbackSourceType = source.type,
-                        playbackSourceId = source.id,
-                    )
-                }
+                val disliked = TrackRatingStore.dislikedSongs()
+                val songs = page.songs
+                    .filterNot { TrackRatingStore.isDisliked(it, disliked) }
+                    .map { song ->
+                        if (source == null) song else song.withQueueSource(source)
+                            .copy(queueTier = QueueTier.CONTEXT)
+                    }
                 val result = boundedContextRegistry.complete(
                     request,
                     ContinuationPage(songs = songs, continuationToken = page.continuation),
@@ -2981,6 +3071,7 @@ class PlaybackService : MediaLibraryService() {
             window = window,
             materialized = existingEntries,
             repeatAll = repeatAll,
+            excludedCanonicalIndices = dislikedCanonicalIndices(snapshot),
         )
         if (additions.isEmpty()) return
         val autoplayIndex = (now + 1 until exoPlayer.mediaItemCount)
@@ -2990,6 +3081,14 @@ class PlaybackService : MediaLibraryService() {
             boundedMediaItem(snapshot.songs[entry.canonicalIndex], entry.canonicalIndex, entry.cycleId)
         }
         exoPlayer.addMediaItems(autoplayIndex, items)
+    }
+
+    private fun dislikedCanonicalIndices(snapshot: ContextSnapshot): Set<Int> {
+        val disliked = TrackRatingStore.dislikedSongs()
+        if (disliked.isEmpty()) return emptySet()
+        return snapshot.songs.mapIndexedNotNullTo(HashSet()) { index, song ->
+            index.takeIf { TrackRatingStore.isDisliked(song, disliked) }
+        }
     }
 
     private fun boundedContextAnchor(exoPlayer: ExoPlayer): Int? {
@@ -3057,11 +3156,16 @@ class PlaybackService : MediaLibraryService() {
             boundedMediaItem(song, canonical.indexOfFirst { it.contextEntryKey() == song.contextEntryKey() }, window.cycleId)
         }
         val current = boundedMediaItem(plan.current, plan.currentCanonicalIndex, window.cycleId)
-        val user = plan.userQueue.map { it.copy(queueEntryId = it.queueEntryId ?: UUID.randomUUID().toString()).toMediaItem() }
+        val disliked = TrackRatingStore.dislikedSongs()
+        val user = plan.userQueue
+            .filterNot { TrackRatingStore.isDisliked(it, disliked) }
+            .map { it.copy(queueEntryId = it.queueEntryId ?: UUID.randomUUID().toString()).toMediaItem() }
         val context = plan.contextUpcoming.map { entry ->
             boundedMediaItem(canonical[entry.canonicalIndex], entry.canonicalIndex, entry.cycleId)
         }
-        val autoplay = plan.autoplay.map { it.copy(queueEntryId = it.queueEntryId ?: UUID.randomUUID().toString()).toMediaItem() }
+        val autoplay = plan.autoplay
+            .filterNot { TrackRatingStore.isDisliked(it, disliked) }
+            .map { it.copy(queueEntryId = it.queueEntryId ?: UUID.randomUUID().toString()).toMediaItem() }
         return history + listOf(current) + user + context + autoplay
     }
 
@@ -3219,7 +3323,9 @@ class PlaybackService : MediaLibraryService() {
                         val room = MAX_QUEUED_AUTOPLAY -
                             (latestPlayer.currentMediaItemIndex + 1 until latestPlayer.mediaItemCount)
                                 .count { latestPlayer.getMediaItemAt(it).fromAutoplay }
+                        val disliked = TrackRatingStore.dislikedSongs()
                         val fresh = resolved
+                            .filterNot { TrackRatingStore.isDisliked(it, disliked) }
                             .filterNot { song -> queuedNow.any { QueueBuilder.isSameRecording(it, song) } }
                             .take(room.coerceAtLeast(0))
                         if (fresh.isNotEmpty()) latestPlayer.addMediaItems(fresh.map { it.toMediaItem() })
@@ -3288,7 +3394,10 @@ class PlaybackService : MediaLibraryService() {
                 val waiting = partyUpcomingAfter(party.queue, party.playback, currentId)
                 val waitingIds = waiting.mapTo(HashSet()) { it.videoId }
                 val room = MAX_QUEUED_AUTOPLAY - waiting.count { it.fromAutoplay }
-                val fresh = suggestions.filterNot { it.videoId in waitingIds }.take(room.coerceAtLeast(0))
+                val disliked = TrackRatingStore.dislikedSongs()
+                val fresh = suggestions
+                    .filterNot { it.videoId in waitingIds || TrackRatingStore.isDisliked(it, disliked) }
+                    .take(room.coerceAtLeast(0))
                 if (fresh.isEmpty()) return@withContext true
                 ListenTogether.queueAdd(fresh.map { it.toPartyTrack(0L) })
                 val added = fresh.first().videoId
@@ -3339,6 +3448,7 @@ class PlaybackService : MediaLibraryService() {
             window = window,
             continuationState = snapshot.continuationState,
             repeatAll = exoPlayer.repeatMode == Player.REPEAT_MODE_ALL,
+            excludedCanonicalIndices = dislikedCanonicalIndices(snapshot),
         )
     }
 
@@ -3406,14 +3516,66 @@ class PlaybackService : MediaLibraryService() {
         // twice for having been in the mix before it.
         val present = (0 until exoPlayer.mediaItemCount)
             .mapTo(mutableSetOf()) { exoPlayer.getMediaItemAt(it).mediaId }
-        val restored = stashed.filter { it.mediaId !in present }
+        val disliked = TrackRatingStore.dislikedSongs()
+        val restored = stashed.filter {
+            it.mediaId !in present && !TrackRatingStore.isDisliked(it.toSong(), disliked)
+        }
         if (restored.isEmpty()) return
         exoPlayer.addMediaItems(restored)
     }
 
-    private fun toggleFavoriteFromNotification(videoId: String) {
+    private fun removeDislikedFromQueue(target: Song) {
+        val activePlayer = player ?: return
+        crossfade?.onSkipRequested()
+        stationActionJob?.cancel()
+        autoplayLoadJob?.cancel()
+        autoplayLoadJob = null
+        autoplaySeed = null
+        sessionSongHistory += target
+
+        val disliked = TrackRatingStore.dislikedSongs()
+        repeatAllStash = repeatAllStash.filterNot {
+            TrackRatingStore.isDisliked(it.toSong(), disliked)
+        }
+        if (repeatAllStash.isEmpty()) repeatAllStashSeed = null
+
+        val party = ListenTogether.state.value
+        if (party.inParty) {
+            party.queue.items
+                .filter { queued -> QueueBuilder.isSameRecording(queued.toSong(), target) }
+                .map { it.videoId }
+                .distinct()
+                .forEach(ListenTogether::queueRemove)
+        }
+
+        val removed = QueueCoordinator.removeMatchingRecordings(activePlayer, target)
+        if (boundedContextWindow == null) {
+            QueueShuffle.removeMatchingRecording(target)
+        } else {
+            boundedEditState = BoundedQueueEdits.requestRefresh(boundedEditState)
+            activePlayer.currentMediaItem?.let { syncBoundedContextCursor(activePlayer, it) }
+            if (crossfade?.isTransitioning() != true) applyDeferredBoundedQueueEdit()
+        }
+        if (removed > 0) {
+            saveQueueSnapshotImmediately(activePlayer)
+            refreshCustomLayouts()
+            publishWidgetState()
+        }
+        loadAutoplayForCurrentTrack()
+    }
+
+    private fun reconcilePersistedDislikes() {
+        val disliked = TrackRatingStore.dislikedSongs()
+        if (disliked.isEmpty()) return
+        disliked.forEach(::removeDislikedFromQueue)
+    }
+
+    private fun toggleFavoriteFromNotification(item: MediaItem) {
         favoriteActionJob?.cancel()
+        val song = item.toSong()
+        val videoId = song.videoId
         val previous = LikeState.overrides.value[videoId] ?: LikeStatus.INDIFFERENT
+        val previousEntry = TrackRatingStore.entry(videoId)
         val target = if (previous == LikeStatus.LIKE) {
             LikeStatus.INDIFFERENT
         } else {
@@ -3422,12 +3584,15 @@ class PlaybackService : MediaLibraryService() {
 
         // Match the player UI: update both surfaces immediately, then reconcile
         // the optimistic state with YouTube in the background.
-        LikeState.set(videoId, target)
+        TrackRatingStore.set(song, target)
         refreshCustomLayouts()
+        val youtubeAccountWrite = videoId.matches(Regex("[A-Za-z0-9_-]{11}")) &&
+            SignedIn.state(this).value
+        if (!youtubeAccountWrite) return
         favoriteActionJob = scope.launch {
             YtMusicRepository.rate(videoId, target)
                 .onFailure {
-                    LikeState.set(videoId, previous)
+                    TrackRatingStore.restore(song, previous, previousEntry)
                     refreshCustomLayouts()
                     TrackLog.w("BitChord", "notification favorite failed: ${it.message}", about = videoId)
                 }
@@ -3454,6 +3619,11 @@ class PlaybackService : MediaLibraryService() {
         .setLoadControl(farBufferingLoadControl())
         .setAudioAttributes(AUDIO_ATTRIBUTES, /* handleAudioFocus = */ ownsSession)
         .setHandleAudioBecomingNoisy(ownsSession)
+        // Screen-off playback used to rely on the audio sink alone, which lets
+        // the CPU and the Wi-Fi radio power-save between buffers. NETWORK makes
+        // ExoPlayer hold a partial wake lock and a multicast-free Wi-Fi lock for
+        // as long as it is playing.
+        .setWakeMode(C.WAKE_MODE_NETWORK)
         // Back restarts the track once you're this far into it; only a
         // press before that steps to the previous one.
         .setMaxSeekToPreviousPositionMs(BACK_RESTARTS_AFTER_MS)
@@ -5475,7 +5645,24 @@ class PlaybackService : MediaLibraryService() {
         // handing over the search that just cost three attempts would only
         // schedule a fourth.
         if (StreamChoice.substitutesRefused(videoId)) {
-            return Resolved.YouTube(StreamResolver.resolve(videoId))
+            val youtube = runCatching { StreamResolver.resolve(videoId) }
+            val rescued = if (youtube.isFailure) {
+                withTimeoutOrNull(RESCUE_TIMEOUT_MS) { SourceResolver.rescueOnAnySource(target) }
+            } else {
+                null
+            }
+            if (rescued != null) {
+                val by = rescued.sourceConfigId?.let { SourceRegistry.config(it)?.displayName } ?: "Module"
+                TrackLog.w(
+                    "BitChord",
+                    "'${target.title}' served by $by after a substitute was refused",
+                    about = videoId,
+                )
+                NerdStats.recordSource(videoId, by)
+                noticeRescue(by)
+                return Resolved.Module(rescued)
+            }
+            return Resolved.YouTube(youtube.getOrThrow())
         }
         if (DirectSourceGate.isActive()) return resolveDirect(videoId, target)
         NerdStats.onLosslessRaceStart(videoId)
@@ -5587,7 +5774,26 @@ class PlaybackService : MediaLibraryService() {
             return Resolved.Module(quick)
         }
 
-        val url = fallback.await().getOrThrow()
+        val youtube = fallback.await()
+        if (youtube.isFailure) {
+            // Nothing on YouTube, and nothing from the sources ranked above it:
+            // the ones below get their turn before the row is reported dead.
+            val rescued = withTimeoutOrNull(RESCUE_TIMEOUT_MS) { SourceResolver.rescueOnAnySource(target) }
+            if (rescued != null) {
+                val by = rescued.sourceConfigId?.let { SourceRegistry.config(it)?.displayName } ?: "Module"
+                TrackLog.w(
+                    "BitChord",
+                    "'${target.title}' rescued from $by after YouTube refused it",
+                    about = videoId,
+                )
+                NerdStats.recordSource(videoId, by)
+                noticeRescue(by)
+                return Resolved.Module(rescued)
+            }
+            throw youtube.exceptionOrNull()
+                ?: java.io.IOException("YouTube could not serve $videoId")
+        }
+        val url = youtube.getOrThrow()
         // Marked pending only here, with the fallback's own bitrate in hand:
         // that figure is the answer to "better than what?" the second look
         // measures candidates against, and it isn't known until the client
@@ -6199,6 +6405,7 @@ class PlaybackService : MediaLibraryService() {
                 source = persisted.source,
                 continuationToken = restoredContext.continuationToken,
                 shuffle = restoredWindow.isShuffleEnabled,
+                preserveUserQueue = persisted.entries.any { it.song.queueTier == QueueTier.USER_QUEUE },
             ),
         )
         boundedEditState = BoundedQueueEdits.invalidateContext(boundedEditState)
@@ -7357,91 +7564,13 @@ class PlaybackService : MediaLibraryService() {
 
     // ---- Discord Rich Presence -------------------------------------------------
 
-    /**
-     * Keeps the gateway connection in step with the settings that decide whether
-     * there should be one, and re-pushes the presence when the settings that
-     * decide what it *says* change.
-     *
-     * Two collectors rather than one because the two do different work. The
-     * account and the master switch can only be honoured by building or tearing
-     * down a connection; everything else is a field in a payload that can be
-     * re-sent over the connection already open. Combining them would reconnect
-     * the socket every time the user typed a character into a button label.
-     */
+    /** Re-pushes local playback once its measured quality line settles. */
     private fun observeDiscord() {
         scope.launch {
-            combine(
-                AppSettings.discordToken,
-                AppSettings.discordRpcEnabled,
-            ) { token, enabled -> token.takeIf { enabled && it.isNotBlank() } }
-                .distinctUntilChanged()
-                .collectLatest { token ->
-                    // Torn down before anything is built, so switching accounts
-                    // can't leave the old one's socket up publishing under a
-                    // profile the user has just disconnected.
-                    discordUpdateJob?.cancel()
-                    discordRpc?.let { rpc ->
-                        val wasUp = discordPresenceUp
-                        discordPresenceUp = false
-                        // On IO, not on this collector's main thread: the
-                        // teardown closes a socket, and closing one gracefully
-                        // — which is what flushes the presence-clear queued on
-                        // the line above — blocks until the frame is away.
-                        //
-                        // Bounded, and that is the point rather than a
-                        // precaution. This runs on the way to *replacing*
-                        // [discordRpc], so for as long as it takes the field is
-                        // null and the feature is off: a teardown that hung —
-                        // which one waiting on an unreachable socket did — read
-                        // to the user as a switch that had stopped working
-                        // altogether until the app was restarted.
-                        withContext(Dispatchers.IO + NonCancellable) {
-                            withTimeoutOrNull(DISCORD_TEARDOWN_TIMEOUT_MS) {
-                                if (wasUp) runCatching { rpc.close() }
-                            }
-                            runCatching { rpc.closeRPC() }
-                        }
-                    }
-                    discordRpc = null
-
-                    if (token == null) return@collectLatest
-                    discordRpc = DiscordRPC(this@PlaybackService, token)
-                    // A presence that only appeared at the next track change
-                    // would make turning the switch on look like it had done
-                    // nothing for the length of a song.
-                    player?.takeIf { it.isPlaying }?.let(::pushDiscordPresence)
-                }
+            AppSettings.playbackSpeed.drop(1).collect {
+                player?.takeIf { p -> p.isPlaying }?.let(::pushDiscordPresence)
+            }
         }
-
-        // The card's own contents, plus the playback rate — which is not
-        // cosmetic here: the timestamps are wall-clock instants with the rate
-        // divided out, so a change to it invalidates a presence already up.
-        scope.launch {
-            // Explicit <Any, _> for the same reason as [observeScrobbling]:
-            // mixed element types, and the reified vararg combine() otherwise
-            // infers an intersection type. Compared as a list rather than a
-            // joined string so two different settings can't stringify alike.
-            combine<Any, List<Any>>(
-                AppSettings.discordUseDetails,
-                AppSettings.discordStatus,
-                AppSettings.discordActivityType,
-                AppSettings.discordActivityName,
-                AppSettings.discordButton1Text,
-                AppSettings.discordButton1Visible,
-                AppSettings.discordButton2Text,
-                AppSettings.discordButton2Visible,
-                AppSettings.playbackSpeed,
-            ) { it.toList() }
-                .distinctUntilChanged()
-                // Dropped so the collector's first emission — which arrives at
-                // startup, before anything is playing — isn't treated as a
-                // change the user made.
-                .drop(1)
-                .collect {
-                    player?.takeIf { p -> p.isPlaying }?.let(::pushDiscordPresence)
-                }
-        }
-
         // The first track push usually happens before Media3 has configured
         // its decoder, so measured quality arrives just afterwards. Re-send
         // only when the rendered premium line changes; the periodic stats
@@ -7460,43 +7589,15 @@ class PlaybackService : MediaLibraryService() {
                     player?.takeIf { p -> p.isPlaying }?.let(::pushDiscordPresence)
                 }
         }
-
-        // A network coming back, which is the other half of surviving a spell in
-        // the background: the gateway heals itself, but its retry backoff climbs
-        // to a minute, and a listener who walked back into Wi-Fi shouldn't watch
-        // a blank profile for that long. Nudging it here collapses the wait.
-        //
-        // [AppSettings.meteredConnection] is null only while there is no active
-        // network, so null -> non-null is exactly "we are online again". A
-        // metered/unmetered flip is worth acting on too: the socket does not
-        // survive a transport handover, and the old one may not have noticed yet.
-        scope.launch {
-            AppSettings.meteredConnection
-                .drop(1)
-                .collect { metered ->
-                    if (metered == null) return@collect
-                    val rpc = discordRpc ?: return@collect
-                    withContext(Dispatchers.IO) { runCatching { rpc.wakeUp() } }
-                    // Re-pushed rather than left to the gateway's own replay,
-                    // because a handover can strand the socket in a state where
-                    // it believes it is still connected: the push is what makes
-                    // it prove otherwise.
-                    if (discordPresenceUp) {
-                        player?.takeIf { p -> p.isPlaying }?.let(::pushDiscordPresence)
-                    }
-                }
-        }
     }
 
     /**
      * Publishes the track [exoPlayer] is on as the user's Discord presence.
      *
-     * A no-op with no connection, which is the ordinary case — most people will
-     * never connect an account, and this is called from the middle of every
-     * track change.
+     * The process-wide coordinator owns the gateway and arbitrates this source
+     * against Yandex Music playback observed on another device.
      */
     private fun pushDiscordPresence(exoPlayer: ExoPlayer) {
-        val rpc = discordRpc ?: return
         val song = exoPlayer.currentMediaItem?.toSong() ?: return
         // Read on the main thread, before the push is handed to IO: by the time
         // a coroutine gets to run, the queue may have moved on, and ExoPlayer's
@@ -7518,27 +7619,16 @@ class PlaybackService : MediaLibraryService() {
         val audioQuality = discordAudioQualityLine(NerdStats.current.value)
             .takeIf { AppSettings.discordShowAudioQuality.value }
 
-        discordUpdateJob?.cancel()
-        discordPresenceUp = true
-        discordUpdateJob = scope.launch(Dispatchers.IO) {
-            rpc.updateSong(
+        DiscordPresenceCoordinator.publish(
+            DiscordPresenceCoordinator.Source.BITCHORD,
+            DiscordPresenceCoordinator.Snapshot(
                 song = song,
-                currentPlaybackTimeMillis = positionMs,
-                durationMillis = durationMs,
+                positionMs = positionMs,
+                durationMs = durationMs,
                 playbackSpeed = speed,
-                useDetails = AppSettings.discordUseDetails.value,
-                status = AppSettings.discordStatus.value,
-                button1Text = AppSettings.discordButton1Text.value,
-                button1Visible = AppSettings.discordButton1Visible.value,
-                button2Text = AppSettings.discordButton2Text.value,
-                button2Visible = AppSettings.discordButton2Visible.value,
-                activityType = AppSettings.discordActivityType.value,
-                activityName = AppSettings.discordActivityName.value,
                 audioQuality = audioQuality,
-            ).onFailure {
-                TrackLog.d("BitChord", "Discord presence failed: ${it.message}", about = song.videoId)
-            }
-        }
+            ),
+        )
     }
 
     /**
@@ -7546,13 +7636,7 @@ class PlaybackService : MediaLibraryService() {
      * for a reconnect. Discord clears the card on an activity-less presence.
      */
     private fun clearDiscordPresence() {
-        val rpc = discordRpc ?: return
-        if (!discordPresenceUp) return
-        discordPresenceUp = false
-        discordUpdateJob?.cancel()
-        discordUpdateJob = scope.launch(Dispatchers.IO) {
-            runCatching { rpc.close() }
-        }
+        DiscordPresenceCoordinator.clear(DiscordPresenceCoordinator.Source.BITCHORD)
     }
 
     /**
@@ -7669,21 +7753,9 @@ class PlaybackService : MediaLibraryService() {
         // Last chance to get the current track's minutes onto disk: the scope is
         // cancelled a few lines down and the sampler goes with it.
         ListeningRecorder.onStopped()
-        // Discord, on the same terms as the ListenBrainz submit above: the
-        // service scope is cancelled a few lines down, and a presence left up
-        // would advertise a track that stopped when the process did — until
-        // Discord noticed the socket had gone, which can take minutes.
-        discordRpc?.let { rpc ->
-            discordRpc = null
-            val wasUp = discordPresenceUp
-            discordPresenceUp = false
-            CoroutineScope(Dispatchers.IO).launch {
-                withTimeoutOrNull(DISCORD_TEARDOWN_TIMEOUT_MS) {
-                    if (wasUp) runCatching { rpc.close() }
-                }
-                runCatching { rpc.closeRPC() }
-            }
-        }
+        // The process-wide coordinator may still be publishing a Yandex Music
+        // track, so remove only this service's local source.
+        DiscordPresenceCoordinator.clear(DiscordPresenceCoordinator.Source.BITCHORD)
         scope.cancel()
         QueueShuffle.isCrossfadeTransitioning = null
         crossfade?.release()
@@ -7768,7 +7840,7 @@ class PlaybackService : MediaLibraryService() {
 
     private fun updateLyricSubtitle() {
         val exoPlayer = player ?: return
-        val currentSong = exoPlayer.currentMediaItem?.toSong() ?: return
+        val currentArtist = exoPlayer.currentMediaItem?.mediaMetadata?.artist?.toString() ?: return
         val lines = serviceLyrics
         val pos = crossfade?.loopPositionMs() ?: exoPlayer.currentPosition
         val subtitleText = if (lines != null && lines.isNotEmpty() && AppSettings.syncedLyrics.value) {
@@ -7777,10 +7849,10 @@ class PlaybackService : MediaLibraryService() {
             if (currentLine != null && !currentLine.isGap && currentLine.text.isNotBlank()) {
                 "♪ ${currentLine.text}"
             } else {
-                currentSong.artist
+                currentArtist
             }
         } else {
-            currentSong.artist
+            currentArtist
         }
 
         if (subtitleText != lastPublishedSubtitle) {
@@ -8426,6 +8498,7 @@ class PlaybackService : MediaLibraryService() {
                 .add(upgradeQualityCommand)
                 .add(swapVersionCommand)
                 .add(queueDragCommand)
+                .add(removeDislikedCommand)
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailablePlayerCommands(MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS)
@@ -8468,6 +8541,9 @@ class PlaybackService : MediaLibraryService() {
                         smoothSwapCurrentTrackVersion(targetSong.toMediaItem())
                     }
                 }
+                ACTION_REMOVE_DISLIKED -> args.getBundle(EXTRA_DISLIKED_SONG)
+                    ?.let(::songFromBundle)
+                    ?.let(::removeDislikedFromQueue)
                 ACTION_QUEUE_DRAG -> {
                     if (args.getBoolean(EXTRA_QUEUE_DRAG_ACTIVE, false)) {
                         partySync?.beginQueueDrag()
@@ -8486,7 +8562,7 @@ class PlaybackService : MediaLibraryService() {
                             // reconcile, and the button follows [OfflinePlaylists.liked].
                             OfflinePlaylists.toggleLike(song)
                         } else {
-                            toggleFavoriteFromNotification(item.mediaId)
+                            toggleFavoriteFromNotification(item)
                         }
                     }
                 else -> return Futures.immediateFuture(
@@ -9324,17 +9400,6 @@ class PlaybackService : MediaLibraryService() {
         /** How long [scheduleLoudnessRetry] waits for a still-resolving figure. */
         const val LOUDNESS_RETRY_MS = 6_000L
 
-        /**
-         * How long a Discord teardown may spend clearing the presence before the
-         * socket is closed out from under it.
-         *
-         * Closing the gateway ends the session, which clears the card on
-         * Discord's side anyway — the explicit clear only makes it immediate. So
-         * this is a bound on politeness, not on correctness, and it is short
-         * because whatever is tearing down is waiting on it.
-         */
-        const val DISCORD_TEARDOWN_TIMEOUT_MS = 3_000L
-
         /** Upper bound per range; [PlayerClient.rangeBytesFor] narrows it per client. */
         const val STREAM_CHUNK_BYTES = 1L * 1024 * 1024
 
@@ -9377,6 +9442,9 @@ class PlaybackService : MediaLibraryService() {
          * waits *longer* under a tighter cap than a looser one.
          */
         const val RESOLVE_TIMEOUT_MS = 120_000L
+
+        /** Public SoundCloud extraction is one API walk, not a YouTube client ladder. */
+        const val SOUNDCLOUD_RESOLVE_TIMEOUT_MS = 20_000L
 
         /**
          * Cap on offering a YouTube track to a higher-ranked source.

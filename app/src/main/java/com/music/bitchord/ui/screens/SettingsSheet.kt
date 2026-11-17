@@ -13,7 +13,15 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateContentSize
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -92,12 +100,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.FilterChip
 import com.music.bitchord.ui.components.IosSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -119,6 +129,7 @@ import kotlin.math.abs
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -131,21 +142,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.viewinterop.AndroidView
 import com.music.bitchord.AppIcon
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import com.music.bitchord.ui.components.PillSegmentedControl
-import com.music.bitchord.ui.components.isGlassSupported
 import com.music.bitchord.ui.components.languageDisplayNameRes
 import com.music.bitchord.ui.components.MessageState
 import com.music.bitchord.ui.components.SearchField
@@ -157,6 +162,8 @@ import com.music.bitchord.data.LocalMediaRepository
 import com.music.bitchord.data.NerdStats
 import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.listentogether.ListenTogether
+import com.music.bitchord.data.net.RootZapret
+import com.music.bitchord.data.net.VlessStore
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.OutputPcmMode
 import com.music.bitchord.data.settings.BitPerfectMode
@@ -172,6 +179,12 @@ import com.music.bitchord.data.settings.AppFont
 import com.music.bitchord.data.stats.Backup
 import com.music.bitchord.playback.AudioCache
 import com.music.bitchord.ui.player.fullBleedArtworkAvailable
+import com.music.bitchord.ui.theme.NothingPanelShape
+import com.music.bitchord.ui.theme.NothingCompactShape
+import com.music.bitchord.ui.theme.nothingPanelChrome
+import com.music.bitchord.ui.theme.LocalMaterial3StyleEnabled
+import com.music.bitchord.ui.theme.LocalNothingStyleEnabled
+import com.music.bitchord.ui.theme.NothingRed
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import java.util.Locale
@@ -243,9 +256,6 @@ fun SettingsScreen(
     val listenTogetherButton by AppSettings.showListenTogetherButton.collectAsStateWithLifecycle()
     val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    val liquidGlass by AppSettings.liquidGlass.collectAsStateWithLifecycle()
-    val progressiveBlur by AppSettings.progressiveBlur.collectAsStateWithLifecycle()
-    val liquidGlassSupported = isGlassSupported()
     val lyricsBlur by AppSettings.lyricsBlur.collectAsStateWithLifecycle()
     val animatedCanvas by AppSettings.animatedCanvas.collectAsStateWithLifecycle()
     val canvasOverCellular by AppSettings.canvasOverCellular.collectAsStateWithLifecycle()
@@ -614,7 +624,7 @@ fun SettingsScreen(
                     title = exportDownloadsTitle,
                     checked = exportDownloads,
                     onCheckedChange = AppSettings::setExportDownloads,
-                    subtitle = "Music/BitChord".takeIf { exportDownloads },
+                    subtitle = "Music/RX Playa".takeIf { exportDownloads },
                 )
             }
             val syncPlaylistsTitle = stringResource(R.string.sync_downloaded_playlists)
@@ -888,6 +898,134 @@ fun SettingsScreen(
         }
 
         if (shows(SettingsCategory.APPEARANCE)) SearchableSettingsGroup(search, header = stringResource(R.string.appearance)) {
+            val glassTitle = stringResource(R.string.liquid_glass_title)
+            val glassEnabled by AppSettings.liquidGlassEnabled.collectAsStateWithLifecycle()
+            row(glassTitle, "glass", "frost", "blur", "refract") {
+                SettingsRow(
+                    icon = SfIcons.BlurOn,
+                    title = glassTitle,
+                    subtitle = stringResource(R.string.liquid_glass_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = glassEnabled,
+                            onCheckedChange = AppSettings::setLiquidGlassEnabled,
+                        )
+                    },
+                    onClick = { AppSettings.setLiquidGlassEnabled(!glassEnabled) },
+                )
+            }
+            val accentTitle = stringResource(R.string.accent_colour)
+            val accentKey by AppSettings.accentKey.collectAsStateWithLifecycle()
+            val reduceMotion by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+            row(accentTitle, "colour", "color", "accent", "theme") {
+                SettingsRow(icon = SfIcons.Appearance, title = accentTitle)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(start = ROW_INSET, end = ROW_INSET, bottom = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    com.music.bitchord.ui.theme.AppAccent.entries.forEach { option ->
+                        val selected = option.key == accentKey
+                        val selection by animateFloatAsState(
+                            targetValue = if (selected) 1.14f else 1f,
+                            animationSpec = tween(if (reduceMotion) 0 else 190),
+                            label = "accentSelection",
+                        )
+                        val swatch = if (option == com.music.bitchord.ui.theme.AppAccent.DEFAULT) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            option.color
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .graphicsLayer {
+                                    scaleX = selection
+                                    scaleY = selection
+                                }
+                                .clip(RoundedCornerShape(50))
+                                .background(swatch)
+                                .border(
+                                    width = if (selected) 2.dp else 1.dp,
+                                    color = if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                                    shape = RoundedCornerShape(50),
+                                )
+                                .clickable(
+                                    onClickLabel = option.display,
+                                ) { AppSettings.setAccentKey(option.key) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (option == com.music.bitchord.ui.theme.AppAccent.DEFAULT) {
+                                Text(
+                                    text = "A",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.surface,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            val uiStyleKey by AppSettings.uiStyleKey.collectAsStateWithLifecycle()
+            val styleTitle = stringResource(R.string.ui_style_title)
+            row(styleTitle, "design", "skin", "material", "m3") {
+                SettingsRow(
+                    icon = SfIcons.Appearance,
+                    title = styleTitle,
+                    subtitle = stringResource(R.string.ui_style_subtitle),
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = ROW_INSET, end = ROW_INSET, bottom = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    com.music.bitchord.ui.theme.UiStyle.entries.forEach { option ->
+                        val selected = option.key == uiStyleKey
+                        FilterChip(
+                            selected = selected,
+                            onClick = { AppSettings.setUiStyleKey(option.key) },
+                            label = { Text(option.display) },
+                        )
+                    }
+                }
+            }
+            if (uiStyleKey == com.music.bitchord.ui.theme.UiStyle.MATERIAL3.key) {
+                val youTitle = stringResource(R.string.material_you_title)
+                val youOn by AppSettings.materialYou.collectAsStateWithLifecycle()
+                row(youTitle, "wallpaper", "monet", "dynamic", "material you") {
+                    SettingsRow(
+                        icon = SfIcons.Appearance,
+                        title = youTitle,
+                        subtitle = stringResource(R.string.material_you_subtitle),
+                        trailing = {
+                            IosSwitch(checked = youOn, onCheckedChange = AppSettings::setMaterialYou)
+                        },
+                        onClick = { AppSettings.setMaterialYou(!youOn) },
+                    )
+                }
+                val customTitle = stringResource(R.string.custom_accent_title)
+                val custom by AppSettings.customAccent.collectAsStateWithLifecycle()
+                row(customTitle, "accent", "hue", "custom colour") {
+                    SettingsRow(
+                        icon = SfIcons.Appearance,
+                        title = customTitle,
+                        subtitle = stringResource(R.string.custom_accent_hint),
+                        trailing = {
+                            TextButton(onClick = { AppSettings.setCustomAccent(null) }) {
+                                Text(stringResource(R.string.custom_accent_reset))
+                            }
+                        },
+                    )
+                    AccentHuePicker(
+                        initial = custom?.let { Color(it) } ?: MaterialTheme.colorScheme.primary,
+                        onChange = { AppSettings.setCustomAccent(it.toArgb().toLong() and 0xFFFFFFFFL) },
+                    )
+                }
+            }
             val themeTitle = stringResource(R.string.theme)
             row(themeTitle, "dark mode", "light mode") {
                 SettingsRow(icon = Icons.Rounded.Brightness4, title = themeTitle)
@@ -937,43 +1075,6 @@ fun SettingsScreen(
                     },
                     onClick = { AppSettings.setReduceDynamicBlur(!reduceDynamicBlur) },
                 )
-            }
-            val liquidGlassTitle = stringResource(R.string.liquid_glass)
-            row(liquidGlassTitle, "glass", "blur") {
-                SettingsRow(
-                    icon = SfIcons.AutoAwesome,
-                    title = liquidGlassTitle,
-                    subtitle = stringResource(
-                        if (liquidGlassSupported) {
-                            R.string.liquid_glass_subtitle
-                        } else {
-                            R.string.liquid_glass_unavailable
-                        },
-                    ),
-                    enabled = liquidGlassSupported,
-                    trailing = {
-                        IosSwitch(
-                            checked = liquidGlass,
-                            onCheckedChange = AppSettings::setLiquidGlass,
-                            enabled = liquidGlassSupported,
-                        )
-                    },
-                    onClick = { AppSettings.setLiquidGlass(!liquidGlass) },
-                )
-            }
-            // One line, like Direct Source Stream under Sources, and only while
-            // Liquid Glass is on: it qualifies the glass rather than standing on
-            // its own. Its own switch because it costs frames of its own. Reduce
-            // dynamic blur turns it off.
-            if (liquidGlass && liquidGlassSupported) {
-                val progressiveBlurTitle = stringResource(R.string.progressive_blur)
-                row(progressiveBlurTitle, "blur", "status bar", "top", divided = false) {
-                    SettingsSubRow(
-                        title = progressiveBlurTitle,
-                        checked = progressiveBlur,
-                        onCheckedChange = AppSettings::setProgressiveBlur,
-                    )
-                }
             }
             // Left out where the player won't honour it: a window too wide for
             // the player to fill and too narrow to stand a page beside it keeps
@@ -1538,6 +1639,303 @@ fun SettingsScreen(
         }
 
         if (shows(SettingsCategory.ADVANCED)) SearchableSettingsGroup(search, header = stringResource(R.string.advanced_options)) {
+            val vlessTitle = stringResource(R.string.vless_title)
+            row(vlessTitle, "vless", "proxy", "vpn", "key", "youtube") {
+                val vlessLink by VlessStore.link.collectAsStateWithLifecycle()
+                val vlessEnabled by VlessStore.enabled.collectAsStateWithLifecycle()
+                val probeScope = rememberCoroutineScope()
+                val reduceMotion by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+                var showVlessDialog by remember { mutableStateOf(false) }
+                var vlessProbe by remember { mutableStateOf<String?>(null) }
+                var vlessDraft by remember { mutableStateOf("") }
+                var vlessError by remember { mutableStateOf<String?>(null) }
+                val vlessLabel = remember(vlessLink) {
+                    com.music.bitchord.net.Vless.parse(vlessLink).getOrNull()?.label
+                }
+                val vlessSubtitle = when {
+                    vlessLabel == null -> stringResource(R.string.vless_subtitle)
+                    vlessEnabled -> stringResource(R.string.vless_state_on, vlessLabel)
+                    else -> stringResource(R.string.vless_state_saved, vlessLabel)
+                }
+                SettingsRow(
+                    icon = SfIcons.Dns,
+                    title = vlessTitle,
+                    subtitle = vlessSubtitle,
+                    trailing = {
+                        IosSwitch(
+                            checked = vlessEnabled,
+                            onCheckedChange = { wanted ->
+                                if (wanted && vlessLabel == null) {
+                                    vlessDraft = ""
+                                    vlessError = null
+                                    showVlessDialog = true
+                                } else {
+                                    VlessStore.setEnabled(wanted)
+                                }
+                            },
+                        )
+                    },
+                    onClick = {
+                        vlessDraft = ""
+                        vlessError = null
+                        showVlessDialog = true
+                    },
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = ROW_INSET, end = ROW_INSET, bottom = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TextButton(
+                        onClick = {
+                            vlessDraft = ""
+                            vlessError = null
+                            showVlessDialog = true
+                        },
+                    ) { Text(stringResource(R.string.vless_add)) }
+                    if (vlessLabel != null) {
+                        TextButton(
+                            onClick = {
+                                vlessDraft = ""
+                                vlessError = null
+                                probeScope.launch {
+                                    vlessProbe = "…"
+                                    vlessProbe = VlessStore.testConnection().fold(
+                                        onSuccess = { millis -> "OK · ${millis} мс" },
+                                        onFailure = { "Ошибка: ${it.message ?: it::class.simpleName}" },
+                                    )
+                                }
+                            },
+                        ) { Text(stringResource(R.string.vless_test)) }
+                        TextButton(onClick = { VlessStore.clear() }) {
+                            Text(stringResource(R.string.vless_clear))
+                        }
+                    }
+                }
+                AnimatedVisibility(
+                    visible = vlessProbe != null,
+                    enter = fadeIn(tween(if (reduceMotion) 0 else 160)) +
+                        expandVertically(tween(if (reduceMotion) 0 else 160)),
+                    exit = fadeOut(tween(if (reduceMotion) 0 else 120)) +
+                        shrinkVertically(tween(if (reduceMotion) 0 else 120)),
+                ) {
+                    Text(
+                        text = vlessProbe.orEmpty(),
+                        modifier = Modifier
+                            .padding(start = ROW_INSET, end = ROW_INSET)
+                            .animateContentSize(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                if (showVlessDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showVlessDialog = false },
+                        title = { Text(stringResource(R.string.vless_title)) },
+                        text = {
+                            Column {
+                                OutlinedTextField(
+                                    value = vlessDraft,
+                                    onValueChange = { vlessDraft = it; vlessError = null },
+                                    singleLine = false,
+                                    minLines = 3,
+                                    placeholder = { Text("vless://uuid@host:443?security=tls&type=tcp&sni=host#name") },
+                                )
+                                vlessError?.let { message ->
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        text = message,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                VlessStore.save(vlessDraft).fold(
+                                    onSuccess = { showVlessDialog = false },
+                                    onFailure = { vlessError = it.message },
+                                )
+                            }) { Text(stringResource(R.string.vless_save)) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showVlessDialog = false }) {
+                                Text(stringResource(R.string.cancel))
+                            }
+                        },
+                    )
+                }
+            }
+            val zapretTitle = stringResource(R.string.zapret_title)
+            row(zapretTitle, "zapret", "root", "dpi", "nfqws", "magisk", "youtube") {
+                val zapretScope = rememberCoroutineScope()
+                val zapretPath by AppSettings.zapretPath.collectAsStateWithLifecycle()
+                val zapretStrategyKey by AppSettings.zapretStrategy.collectAsStateWithLifecycle()
+                val savedArgs by AppSettings.zapretArgs.collectAsStateWithLifecycle()
+                val zapretAutoStart by AppSettings.zapretAutoStart.collectAsStateWithLifecycle()
+                var zapretStatus by remember { mutableStateOf<String?>(null) }
+                var zapretRunning by remember { mutableStateOf(false) }
+                var zapretBusy by remember { mutableStateOf(false) }
+                var zapretLog by remember { mutableStateOf<String?>(null) }
+                var showArgs by remember { mutableStateOf(false) }
+                var argsDraft by remember { mutableStateOf(savedArgs) }
+                val strategy = RootZapret.Strategy.of(zapretStrategyKey)
+                val hostFile = remember { RootZapret.hostFile(context) }
+                val logFile = remember { RootZapret.logFile(context) }
+
+                val binaryPicker = rememberLauncherForActivityResult(
+                    ActivityResultContracts.GetContent(),
+                ) { uri ->
+                    if (uri == null) return@rememberLauncherForActivityResult
+                    zapretScope.launch {
+                        zapretBusy = true
+                        zapretStatus = RootZapret.importBinary(context, uri)
+                        zapretBusy = false
+                    }
+                }
+
+                SettingsRow(
+                    icon = SfIcons.Dns,
+                    title = zapretTitle,
+                    subtitle = zapretStatus ?: stringResource(R.string.zapret_not_checked),
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(start = ROW_INSET, end = ROW_INSET, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TextButton(
+                        enabled = !zapretBusy,
+                        onClick = {
+                            zapretScope.launch {
+                                zapretBusy = true
+                                val status = RootZapret.probe(zapretPath)
+                                zapretStatus = status.message
+                                zapretRunning = status.running
+                                zapretBusy = false
+                            }
+                        },
+                    ) { Text(stringResource(R.string.zapret_check)) }
+                    TextButton(
+                        enabled = !zapretBusy,
+                        onClick = {
+                            zapretScope.launch {
+                                zapretBusy = true
+                                if (zapretRunning) {
+                                    zapretStatus = RootZapret.stop()
+                                    zapretRunning = false
+                                } else {
+                                    zapretStatus = RootZapret.start(
+                                        userPath = zapretPath,
+                                        strategy = strategy,
+                                        customArgs = savedArgs,
+                                        hostFile = hostFile,
+                                        logFile = logFile,
+                                    )
+                                    zapretRunning = RootZapret.probe(zapretPath).running
+                                }
+                                zapretBusy = false
+                            }
+                        },
+                    ) {
+                        Text(stringResource(if (zapretRunning) R.string.zapret_stop else R.string.zapret_start))
+                    }
+                    TextButton(
+                        enabled = !zapretBusy,
+                        onClick = {
+                            val next = when (strategy) {
+                                RootZapret.Strategy.FAKE_SPLIT -> RootZapret.Strategy.FAKE_TTL
+                                RootZapret.Strategy.FAKE_TTL -> RootZapret.Strategy.SPLIT_ONLY
+                                RootZapret.Strategy.SPLIT_ONLY -> RootZapret.Strategy.CUSTOM
+                                RootZapret.Strategy.CUSTOM -> RootZapret.Strategy.FAKE_SPLIT
+                            }
+                            AppSettings.setZapretStrategy(next.key)
+                        },
+                    ) { Text(strategy.display) }
+                    TextButton(onClick = { argsDraft = savedArgs; showArgs = true }) {
+                        Text(stringResource(R.string.zapret_arguments))
+                    }
+                    TextButton(
+                        onClick = {
+                            zapretScope.launch {
+                                val diagnosis = RootZapret.diagnose(context, zapretPath)
+                                zapretLog = diagnosis.environment + "\n\n" + diagnosis.log
+                            }
+                        },
+                    ) { Text(stringResource(R.string.zapret_log)) }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = ROW_INSET, end = ROW_INSET, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = { binaryPicker.launch("*/*") }) {
+                        Text(stringResource(R.string.zapret_import))
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        stringResource(R.string.zapret_autostart),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    IosSwitch(
+                        checked = zapretAutoStart,
+                        onCheckedChange = AppSettings::setZapretAutoStart,
+                    )
+                }
+
+                if (showArgs) {
+                    AlertDialog(
+                        onDismissRequest = { showArgs = false },
+                        title = { Text(stringResource(R.string.zapret_arguments)) },
+                        text = {
+                            OutlinedTextField(
+                                value = argsDraft,
+                                onValueChange = { argsDraft = it },
+                                singleLine = false,
+                                placeholder = { Text("--dpi-desync=fake,split2 --dpi-desync-ttl=3") },
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                AppSettings.setZapretArgs(argsDraft.trim())
+                                AppSettings.setZapretStrategy(RootZapret.Strategy.CUSTOM.key)
+                                showArgs = false
+                            }) { Text(stringResource(R.string.zapret_save)) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showArgs = false }) {
+                                Text(stringResource(R.string.cancel))
+                            }
+                        },
+                    )
+                }
+
+                zapretLog?.let { text ->
+                    AlertDialog(
+                        onDismissRequest = { zapretLog = null },
+                        title = { Text(stringResource(R.string.zapret_log)) },
+                        text = {
+                            Text(
+                                text = text,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.verticalScroll(rememberScrollState()),
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { zapretLog = null }) {
+                                Text(stringResource(R.string.close))
+                            }
+                        },
+                    )
+                }
+            }
             val smartAlignmentTitle = stringResource(R.string.smart_version_alignment)
             row(smartAlignmentTitle, "alignment", "sync", "waveform", "video", "audio", "skit", "intro") {
                 SettingsRow(
@@ -1594,7 +1992,7 @@ fun SettingsScreen(
                         ) {
                             // A glass foreground holds the finished icon in its own shape on the
                             // central 72 of 108 dp: scaled 1.5× it fills the tile as designed.
-                            // Only the default goes through an adaptive mask.
+                            // The default JPEG goes through Android's drawable loader unchanged.
                             val preview = option.previewRes
                             if (preview == null) {
                                 AndroidView(
@@ -1641,31 +2039,7 @@ fun SettingsScreen(
         // the whole list, so it goes when the list is narrowed to a few rows.
         if (section == null && searchQuery.isBlank()) {
         Text(
-            text = buildAnnotatedString {
-                append("bitchord $version  ")
-                val linkStyles = TextLinkStyles(
-                    style = SpanStyle(
-                        color = MaterialTheme.colorScheme.primary,
-                        textDecoration = TextDecoration.Underline,
-                    ),
-                )
-                withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx/BitChord", linkStyles)) {
-                    append("GitHub")
-                }
-                append("  ")
-                withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx", linkStyles)) {
-                    append("Developer")
-                }
-                append("  ")
-                withLink(LinkAnnotation.Url("https://discord.gg/pDdKfrdHY6", linkStyles)) {
-                    append("Discord")
-                }
-                append("  ")
-                withLink(LinkAnnotation.Url("https://bitchord.kushagrasingh.in/", linkStyles)) {
-                    append("Website")
-                }
-                append("\n~YouTube Music & Listen Together Backend")
-            },
+            text = "RX Playa $version\nYouTube Music & Listen Together",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -1735,7 +2109,14 @@ fun SettingsScreen(
                 TextButton(
                     onClick = {
                         showPerformanceWarning = false
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        // Unrestricted battery use is what keeps playback alive
+                        // when an OEM game mode or a long screen-off stretch tries
+                        // to reclaim the process; App info alone cannot grant it.
+                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = Uri.fromParts("package", context.packageName, null)
+                        }.takeIf {
+                            it.resolveActivity(context.packageManager) != null
+                        } ?: Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                             data = Uri.fromParts("package", context.packageName, null)
                         }
                         val settingsIntent = intent.takeIf {
@@ -1988,6 +2369,7 @@ internal fun AccountCard(
     account: Account?,
     onSignIn: () -> Unit,
     onClick: (() -> Unit)? = null,
+    guest: Boolean = false,
     /** Sits inside a [SettingsGroup] that already supplies the card, so draws none of its own. */
     grouped: Boolean = false,
 ) {
@@ -2006,7 +2388,7 @@ internal fun AccountCard(
             )
             .then(
                 when {
-                    signedIn && onClick != null -> Modifier.clickable(onClick = onClick)
+                    (signedIn || guest) && onClick != null -> Modifier.clickable(onClick = onClick)
                     !signedIn -> Modifier.clickable(onClick = onSignIn)
                     else -> Modifier
                 },
@@ -2298,8 +2680,9 @@ private inline fun SearchableSettingsGroup(
  */
 @Composable
 internal fun SettingsPageTitle(text: String) {
+    val nothing = LocalNothingStyleEnabled.current
     Text(
-        text = text,
+        text = if (nothing) "· ${text.uppercase(Locale.ROOT)} ·" else text,
         style = MaterialTheme.typography.displayLarge,
         color = MaterialTheme.colorScheme.onBackground,
         modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 14.dp),
@@ -2318,15 +2701,30 @@ internal fun SettingsGroup(
     topSpacing: Dp = 26.dp,
     content: @Composable () -> Unit,
 ) {
+    val nothing = LocalNothingStyleEnabled.current
+    // The skin draws each group as one large rounded card on a tonal surface,
+    // which is what the appearance it follows does — the classic skin keeps its
+    // tighter corners and its own tint.
+    val material3 = com.music.bitchord.ui.theme.LocalMaterial3StyleEnabled.current
+    val groupShape = when {
+        nothing -> NothingPanelShape
+        material3 -> RoundedCornerShape(28.dp)
+        else -> GroupShape
+    }
     if (header != null) {
+        // The skin's section label: sentence case in the accent colour, the way
+        // the settings app it follows names a group. The classic skins keep the
+        // small-caps grey label they were designed around.
         Text(
-            text = header.uppercase(Locale.ROOT),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = if (material3) header else header.uppercase(Locale.ROOT),
+            style = if (material3) MaterialTheme.typography.labelLarge
+            else MaterialTheme.typography.labelSmall,
+            color = if (material3) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(
-                start = GROUP_INSET + 4.dp,
+                start = GROUP_INSET + if (material3) 4.dp else 4.dp,
                 end = GROUP_INSET,
-                top = 26.dp,
+                top = if (material3) 24.dp else 26.dp,
                 bottom = 8.dp,
             ),
         )
@@ -2337,8 +2735,19 @@ internal fun SettingsGroup(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = GROUP_INSET)
-            .clip(GroupShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .clip(groupShape)
+            .background(
+                if (material3) MaterialTheme.colorScheme.surfaceContainer
+                else MaterialTheme.colorScheme.surfaceVariant,
+            )
+            .then(
+                if (nothing) Modifier.border(
+                    width = 1.dp,
+                    color = NothingRed.copy(alpha = 0.38f),
+                    shape = groupShape,
+                ) else Modifier,
+            )
+            .nothingPanelChrome(nothing),
     ) {
         content()
     }
@@ -2360,8 +2769,9 @@ internal fun SettingsGroup(
 internal fun RowDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(start = TEXT_INSET),
-        thickness = 0.5.dp,
-        color = MaterialTheme.colorScheme.outline,
+        thickness = if (LocalMaterial3StyleEnabled.current) 1.dp else 0.5.dp,
+        color = if (LocalMaterial3StyleEnabled.current) MaterialTheme.colorScheme.outlineVariant
+        else MaterialTheme.colorScheme.outline,
     )
 }
 
@@ -2387,29 +2797,51 @@ internal fun SettingsRow(
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
+    val nothing = LocalNothingStyleEnabled.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (onClick != null && enabled) Modifier.clickable(onClick = onClick) else Modifier)
             .alpha(if (enabled) 1f else 0.45f)
-            .heightIn(min = 52.dp)
+            .heightIn(min = if (LocalMaterial3StyleEnabled.current) 64.dp else 52.dp)
             .padding(horizontal = ROW_INSET, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (iconPainter != null) {
-            Icon(
-                painter = iconPainter,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.size(ICON_SIZE),
-            )
-        } else if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.size(ICON_SIZE),
-            )
+        if (iconPainter != null || icon != null) {
+            Box(
+                modifier = Modifier
+                    .size(if (nothing) 32.dp else ICON_SIZE)
+                    .then(
+                        if (nothing) Modifier
+                            .clip(NothingCompactShape)
+                            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.72f))
+                            .border(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant,
+                                NothingCompactShape,
+                            )
+                        else Modifier,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (iconPainter != null) {
+                    Icon(
+                        painter = iconPainter,
+                        contentDescription = null,
+                        tint = if (nothing) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.size(if (nothing) 18.dp else ICON_SIZE),
+                    )
+                } else if (icon != null) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = if (nothing) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.size(if (nothing) 18.dp else ICON_SIZE),
+                    )
+                }
+            }
         }
         Spacer(Modifier.width(ICON_GAP))
         Column(Modifier.weight(1f)) {
@@ -2883,5 +3315,44 @@ internal fun <T> ChoiceGroup(
                 }
             }
         }
+    }
+}
+
+/**
+ * A hue wheel in one line: drag freely, commit once.
+ *
+ * The colour is written only when the thumb is released. Every frame of a drag
+ * would otherwise be a new palette across the whole app and a preference write,
+ * which is both janky and pointless — the listener is looking at the swatch
+ * under the thumb, not at the shade before it.
+ */
+@Composable
+private fun AccentHuePicker(initial: Color, onChange: (Color) -> Unit) {
+    var hue by remember {
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(initial.toArgb(), hsv)
+        mutableFloatStateOf(hsv[0])
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = ROW_INSET, end = ROW_INSET, bottom = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(50))
+                .background(Color.hsl(hue, 0.72f, 0.52f)),
+        )
+        Slider(
+            value = hue,
+            onValueChange = { hue = it },
+            onValueChangeFinished = { onChange(Color.hsl(hue, 0.72f, 0.52f)) },
+            valueRange = 0f..360f,
+            modifier = Modifier.weight(1f),
+            colors = SliderDefaults.colors(),
+        )
     }
 }

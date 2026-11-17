@@ -14,8 +14,13 @@ import android.content.pm.PackageManager
  * through the device's launcher mask. The first two keep yesterday's alias
  * names so a choice made before the update stays enabled.
  */
-enum class AppIcon(val alias: String, val iconRes: Int, val labelRes: Int, val previewRes: Int? = null) {
-    Default("LauncherDefault", R.mipmap.ic_launcher, R.string.app_icon_default),
+enum class AppIcon(
+    val alias: String,
+    val iconRes: Int,
+    val labelRes: Int,
+    val previewRes: Int? = null,
+) {
+    Default("LauncherDefault", R.mipmap.ic_rx, R.string.app_icon_default),
     Monochrome("LauncherMonochrome", R.mipmap.ic_monochrome, R.string.app_icon_monochrome),
     LiquidGlass("LauncherGlassLight", R.mipmap.ic_liquid_glass, R.string.app_icon_liquid_glass, R.mipmap.ic_liquid_glass_foreground),
     LiquidGlassDark("LauncherGlassDark", R.mipmap.ic_liquid_glass_dark, R.string.app_icon_liquid_glass_dark, R.mipmap.ic_liquid_glass_dark_foreground),

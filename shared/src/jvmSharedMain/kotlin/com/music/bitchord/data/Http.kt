@@ -1,5 +1,6 @@
 package com.music.bitchord.data
 
+import com.music.bitchord.net.DesyncProxy
 import okhttp3.ConnectionPool
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
@@ -131,6 +132,21 @@ object Http {
     }
 
     val client: OkHttpClient = OkHttpClient.Builder()
+        .dns(ResilientServiceDns)
+        // Null unless the listener opted into the anti-throttling option.
+        .proxySelector(DesyncProxy.proxySelector())
+        .proxyAuthenticator { _, response ->
+            // The loopback proxy demands proof that the caller is this process;
+            // answering once is enough, a second 407 means something else is wrong.
+            if (response.request.header("Proxy-Authorization") != null) {
+                null
+            } else {
+                val (user, secret) = DesyncProxy.authorization()
+                response.request.newBuilder()
+                    .header("Proxy-Authorization", okhttp3.Credentials.basic(user, secret))
+                    .build()
+            }
+        }
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)

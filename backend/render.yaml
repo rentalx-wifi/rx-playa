@@ -43,3 +43,12 @@ services:
       # invite deep links then use it verbatim.
       - key: JAM_PUBLIC_ORIGIN
         sync: false
+      # Official SoundCloud OAuth. Keep the secret only in Render's secret UI.
+      - key: SOUNDCLOUD_CLIENT_ID
+        sync: false
+      - key: SOUNDCLOUD_CLIENT_SECRET
+        sync: false
+      - key: SOUNDCLOUD_REDIRECT_URI
+        value: "rxmusic://oauth/soundcloud"
+      - key: OAUTH_RATE_PER_MINUTE
+        value: "12"

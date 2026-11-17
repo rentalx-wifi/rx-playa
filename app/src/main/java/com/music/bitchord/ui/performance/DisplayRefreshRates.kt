@@ -24,3 +24,13 @@ fun Display?.supportedPerformanceRefreshRates(): List<Int> {
 /** Maps a saved preference to a real mode, including preferences restored on another device. */
 fun Display?.resolvePerformanceRefreshRate(preferred: Int): Int =
     supportedPerformanceRefreshRates().minBy { abs(it - preferred) }
+
+/** Same-resolution mode nearest to the requested rate; zero lets Android choose automatically. */
+fun Display?.resolvePerformanceDisplayModeId(preferred: Int): Int {
+    val display = this ?: return 0
+    val current = display.mode
+    val sameResolution = display.supportedModes.filter {
+        it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight
+    }
+    return sameResolution.minByOrNull { abs(it.refreshRate - preferred) }?.modeId ?: 0
+}

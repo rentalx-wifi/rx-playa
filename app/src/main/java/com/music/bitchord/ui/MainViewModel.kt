@@ -14,8 +14,15 @@ import com.music.bitchord.auth.adjacentProfile
 import com.music.bitchord.data.AppUpdateChecker
 import com.music.bitchord.data.LocalMediaRepository
 import com.music.bitchord.data.LikeState
+import com.music.bitchord.data.TrackRatingStore
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.TopPicks
+import com.music.bitchord.data.personalization.PersonalizedHome
+import com.music.bitchord.data.personalization.PersonalizedHomeState
+import com.music.bitchord.data.personalization.TasteProfiles
+import com.music.bitchord.data.personalization.TasteSignalStore
+import com.music.bitchord.data.personalization.tasteDigest
+import com.music.bitchord.data.model.HomeSource
 import com.music.bitchord.data.AppleArtistPhotos
 import com.music.bitchord.data.model.ArtistRef
 import com.music.bitchord.data.model.TopPick
@@ -28,12 +35,20 @@ import java.time.LocalDateTime
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import kotlin.coroutines.cancellation.CancellationException
-import com.music.bitchord.data.model.SPOTIFY_MISSING_PREFIX
-import com.music.bitchord.data.model.SPOTIFY_PENDING_PREFIX
 import com.music.bitchord.data.spotify.SPOTIFY_PAGE_PREFIX
-import com.music.bitchord.data.spotify.SpotifyImporter
 import com.music.bitchord.data.spotify.SpotifyLibrary
 import com.music.bitchord.data.spotify.SpotifyTrack
+import com.music.bitchord.data.spotify.isSpotifySourceTrack
+import com.music.bitchord.data.spotify.toSourceSong
+import com.music.bitchord.data.importing.BasicExternalPlaylistTrack
+import com.music.bitchord.data.importing.ExternalPlaylistImporter
+import com.music.bitchord.data.importing.writeImportedPlaylist
+import com.music.bitchord.data.soundcloud.SoundCloudPlaylistImporter
+import com.music.bitchord.data.soundcloud.toSearchSong
+import com.music.bitchord.data.soundcloud.SoundCloudAccountApi
+import com.music.bitchord.data.vk.VkMusicApi
+import com.music.bitchord.data.vk.isVkSourceTrack
+import com.music.bitchord.data.yandex.YandexMusicApi
 import com.music.bitchord.data.lyrics.EmbeddedLyrics
 import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.lyrics.LyricsRepository
@@ -61,10 +76,12 @@ import com.music.bitchord.data.model.SearchFilter
 import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.model.durationMillis
 import com.music.bitchord.data.model.SongMenu
 import com.music.bitchord.data.model.SubscriptionState
 import com.music.bitchord.data.model.UiState
 import com.music.bitchord.data.model.UserPlaylist
+import com.music.bitchord.data.model.WatchTarget
 import com.music.bitchord.data.model.SearchHistoryEntity
 import com.music.bitchord.data.model.EntityType
 import com.music.bitchord.data.settings.SearchHistory
@@ -106,6 +123,7 @@ import com.music.bitchord.playback.BoundedContextRequests
 import com.music.bitchord.playback.DirectSourceGate
 import com.music.bitchord.playback.contextEntryKey
 import com.music.bitchord.playback.StreamChoice
+import com.music.bitchord.playback.TrackText
 import com.music.bitchord.ui.screens.CACHE_FOLDER_BROWSE_ID
 import com.music.bitchord.data.LocalGroup
 import com.music.bitchord.data.LocalGroups
@@ -115,8 +133,8 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
-/** What the Search tab searches: YouTube Music, or the Local Music folder on this device. */
-enum class SearchSource { YOUTUBE, LIBRARY, ADDONS }
+/** Every catalogue the Search tab can query, separately or as one merged music search. */
+enum class SearchSource { ALL, YOUTUBE, YANDEX, SPOTIFY, SOUNDCLOUD, VK, LIBRARY, ADDONS }
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -126,8 +144,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _signedIn = SignedIn.state(app)
     val signedIn: StateFlow<Boolean> = _signedIn.asStateFlow()
 
+    private val _personalizedHome = MutableStateFlow(PersonalizedHomeState())
+    val personalizedHomeState = _personalizedHome.asStateFlow()
+    private lateinit var personalizedHome: PersonalizedHome
     private val _home = MutableStateFlow<UiState<List<HomeShelf>>>(UiState.Loading)
-    val home: StateFlow<UiState<List<HomeShelf>>> = _home.asStateFlow()
+    val home: StateFlow<UiState<List<HomeShelf>>> = combine(_home, _personalizedHome) { base, personalized ->
+        val dislikedIds = personalized.profile.dislikes.mapTo(HashSet()) { it.videoId }
+        val native = (base as? UiState.Success)?.data.orEmpty().map { shelf ->
+            shelf.copy(items = shelf.items.filter { item ->
+                item.videoId !in dislikedIds
+            }.map { item -> if (item.sources.isEmpty()) item.copy(sources = setOf(HomeSource.YOUTUBE)) else item })
+        }.filter { it.items.isNotEmpty() }
+        val titles = personalized.shelves.mapTo(HashSet()) { it.title.lowercase(Locale.ROOT) }
+        val supplementary = native.filterNot { it.title.lowercase(Locale.ROOT) in titles }
+            .withoutRepeatsOf(personalized.shelves)
+        if (personalized.shelves.isNotEmpty()) UiState.Success(personalized.shelves + supplementary)
+        else if (base is UiState.Success) UiState.Success(native) else base
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, UiState.Loading)
 
     /**
      * Token for the next page of Home shelves; null once there's nothing
@@ -228,7 +261,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val typeaheadResults: StateFlow<List<SearchResult>> = _typeaheadResults.asStateFlow()
 
     /** Where the Search tab looks — see [setSearchSource]. */
-    private val _searchSource = MutableStateFlow(SearchSource.YOUTUBE)
+    private val _searchSource = MutableStateFlow(SearchSource.ALL)
     val searchSource: StateFlow<SearchSource> = _searchSource.asStateFlow()
 
     /**
@@ -240,6 +273,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _addonResults = MutableStateFlow<UiState<List<Song>>?>(null)
     val addonResults: StateFlow<UiState<List<Song>>?> = _addonResults.asStateFlow()
     private var addonSearchJob: Job? = null
+    private var addonSearchGeneration = 0L
+
+    private val _platformResults = MutableStateFlow<UiState<List<Song>>?>(null)
+    val platformResults: StateFlow<UiState<List<Song>>?> = _platformResults.asStateFlow()
+    private val _platformLoadingMore = MutableStateFlow(false)
+    val platformLoadingMore: StateFlow<Boolean> = _platformLoadingMore.asStateFlow()
+    private var platformSearchJob: Job? = null
+    private var platformLoadMoreJob: Job? = null
+    private var platformSearchGeneration = 0L
+    private var soundCloudSearchQuery: String? = null
+    private var soundCloudNextOffset: Int? = null
+    private var soundCloudNextHref: String? = null
 
     /** The words typed into the Addons search before, newest first. */
     val addonSearchHistory: StateFlow<List<String>> = SearchHistory.addonRecent
@@ -635,6 +680,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     val releaseLibrary: StateFlow<Map<String, LibraryState>> = _releaseLibrary.asStateFlow()
 
+    /** Always null in this fork; retained only so the shared TV shell remains source-compatible. */
+    val updateAvailable: StateFlow<AppUpdateChecker.UpdateInfo?> = AppUpdateChecker.available
+
     /** Reads whether the release [browseId] is saved, once; a no-op if already known. */
     fun loadReleaseLibrary(browseId: String) {
         if (browseId in _releaseLibrary.value) return
@@ -663,9 +711,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
 
-    /** Set once per launch if GitHub has a release newer than this build. */
-    val updateAvailable: StateFlow<AppUpdateChecker.UpdateInfo?> = AppUpdateChecker.available
-
     // ---- Ratings, library and playlists -------------------------------------
 
     /**
@@ -687,6 +732,26 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             liked + overrides
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
+    /** One Favorites tab: durable local/provider likes plus the account library. */
+    val favoriteSongs: StateFlow<List<Song>> = combine(
+        _library,
+        TrackRatingStore.ratings,
+        OfflinePlaylists.playlists,
+        LikeState.overrides,
+    ) { library, stored, offline, overrides ->
+        val durable = stored.values.asSequence()
+            .filter { it.likeStatus == LikeStatus.LIKE }
+            .sortedByDescending { it.changedAtMs }
+            .map { it.song() }
+            .toList()
+        val onDevice = offline.firstOrNull { it.isLiked }?.songs.orEmpty()
+        val account = (library as? UiState.Success)?.data?.likedSongs.orEmpty().filter { song ->
+            val durableStatus = stored[song.videoId]?.likeStatus
+            durableStatus == null || durableStatus == LikeStatus.LIKE
+        }
+        (durable + onDevice + account).distinctBy { it.videoId }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     fun likeStatusOf(videoId: String): LikeStatus =
         likeStatuses.value[videoId] ?: LikeStatus.INDIFFERENT
 
@@ -702,10 +767,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (!requireSignIn()) return
         val previous = likeStatusOf(videoId)
         if (previous == status) return
+        val identity = tasteListenerKey()
         LikeState.set(videoId, status)
         viewModelScope.launch {
-            YtMusicRepository.rate(videoId, status).fold(
+            val result = YtMusicRepository.rate(videoId, status)
+            if (identity != tasteListenerKey()) return@launch
+            result.fold(
                 onSuccess = {
+                    TasteSignalStore.rememberRating(identity, videoId, status)
                     // Liked Music is now out of date either way.
                     libraryStale = true
                     if (status != LikeStatus.LIKE) dropFromLikedLists(videoId)
@@ -796,6 +865,56 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 LikeStatus.DISLIKE
             },
         )
+        return previous
+    }
+
+    /** Provider-neutral rating used by the main player, menus and Favorites. */
+    fun setLike(song: Song, status: LikeStatus) {
+        val previous = likeStatusOf(song.videoId)
+        if (previous == status) return
+        val previousEntry = TrackRatingStore.entry(song.videoId)
+        if (song.localUri != null && status == LikeStatus.DISLIKE && OfflinePlaylists.isLiked(song)) {
+            OfflinePlaylists.toggleLike(song)
+        }
+        TrackRatingStore.set(song, status)
+
+        val youtubeTrack = song.videoId.matches(Regex("[A-Za-z0-9_-]{11}")) &&
+            !song.isSpotifySourceTrack && !song.isVkSourceTrack &&
+            !song.videoId.startsWith("soundcloud:")
+        when {
+            youtubeTrack && _signedIn.value -> {
+                val identity = tasteListenerKey()
+                viewModelScope.launch {
+                    YtMusicRepository.rate(song.videoId, status).fold(
+                        onSuccess = {
+                            TasteSignalStore.rememberRating(identity, song.videoId, status)
+                            libraryStale = true
+                            if (status != LikeStatus.LIKE) dropFromLikedLists(song.videoId)
+                            if (previous == LikeStatus.LIKE && status == LikeStatus.INDIFFERENT) {
+                                forgetFromLibrary(song.videoId)
+                            }
+                        },
+                        onFailure = { TrackRatingStore.restore(song, previous, previousEntry) },
+                    )
+                }
+            }
+            song.videoId.startsWith("soundcloud:") && AppSettings.soundCloudAccessToken.value.isNotBlank() -> {
+                viewModelScope.launch {
+                    runCatching { SoundCloudAccountApi.setLiked(song.videoId, status == LikeStatus.LIKE) }
+                }
+            }
+            else -> Unit // Spotify, VK, guest YouTube and local-provider rows stay device-local.
+        }
+    }
+
+    fun toggleLike(song: Song) = setLike(
+        song,
+        if (likeStatusOf(song.videoId) == LikeStatus.LIKE) LikeStatus.INDIFFERENT else LikeStatus.LIKE,
+    )
+
+    fun toggleDislike(song: Song): LikeStatus {
+        val previous = likeStatusOf(song.videoId)
+        setLike(song, if (previous == LikeStatus.DISLIKE) LikeStatus.INDIFFERENT else LikeStatus.DISLIKE)
         return previous
     }
 
@@ -968,7 +1087,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             items.isEmpty() -> page.shelves.filterNot { it === existing }
             else -> page.shelves.map { if (it === existing) existing.copy(items = items) else it }
         }
-        _library.value = UiState.Success(page.copy(shelves = shelves))
+        val updated = page.copy(shelves = shelves)
+        _library.value = UiState.Success(updated)
+        personalizedHome.updateLibrary(updated, tasteListenerKey())
     }
 
     /**
@@ -977,6 +1098,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * bar both, which read [DetailPage.title].
      */
     private fun setPlaylistTitle(playlist: UserPlaylist, title: String) {
+        TasteSignalStore.renameImport(playlist.browseId, title)
         _playlists.value = _playlists.value.map {
             if (it.playlistId == playlist.playlistId) it.copy(title = title) else it
         }
@@ -1103,54 +1225,60 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         privacy: PlaylistPrivacy,
         videoIds: List<String>,
         songs: List<Song> = emptyList(),
+        source: HomeSource = HomeSource.LOCAL,
         /** [savedLocally] is true when the playlist went to this device, not YouTube Music. */
         onResult: ((browseId: String?, title: String, savedLocally: Boolean) -> Unit)? = null,
     ) {
         val name = title.trim().ifBlank { text(R.string.new_playlist) }
+        val owner = tasteListenerKey()
         viewModelScope.launch {
             if (authStore.isSignedIn) {
-                val initialBatch = videoIds.take(50)
-                YtMusicRepository.createPlaylist(
-                    title = name,
-                    privacy = privacy,
-                    videoIds = initialBatch,
-                ).fold(
-                    onSuccess = { playlistId ->
-                        if (videoIds.size > 50) {
-                            videoIds.drop(50).chunked(50).forEach { chunk ->
-                                YtMusicRepository.addToPlaylist(playlistId, chunk)
-                            }
-                        }
-                        setPlaylistOwned("VL$playlistId", true)
-                        libraryStale = true
-                        val created = UserPlaylist(
-                            playlistId = playlistId,
-                            title = name,
-                            subtitle = "${videoIds.size} songs",
-                            thumbnailUrl = null,
-                        )
-                        _playlists.value = listOf(created) +
-                            _playlists.value.filterNot { it.playlistId == created.playlistId }
-                        editPlaylistShelf { items ->
-                            listOf(
-                                ShelfItem(
-                                    title = created.title,
-                                    subtitle = created.subtitle,
-                                    thumbnailUrl = created.thumbnailUrl,
-                                    videoId = null,
-                                    browseId = created.browseId,
-                                ),
-                            ) + items.filterNot { it.browseId == created.browseId }
-                        }
-                        onResult?.invoke(created.browseId, created.title, false)
+                val result = writeImportedPlaylist(
+                    videoIds = videoIds,
+                    songs = songs,
+                    createPlaylist = { initialBatch ->
+                        if (owner != tasteListenerKey()) throw CancellationException("Import account changed")
+                        YtMusicRepository.createPlaylist(name, privacy, initialBatch)
                     },
-                    onFailure = {
-                        val local = com.music.bitchord.data.spotify.LocalPlaylistStore.savePlaylist(name, songs)
-                        onResult?.invoke(local.browseId, local.title, true)
+                    addToPlaylist = { playlistId, batch ->
+                        if (owner != tasteListenerKey()) throw CancellationException("Import account changed")
+                        YtMusicRepository.addToPlaylist(playlistId, batch)
+                    },
+                    saveLocally = { completeSongs ->
+                        com.music.bitchord.data.spotify.LocalPlaylistStore
+                            .savePlaylist(name, completeSongs, source).browseId
                     },
                 )
+                if (owner != tasteListenerKey()) return@launch
+                result.cloudPlaylistId?.let { playlistId ->
+                    setPlaylistOwned("VL$playlistId", true)
+                    libraryStale = true
+                    val created = UserPlaylist(
+                        playlistId = playlistId,
+                        title = name,
+                        subtitle = "${result.acceptedCloudTrackCount} songs",
+                        thumbnailUrl = null,
+                    )
+                    _playlists.value = listOf(created) +
+                        _playlists.value.filterNot { it.playlistId == created.playlistId }
+                    editPlaylistShelf { items ->
+                        listOf(
+                            ShelfItem(
+                                title = created.title,
+                                subtitle = created.subtitle,
+                                thumbnailUrl = created.thumbnailUrl,
+                                videoId = null,
+                                browseId = created.browseId,
+                            ),
+                        ) + items.filterNot { it.browseId == created.browseId }
+                    }
+                }
+                TasteSignalStore.rememberImport(name, source, songs, result.browseId,
+                    owner.takeUnless { result.savedLocally })
+                onResult?.invoke(result.browseId, name, result.savedLocally)
             } else {
-                val local = com.music.bitchord.data.spotify.LocalPlaylistStore.savePlaylist(name, songs)
+                val local = com.music.bitchord.data.spotify.LocalPlaylistStore.savePlaylist(name, songs, source)
+                TasteSignalStore.rememberImport(name, source, songs, local.browseId, null)
                 onResult?.invoke(local.browseId, local.title, true)
             }
         }
@@ -1338,6 +1466,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             YtMusicRepository.deletePlaylist(playlist.playlistId).fold(
                 onSuccess = {
+                    TasteSignalStore.forgetImport(playlist.browseId)
                     _playlists.value = _playlists.value
                         .filterNot { it.playlistId == playlist.playlistId }
                     // The card in the library tab, which is the surface the
@@ -1456,6 +1585,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
+        val tasteAccount = combine(_signedIn, _activeAccountId, _activeProfileId) { signed, _, _ ->
+            if (signed) tasteListenerKey() else null
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, tasteListenerKey())
+        personalizedHome = PersonalizedHome(app, viewModelScope, tasteAccount) { next ->
+            val previous = _personalizedHome.value
+            if (previous.accounts[HomeSource.YOUTUBE] != next.accounts[HomeSource.YOUTUBE] && _home.value is UiState.Success) {
+                homeLoadGeneration.incrementAndGet()
+                _home.value = UiState.Loading
+                homeContinuation = null
+                homeSeenTitles.clear()
+            }
+            _personalizedHome.value = next
+        }
         startSearchPipeline()
         startSuggestPipeline()
         startTypeaheadMediaPipeline()
@@ -1485,6 +1627,39 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
+            AppSettings.soundCloudAccessToken.collectLatest { token ->
+                if (token.isBlank()) return@collectLatest
+                runCatching {
+                    val likes = SoundCloudAccountApi.likedTracks()
+                        .mapIndexed { index, track -> track.toSearchSong(index) }
+                    TrackRatingStore.importLikes(likes)
+                }
+            }
+        }
+        viewModelScope.launch {
+            AppSettings.spotifySpdcToken.collectLatest { token ->
+                if (token.isBlank()) return@collectLatest
+                runCatching {
+                    TrackRatingStore.importLikes(
+                        SpotifyLibrary.tracks(SpotifyLibrary.LIKED_ID).map(SpotifyTrack::toSourceSong),
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
+            AppSettings.yandexMusicToken.collectLatest { token ->
+                if (token.isBlank()) return@collectLatest
+                runCatching {
+                    val api = YandexMusicApi()
+                    val uid = api.account(token).uid
+                    val rows = api.likedTracks(token, uid).map { it.track }
+                    TrackRatingStore.importLikes(
+                        ExternalPlaylistImporter.resolve(rows) { _, _ -> }.first,
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
             // Emptied from Settings while the folder sits open underneath.
             AudioCache.contentsChanged.drop(1).collect {
                 if (_detailStack.value.any { page -> page.browseId == CACHE_FOLDER_BROWSE_ID }) {
@@ -1509,12 +1684,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 .debounce(300)
                 .collect { reloadRemoteDetail(com.music.bitchord.data.smb.SmbConfig.BROWSE_ID) }
         }
-        viewModelScope.launch {
-            // A leftover APK only means "Install Now" for the session that
-            // downloaded it — see AppUpdateChecker.clearCache.
-            AppUpdateChecker.clearCache(getApplication())
-            AppUpdateChecker.check()
-        }
     }
 
     /**
@@ -1529,6 +1698,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Call when the home tab becomes visible. */
     fun onHomeShown() {
+        personalizedHome.refresh()
+        if (libraryStale && _signedIn.value) {
+            libraryStale = false
+            loadLibrary()
+        }
         if (!homeStale) return
         homeStale = false
         // A first load already in flight will pick the new play up by itself.
@@ -1700,6 +1874,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun loadHome() {
+        personalizedHome.refresh()
         val identity = listenerKey()
         val generation = homeLoadGeneration.incrementAndGet()
         _home.value = UiState.Loading
@@ -1811,6 +1986,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * next one. A no-op otherwise, and while one is building.
      */
     fun refreshTopPicksIfStale() {
+        personalizedHome.refresh()
+        if (_signedIn.value && _library.value !is UiState.Loading) loadLibrary()
         if (topPicksJob?.isActive == true) return
         if (topPicksSlotShown == null || topPicksSlotShown == topPicksSlot()) return
         loadTopPicks(listenerKey(), rebuild = false)
@@ -1858,25 +2035,143 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun isCurrentHomeLoad(identity: String?, generation: Long) =
         identity == listenerKey() && generation == homeLoadGeneration.get()
 
-    private fun publishHomeShelves(shelves: List<HomeShelf>, prepend: Boolean = false) {
+    private suspend fun publishHomeShelves(shelves: List<HomeShelf>, prepend: Boolean = false) {
+        val tuned = retuneRecommendations(shelves)
         val existing = (_home.value as? UiState.Success)?.data.orEmpty()
         if (prepend) {
             // YouTube's core home can also contain a stale "Recently played"
             // shelf. The dedicated history endpoint wins and replaces it.
-            val replacing = shelves.map { it.title.lowercase(Locale.ROOT) }.toSet()
+            val replacing = tuned.map { it.title.lowercase(Locale.ROOT) }.toSet()
             homeSeenTitles.addAll(replacing)
-            _home.value = UiState.Success(shelves + existing.filterNot {
+            _home.value = UiState.Success(tuned + existing.filterNot {
                 it.title.lowercase(Locale.ROOT) in replacing
             })
             return
         }
-        val added = shelves.withoutRepeatsOf(existing)
+        val added = tuned.withoutRepeatsOf(existing)
             .filter { homeSeenTitles.add(it.title.lowercase(Locale.ROOT)) }
         if (added.isNotEmpty()) _home.value = UiState.Success(existing + added)
     }
 
+    /**
+     * The home feed's "for you" shelves, rebuilt around what this device
+     * actually listens to.
+     *
+     * YouTube's own "Trending for you" is a global popularity list with the
+     * listener's name on it: the same major-label rows for everybody, which is
+     * why it reads as junk next to a feed that knows what you played yesterday.
+     * The rows are therefore filtered by taste — a shelf item survives only when
+     * one of its credits is an artist in [TasteProfile][com.music.bitchord.data.personalization.TasteProfile],
+     * and the survivors are ordered by how strongly that taste is held. Disliked
+     * recordings are dropped outright.
+     *
+     * A shelf that cannot fill itself from taste is topped up from the radio of
+     * the listener's strongest track, which is a different question of YouTube
+     * and returns related recordings rather than the chart. If even that leaves
+     * too few rows, the shelf is removed: an empty section is better than one
+     * that recommends nothing the listener would play.
+     *
+     * Only shelves whose titles announce themselves as recommendations are
+     * touched. "Listen again", "New releases" and the mood shelves are either
+     * already personal or deliberately editorial, and reranking them would be
+     * answering a question nobody asked.
+     */
+    private suspend fun retuneRecommendations(shelves: List<HomeShelf>): List<HomeShelf> {
+        val taste = _personalizedHome.value.profile.tracks
+            .filter { it.song.videoId.isNotBlank() }
+            .sortedByDescending { it.score }
+            .take(TASTE_ARTIST_POOL)
+        if (taste.size < MIN_TASTE_TRACKS) return shelves
+        val disliked = TrackRatingStore.dislikedSongs()
+        return shelves.mapNotNull { shelf ->
+            if (!shelf.looksLikeRecommendations()) return@mapNotNull shelf
+            val ranked = shelf.items.asSequence()
+                .filter { it.videoId != null }
+                .filterNot { TrackRatingStore.isDisliked(it.asSong(), disliked) }
+                .map { item -> item to tasteAffinity(item, taste) }
+                .filter { it.second > 0.0 }
+                .sortedByDescending { it.second }
+                .map { it.first }
+                .toList()
+            val items = if (ranked.size >= MIN_RECOMMENDED_ITEMS) {
+                ranked.take(MAX_RECOMMENDED_ITEMS)
+            } else {
+                ranked + radioTopUp(ranked, taste, disliked)
+            }
+            if (items.size < MIN_RECOMMENDED_ITEMS) null else shelf.copy(items = items)
+        }
+    }
+
+    /** How strongly [item]'s credits match something in [taste]; zero when nothing does. */
+    private fun tasteAffinity(
+        item: ShelfItem,
+        taste: List<com.music.bitchord.data.personalization.TasteTrack>,
+    ): Double {
+        val title = TrackText.titleKey(item.title)
+        var best = 0.0
+        for (entry in taste) {
+            val sameArtist = TrackMatcher.sharesArtist(item.subtitle, entry.song.artist)
+            val sameTitle = title.isNotBlank() && title == TrackText.titleKey(entry.song.title)
+            when {
+                sameArtist && sameTitle -> return RECORDING_AFFINITY + entry.score
+                sameArtist -> best = maxOf(best, entry.score)
+            }
+        }
+        return best
+    }
+
+    /**
+     * Related recordings for a shelf that taste alone cannot fill.
+     *
+     * The seed is the strongest track the listener has, and the answer is
+     * YouTube's related queue for it — the same source AutoPlay uses. Bounded
+     * in time because this runs while the page is being drawn: a radio that
+     * takes longer than the budget is not worth holding the feed for.
+     */
+    private suspend fun radioTopUp(
+        alreadyRanked: List<ShelfItem>,
+        taste: List<com.music.bitchord.data.personalization.TasteTrack>,
+        disliked: List<Song>,
+    ): List<ShelfItem> {
+        val seed = taste.firstOrNull()?.song ?: return emptyList()
+        val related = withTimeoutOrNull(RECOMMEND_RADIO_TIMEOUT_MS) {
+            YtMusicRepository.radio(seed.videoId).getOrNull()
+        }.orEmpty()
+        val seen = alreadyRanked.mapNotNull { it.videoId }.toSet() + seed.videoId
+        return related.asSequence()
+            .filterNot { TrackRatingStore.isDisliked(it, disliked) }
+            .filterNot { it.videoId in seen }
+            .distinctBy { it.videoId }
+            .take(MAX_RECOMMENDED_ITEMS)
+            .map { song ->
+                ShelfItem(
+                    title = song.title,
+                    subtitle = song.artist,
+                    thumbnailUrl = song.thumbnailUrl,
+                    videoId = song.videoId,
+                    browseId = null,
+                    isVideo = song.isVideo,
+                )
+            }
+            .toList()
+    }
+
+    /** Whether a shelf's title announces it as a recommendation rather than a section. */
+    private fun HomeShelf.looksLikeRecommendations(): Boolean {
+        val key = title.lowercase(Locale.ROOT)
+        return RECOMMENDATION_TITLES.any { key.contains(it) }
+    }
+
+    private fun ShelfItem.asSong(): Song = Song(
+        videoId = videoId.orEmpty(),
+        title = title,
+        artist = subtitle,
+        thumbnailUrl = thumbnailUrl,
+    )
+
     /** Refreshes the core feed without blanking the current Play page first. */
     private suspend fun refreshHome(identity: String?) = coroutineScope {
+        personalizedHome.refresh(force = true)
         val recent = if (_signedIn.value) async { YtMusicRepository.homeRecentlyPlayed() } else null
         // Top Picks keeps to its hour; a pull refreshes the feed, not the
         // picks, unless the hour has already turned over.
@@ -1885,7 +2180,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (identity != listenerKey()) return@onSuccess
             homeContinuation = feed.continuation
             homeSeenTitles.clear()
-            val shelves = feed.shelves.withoutRepeatsOf(emptyList())
+            val shelves = retuneRecommendations(feed.shelves).withoutRepeatsOf(emptyList())
                 .filter { homeSeenTitles.add(it.title.lowercase(Locale.ROOT)) }
             if (shelves.isNotEmpty()) _home.value = UiState.Success(shelves)
         }
@@ -1908,7 +2203,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             YtMusicRepository.moreHome(token).onSuccess { feed ->
                 if (identity == listenerKey()) {
                     val existing = (_home.value as? UiState.Success)?.data ?: emptyList()
-                    val added = feed.shelves.withoutRepeatsOf(existing)
+                    val added = retuneRecommendations(feed.shelves).withoutRepeatsOf(existing)
                         .filter { homeSeenTitles.add(it.title.lowercase(Locale.ROOT)) }
                     // A page with nothing new signals the feed has looped back on
                     // itself rather than run dry with a token still attached —
@@ -1929,6 +2224,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun fetchLibrary(identity: String?) {
+        val tasteIdentity = tasteListenerKey()
         val next = YtMusicRepository.library().fold(
             onSuccess = { page ->
                 // Liked Music is published with just its first page on the tab;
@@ -1941,7 +2237,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             },
             onFailure = { UiState.Error(it.friendly()) },
         )
-        if (identity == listenerKey()) _library.value = next
+        if (identity == listenerKey() && tasteIdentity == tasteListenerKey()) {
+            _library.value = next
+            personalizedHome.updateLibrary((next as? UiState.Success)?.data, tasteIdentity)
+        }
     }
 
     /**
@@ -2109,7 +2408,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         // pollute the user's YTMusic server-side search history — only an
         // explicit keyboard submission should do that.  Use the anonymous
         // endpoint so YouTube does not log this query against the account.
-        runSearch(anonymous = true)
+        when (_searchSource.value) {
+            SearchSource.YOUTUBE -> runSearch(anonymous = true)
+            SearchSource.ADDONS -> runAddonSearch(term.trim())
+            SearchSource.ALL,
+            SearchSource.YANDEX,
+            SearchSource.SPOTIFY,
+            SearchSource.SOUNDCLOUD,
+            SearchSource.VK -> runPlatformSearch(term.trim())
+            SearchSource.LIBRARY -> Unit
+        }
     }
 
     fun removeSearch(id: String) = SearchHistory.remove(id)
@@ -2123,8 +2431,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _suggestions.value = emptyList()
             _typeaheadResults.value = emptyList()
             _results.value = null
-            addonSearchJob?.cancel()
-            _addonResults.value = null
+            cancelAddonSearch()
+            cancelPlatformSearch()
             // The list is about to switch from search results to recent
             // searches (or the empty state) — without this it can keep
             // whatever scroll offset the results list was left at, landing
@@ -2136,7 +2444,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         searchSubmitted = false
         // The Library source answers from the device on every keystroke (see
         // [libraryResults]); YouTube's completions have nothing to add to it.
-        if (_searchSource.value != SearchSource.YOUTUBE) return
+        when (_searchSource.value) {
+            SearchSource.ALL,
+            SearchSource.YANDEX,
+            SearchSource.SPOTIFY,
+            SearchSource.SOUNDCLOUD,
+            SearchSource.VK -> {
+                cancelPlatformSearch()
+                return
+            }
+            SearchSource.ADDONS -> {
+                cancelAddonSearch()
+                return
+            }
+            SearchSource.LIBRARY -> return
+            SearchSource.YOUTUBE -> Unit
+        }
         // While typing, surface text completions — the pipeline already feeds
         // them through [suggestRequests] and publishes results via typeahead.
         suggestRequests.tryEmit(newValue)
@@ -2152,11 +2475,242 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         searchSubmitted = true
         _suggestions.value = emptyList()
         _typeaheadResults.value = emptyList()
-        if (_searchSource.value == SearchSource.ADDONS) {
-            runAddonSearch(q)
-            return
+        when (_searchSource.value) {
+            SearchSource.ADDONS -> runAddonSearch(q)
+            SearchSource.ALL,
+            SearchSource.YANDEX,
+            SearchSource.SPOTIFY,
+            SearchSource.SOUNDCLOUD,
+            SearchSource.VK -> runPlatformSearch(q)
+            SearchSource.YOUTUBE -> runSearch(anonymous = false)
+            SearchSource.LIBRARY -> Unit
         }
-        runSearch(anonymous = false)
+    }
+
+    private fun runPlatformSearch(q: String) {
+        cancelPlatformSearch()
+        val generation = platformSearchGeneration
+        _results.value = null
+        _addonResults.value = null
+        _platformResults.value = UiState.Loading
+        _searchScrollReset.value += 1
+        val source = _searchSource.value
+        platformSearchJob = viewModelScope.launch {
+            val next = try {
+                when (source) {
+                    SearchSource.ALL -> searchAllPlatforms(q)
+                    SearchSource.YANDEX -> searchYandex(q, PLATFORM_SEARCH_LIMIT)
+                    SearchSource.SPOTIFY -> searchSpotify(q, PLATFORM_SEARCH_LIMIT)
+                    SearchSource.SOUNDCLOUD -> searchSoundCloud(q, SOUNDCLOUD_PAGE_SIZE)
+                    SearchSource.VK -> searchVk(q, PLATFORM_SEARCH_LIMIT)
+                    else -> emptyList()
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                if (generation == platformSearchGeneration && source == _searchSource.value) {
+                    _platformResults.value = UiState.Error(error.message ?: text(R.string.failed))
+                }
+                return@launch
+            }
+            currentCoroutineContext().ensureActive()
+            if (generation == platformSearchGeneration && source == _searchSource.value && q == _query.value.trim()) {
+                _platformResults.value = UiState.Success(next)
+            }
+        }
+    }
+
+    private fun cancelPlatformSearch() {
+        platformSearchGeneration++
+        platformSearchJob?.cancel()
+        platformSearchJob = null
+        platformLoadMoreJob?.cancel()
+        platformLoadMoreJob = null
+        _platformLoadingMore.value = false
+        soundCloudSearchQuery = null
+        soundCloudNextOffset = null
+        soundCloudNextHref = null
+        _platformResults.value = null
+    }
+
+    fun loadMorePlatformResults() {
+        if (_searchSource.value != SearchSource.SOUNDCLOUD || platformLoadMoreJob?.isActive == true) return
+        val query = soundCloudSearchQuery ?: return
+        val offset = soundCloudNextOffset ?: return
+        val generation = platformSearchGeneration
+        platformLoadMoreJob = viewModelScope.launch {
+            _platformLoadingMore.value = true
+            try {
+                val page = withTimeoutOrNull(SOUNDCLOUD_SEARCH_TIMEOUT_MS) {
+                    SoundCloudPlaylistImporter.searchPage(
+                        query = query,
+                        offset = offset,
+                        limit = SOUNDCLOUD_PAGE_SIZE,
+                        continuationUrl = soundCloudNextHref,
+                    )
+                } ?: return@launch
+                currentCoroutineContext().ensureActive()
+                if (generation != platformSearchGeneration || _searchSource.value != SearchSource.SOUNDCLOUD ||
+                    _query.value.trim() != query
+                ) return@launch
+                val current = (_platformResults.value as? UiState.Success<List<Song>>)?.data.orEmpty()
+                val added = page.tracks.mapIndexed { index, track -> track.toSearchSong(current.size + index) }
+                _platformResults.value = UiState.Success((current + added).distinctBy { it.videoId })
+                soundCloudNextOffset = page.nextOffset
+                soundCloudNextHref = page.nextHref
+            } finally {
+                if (generation == platformSearchGeneration) _platformLoadingMore.value = false
+            }
+        }
+    }
+
+    private suspend fun searchAllPlatforms(query: String): List<Song> = coroutineScope {
+        val youtube = async {
+            val rows = YtMusicRepository.search(query, SearchFilter.SONGS).getOrNull().orEmpty()
+            currentCoroutineContext().ensureActive()
+            rows.mapNotNull {
+                when (it) {
+                    is SearchResult.Track -> it.song
+                    is SearchResult.TopTrack -> it.song
+                    is SearchResult.Browse -> null
+                }
+            }
+        }
+        val yandex = async {
+            val token = AppSettings.yandexMusicToken.value
+            // Anonymous callers get the public endpoint, so Yandex contributes to
+            // "all platforms" without an account instead of silently vanishing.
+            optionalPlatformRows {
+                if (token.isBlank()) {
+                    YandexMusicApi().searchTracksAnonymous(query, ALL_PLATFORM_PER_SOURCE)
+                } else {
+                    YandexMusicApi().searchTracks(token, query, ALL_PLATFORM_PER_SOURCE)
+                }
+            }
+        }
+        val spotify = async {
+            if (AppSettings.spotifySpdcToken.value.isBlank()) emptyList<Song>() else optionalPlatformRows {
+                SpotifyLibrary.searchTracks(query, ALL_PLATFORM_PER_SOURCE).map(SpotifyTrack::toSourceSong)
+            }
+        }
+        val soundCloud = async {
+            optionalPlatformRows {
+                withTimeoutOrNull(SOUNDCLOUD_SEARCH_TIMEOUT_MS) {
+                    SoundCloudPlaylistImporter.search(query, ALL_PLATFORM_PER_SOURCE)
+                }.orEmpty().mapIndexed { index, track -> track.toSearchSong(index) }
+            }
+        }
+        val vk = async {
+            optionalPlatformRows { VkMusicApi.search(query, ALL_PLATFORM_PER_SOURCE) }
+        }
+        val yandexSongs = ExternalPlaylistImporter.resolve(yandex.await()) { _, _ -> }.first
+        currentCoroutineContext().ensureActive()
+        mergePlatformSearchRows(spotify.await() + soundCloud.await() + vk.await() + youtube.await() + yandexSongs)
+    }
+
+    /** One recording, one row; keep a real provider identity over its catalogue duplicate. */
+    private fun mergePlatformSearchRows(rows: List<Song>): List<Song> {
+        val merged = mutableListOf<Song>()
+        rows.forEach { candidate ->
+            val index = merged.indexOfFirst { TasteProfiles.sameRecording(it, candidate) }
+            if (index < 0) {
+                merged += candidate
+            } else if (platformIdentityPriority(candidate) > platformIdentityPriority(merged[index])) {
+                merged[index] = candidate
+            }
+        }
+        return merged
+    }
+
+    private fun platformIdentityPriority(song: Song): Int = when {
+        song.isSpotifySourceTrack || song.playbackSource == "Spotify" -> 3
+        song.videoId.startsWith("soundcloud:") || song.playbackSource == "SoundCloud" -> 2
+        song.isVkSourceTrack || song.playbackSource == "VK Music" -> 2
+        else -> 1
+    }
+
+    private suspend fun <T> optionalPlatformRows(block: suspend () -> List<T>): List<T> = try {
+        block()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Throwable) {
+        emptyList()
+    }
+
+    private suspend fun searchYandex(query: String, limit: Int): List<Song> {
+        val token = AppSettings.yandexMusicToken.value
+        // Without an account the public search endpoint still answers; the rows
+        // are then matched to playable recordings like any other provider.
+        val tracks = if (token.isNotBlank()) {
+            YandexMusicApi().searchTracks(token, query, limit)
+        } else {
+            YandexMusicApi().searchTracksAnonymous(query, limit)
+        }
+        return ExternalPlaylistImporter.resolve(tracks) { _, _ -> }.first
+    }
+
+    private suspend fun searchSpotify(query: String, limit: Int): List<Song> {
+        val cached = cachedSpotifySongs(query, limit, likedOnly = false)
+        if (AppSettings.spotifySpdcToken.value.isBlank()) {
+            check(cached.isNotEmpty()) { text(R.string.tap_to_connect) }
+            return cached
+        }
+        return try {
+            SpotifyLibrary.searchTracks(query, limit).map(SpotifyTrack::toSourceSong).ifEmpty { cached }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            cached
+        }
+    }
+
+    private fun cachedSpotifySongs(query: String, limit: Int, likedOnly: Boolean): List<Song> {
+        val terms = query.trim().lowercase().split(Regex("\\s+")).filter(String::isNotBlank)
+        val rows = if (likedOnly) _personalizedHome.value.profile.recentLikes
+        else _personalizedHome.value.profile.tracks
+        return rows.asSequence()
+            .filter { HomeSource.SPOTIFY in it.sources && it.song.isSpotifySourceTrack }
+            .map { it.song }
+            .filter { song ->
+                val text = listOf(song.title, song.artist, song.albumName.orEmpty()).joinToString(" ").lowercase()
+                terms.all(text::contains)
+            }
+            .distinctBy(Song::videoId)
+            .take(limit)
+            .toList()
+    }
+
+    private suspend fun searchSoundCloud(query: String, limit: Int): List<Song> {
+        val page = withTimeoutOrNull(SOUNDCLOUD_SEARCH_TIMEOUT_MS) {
+            SoundCloudPlaylistImporter.searchPage(query, offset = 0, limit = limit)
+        } ?: error(text(R.string.couldnt_load_tracks))
+        // Do not make the search spinner wait for up to 25 stream resolutions.
+        // Metadata appears immediately; the selected row's native SoundCloud
+        // AAC-HLS stream is resolved on demand in MainActivity.
+        soundCloudSearchQuery = query
+        soundCloudNextOffset = page.nextOffset
+        soundCloudNextHref = page.nextHref
+        return page.tracks.mapIndexed { index, track -> track.toSearchSong(index) }
+    }
+
+    private suspend fun searchVk(query: String, limit: Int): List<Song> {
+        check(AppSettings.vkAccessToken.value.isNotBlank()) { text(R.string.tap_to_connect) }
+        if (com.music.bitchord.BuildConfig.VK_AUDIO_SCOPE_APPROVED) {
+            return VkMusicApi.search(query, limit)
+        }
+        // VK ID remains useful before VK approves the exceptional audio scope:
+        // the dedicated source becomes an explicitly labelled strict fallback,
+        // never a claim that these bytes or rows came from VK Music.
+        return YtMusicRepository.search(query, SearchFilter.SONGS).getOrNull().orEmpty()
+            .mapNotNull {
+                when (it) {
+                    is SearchResult.Track -> it.song
+                    is SearchResult.TopTrack -> it.song
+                    is SearchResult.Browse -> null
+                }
+            }
+            .take(limit)
+            .map { it.copy(playbackSource = "YouTube (VK fallback)") }
     }
 
     /**
@@ -2166,7 +2720,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun runAddonSearch(q: String) {
         SearchHistory.recordAddonQuery(q)
-        addonSearchJob?.cancel()
+        cancelAddonSearch()
+        val generation = addonSearchGeneration
         _searchScrollReset.value += 1
         // Every enabled addon, including ones the connection's quality setting
         // skips for playback: their rows are still worth seeing, and the
@@ -2182,7 +2737,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 addons.map { addon ->
                     async {
                         withTimeoutOrNull(ADDON_SEARCH_TIMEOUT_MS) {
-                            runCatching { addon.search(q, limit = ADDON_SEARCH_LIMIT) }.getOrDefault(emptyList())
+                            optionalPlatformRows { addon.search(q, limit = ADDON_SEARCH_LIMIT) }
                         } ?: emptyList()
                     }
                 }.map { it.await() }
@@ -2191,8 +2746,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val longest = perAddon.maxOfOrNull { it.size } ?: 0
                 for (i in 0 until longest) perAddon.forEach { rows -> rows.getOrNull(i)?.let(::add) }
             }
-            _addonResults.value = UiState.Success(merged)
+            currentCoroutineContext().ensureActive()
+            if (generation == addonSearchGeneration && _searchSource.value == SearchSource.ADDONS &&
+                q == _query.value.trim()
+            ) {
+                _addonResults.value = UiState.Success(merged)
+            }
         }
+    }
+
+    private fun cancelAddonSearch() {
+        addonSearchGeneration++
+        addonSearchJob?.cancel()
+        addonSearchJob = null
+        _addonResults.value = null
     }
 
     /**
@@ -2207,11 +2774,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _searchSource.value = source
         _suggestions.value = emptyList()
         _typeaheadResults.value = emptyList()
+        cancelPlatformSearch()
+        cancelAddonSearch()
         _searchScrollReset.value += 1
         when (source) {
             SearchSource.LIBRARY -> loadLibrarySongs()
             SearchSource.YOUTUBE -> submitSearch()
             SearchSource.ADDONS -> if (_query.value.isNotBlank()) submitSearch()
+            SearchSource.ALL,
+            SearchSource.YANDEX,
+            SearchSource.SPOTIFY,
+            SearchSource.SOUNDCLOUD,
+            SearchSource.VK -> if (_query.value.isNotBlank()) submitSearch()
         }
     }
 
@@ -2577,8 +3151,35 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private const val ADDON_SEARCH_TIMEOUT_MS = 12_000L
         private const val ADDON_SEARCH_LIMIT = 20
 
+        private const val PLATFORM_SEARCH_LIMIT = 25
+        private const val SOUNDCLOUD_PAGE_SIZE = 50
+        private const val ALL_PLATFORM_PER_SOURCE = 8
+        private const val SOUNDCLOUD_SEARCH_TIMEOUT_MS = 15_000L
+
+        /** How many taste entries a recommendation shelf is scored against. */
+        private const val TASTE_ARTIST_POOL = 60
+
+        /** Below this much listening history there is no taste to retune with. */
+        private const val MIN_TASTE_TRACKS = 5
+
+        private const val MIN_RECOMMENDED_ITEMS = 4
+        private const val MAX_RECOMMENDED_ITEMS = 20
+
+        /** A row that is the recording itself outranks any artist-only match. */
+        private const val RECORDING_AFFINITY = 1_000.0
+
+        /** How long the radio top-up may hold the feed. */
+        private const val RECOMMEND_RADIO_TIMEOUT_MS = 4_000L
+
+        /**
+         * Titles that mark a shelf as a recommendation rather than a section,
+         * matched case-insensitively in the listener's own language.
+         */
+        private val RECOMMENDATION_TITLES = listOf(
+            "тренд", "trending", "для вас", "for you", "хит", "chart", "чарт", "топ",
+        )
+
         /** How many Spotify tracks are looked up on YouTube Music at once. */
-        private const val SPOTIFY_MATCH_PARALLELISM = 6
 
         /**
          * How long a keystroke waits before the typeahead is asked about it.
@@ -2755,6 +3356,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             var monthlyListenerCount: String? = null
             /** Whether this artist is subscribed to — see [DetailPage.subscription]. */
             var subscription: SubscriptionState? = null
+            /** The artist header's own Mix target. */
+            var radio: WatchTarget? = null
             val localPlaylist = com.music.bitchord.data.spotify.LocalPlaylistStore.getPlaylist(browseId)
             val remote = remoteLibrary(browseId)
             // A release downloaded whole and opened by its YouTube id — the
@@ -2803,6 +3406,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             subscriberCountText = page.subscriberCountText
                             monthlyListenerCount = page.monthlyListenerCount
                             subscription = page.subscription
+                            radio = page.radio
                             if (page.songs.isEmpty()) {
                                 UiState.Error(text(R.string.no_tracks_here))
                             } else {
@@ -2870,6 +3474,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         subscriberCountText = subscriberCountText,
                         monthlyListenerCount = monthlyListenerCount,
                         subscription = subscription,
+                        radio = radio,
                     )
                 } else {
                     it
@@ -2914,52 +3519,32 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     if (it.browseId == browseId) it.copy(thumbnailUrl = cover) else it
                 }
             }
-            val tracks = runCatching {
+            val tracks = try {
                 SpotifyLibrary.tracks(playlistId) { soFar ->
-                    setSongs(UiState.Success(soFar.map { it.asPendingSong() }))
+                    setSongs(UiState.Success(soFar.map(SpotifyTrack::toSourceSong)))
                 }
-            }.getOrElse {
-                setSongs(UiState.Error(it.message ?: text(R.string.failed)))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                val cached = if (playlistId == SpotifyLibrary.LIKED_ID) {
+                    cachedSpotifySongs(query = "", limit = Int.MAX_VALUE, likedOnly = true)
+                } else {
+                    emptyList()
+                }
+                if (cached.isNotEmpty()) {
+                    setSongs(UiState.Success(cached))
+                    return@launch
+                }
+                setSongs(UiState.Error(failure.message ?: text(R.string.failed)))
                 return@launch
             }
             if (tracks.isEmpty()) {
                 setSongs(UiState.Error(text(R.string.spotify_empty_tracks)))
                 return@launch
             }
-            val gate = Semaphore(SPOTIFY_MATCH_PARALLELISM)
-            coroutineScope {
-                tracks.forEachIndexed { index, track ->
-                    launch {
-                        gate.withPermit {
-                            if (!open()) return@withPermit
-                            val match = runCatching { SpotifyImporter.matchTrack(track) }.getOrNull()
-                            val found = match?.copy(thumbnailUrl = match.thumbnailUrl ?: track.imageUrl)
-                                ?: track.asPendingSong().let {
-                                    it.copy(videoId = SPOTIFY_MISSING_PREFIX + track.id)
-                                }
-                            _detailStack.value = _detailStack.value.map { page ->
-                                val list = (page.songs as? UiState.Success<List<Song>>)?.data
-                                if (page.browseId == browseId && list != null && index < list.size) {
-                                    page.copy(songs = UiState.Success(list.toMutableList().also { it[index] = found }))
-                                } else page
-                            }
-                        }
-                    }
-                }
-            }
+            if (open()) setSongs(UiState.Success(tracks.map(SpotifyTrack::toSourceSong)))
         }
     }
-
-    private fun SpotifyTrack.asPendingSong() = Song(
-        videoId = SPOTIFY_PENDING_PREFIX + id,
-        title = title,
-        artist = artist,
-        thumbnailUrl = imageUrl,
-        durationText = durationMs.takeIf { it > 0 }?.let { ms ->
-            "%d:%02d".format(ms / 60000, ms / 1000 % 60)
-        },
-        albumName = album,
-    )
 
     /**
      * Pushes one album, playlist or artist out of a device folder as a page of
@@ -3536,6 +4121,128 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    fun setPersonalizedHomeVisible(visible: Boolean) = personalizedHome.setVisible(visible)
+
+    suspend fun resolveHomeSong(item: ShelfItem): Result<Song> = personalizedHome.resolve(item)
+
+    /**
+     * Keeps Spotify's identity and presentation while resolving a strictly
+     * matching stream that RX Playa is legally able to play itself.
+     */
+    suspend fun resolveSpotifySourceSong(song: Song): Song? {
+        if (!song.isSpotifySourceTrack) return song
+        val match = ExternalPlaylistImporter.match(
+            BasicExternalPlaylistTrack(
+                title = song.title,
+                artist = song.artist,
+                album = song.albumName,
+                durationMs = song.durationMillis(),
+                coverUrl = song.thumbnailUrl,
+            ),
+        ) ?: return null
+        return match.copy(
+            title = song.title,
+            artist = song.artist,
+            thumbnailUrl = song.thumbnailUrl ?: match.thumbnailUrl,
+            durationText = song.durationText ?: match.durationText,
+            artists = song.artists.ifEmpty { match.artists },
+            albumName = song.albumName ?: match.albumName,
+            playbackSource = "Spotify",
+            playbackSourceType = song.playbackSourceType,
+            playbackSourceId = song.playbackSourceId,
+        )
+    }
+
+    /** Strict playable copy used only when SoundCloud's own CDN fails its probe. */
+    suspend fun resolveSoundCloudFallback(song: Song): Song? {
+        if (!song.videoId.startsWith("soundcloud:")) return song
+        val match = ExternalPlaylistImporter.match(
+            BasicExternalPlaylistTrack(
+                title = song.title,
+                artist = song.artist,
+                album = song.albumName,
+                durationMs = song.durationMillis(),
+                coverUrl = song.thumbnailUrl,
+            ),
+        ) ?: return null
+        return match.copy(
+            title = song.title,
+            artist = song.artist,
+            thumbnailUrl = song.thumbnailUrl ?: match.thumbnailUrl,
+            durationText = song.durationText ?: match.durationText,
+            artists = song.artists.ifEmpty { match.artists },
+            albumName = song.albumName ?: match.albumName,
+            playbackSource = "YouTube (SoundCloud fallback)",
+            playbackSourceType = song.playbackSourceType,
+            playbackSourceId = song.playbackSourceId,
+        )
+    }
+
+    /**
+     * The last playable copy for a SoundCloud row whose own stream is gone: the
+     * top YouTube hit for its title and artist, with no recording match.
+     *
+     * Tried after [resolveSoundCloudFallback], never instead of it. A SoundCloud
+     * upload that is an extended mix, a sped-up edit or a live take has no
+     * runtime-compatible YouTube row, and refusing all of them is what turned a
+     * dead CDN into rows that lit up and then did nothing.
+     */
+    suspend fun resolveSoundCloudTopHit(song: Song): Song? {
+        if (!song.videoId.startsWith("soundcloud:")) return null
+        val match = runCatching {
+            ExternalPlaylistImporter.topHit(
+                BasicExternalPlaylistTrack(
+                    title = song.title,
+                    artist = song.artist,
+                    album = song.albumName,
+                    durationMs = song.durationMillis(),
+                    coverUrl = song.thumbnailUrl,
+                ),
+            )
+        }.getOrNull() ?: return null
+        return match.copy(
+            title = song.title,
+            artist = song.artist,
+            thumbnailUrl = song.thumbnailUrl ?: match.thumbnailUrl,
+            durationText = song.durationText ?: match.durationText,
+            artists = song.artists.ifEmpty { match.artists },
+            albumName = song.albumName ?: match.albumName,
+            playbackSource = "YouTube (SoundCloud fallback)",
+            playbackSourceType = song.playbackSourceType,
+            playbackSourceId = song.playbackSourceId,
+        )
+    }
+
+    /** VK metadata remains visible while an exact playable copy is selected. */
+    suspend fun resolveVkSourceSong(song: Song): Song? {
+        if (!song.isVkSourceTrack) return song
+        val match = ExternalPlaylistImporter.match(
+            BasicExternalPlaylistTrack(
+                title = song.title,
+                artist = song.artist,
+                album = song.albumName,
+                durationMs = song.durationMillis(),
+                coverUrl = song.thumbnailUrl,
+            ),
+        ) ?: return null
+        return match.copy(
+            title = song.title,
+            artist = song.artist,
+            thumbnailUrl = song.thumbnailUrl ?: match.thumbnailUrl,
+            durationText = song.durationText ?: match.durationText,
+            albumName = song.albumName ?: match.albumName,
+            playbackSource = "VK Music fallback",
+            playbackSourceType = song.playbackSourceType,
+            playbackSourceId = song.playbackSourceId,
+        )
+    }
+
+    private fun tasteListenerKey(): String? {
+        if (!_signedIn.value) return null
+        val account = _activeAccountId.value ?: "legacy:${tasteDigest(authStore.cookie.orEmpty())}"
+        return "$account:${_activeProfileId.value ?: "default"}"
+    }
+
     private fun listenerKey(): String? = _activeAccountId.value?.let { accountId ->
         _activeProfileId.value?.let { profileId -> "$accountId:$profileId" }
     }
@@ -3544,6 +4251,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _account.value = null
         likedSyncJob?.cancel()
         LikeState.clear()
+        LikeState.restore(TrackRatingStore.ratings.value.mapValues { it.value.likeStatus })
         _playlistsLoading.value = false
         _playlists.value = emptyList()
         _playlistOwned.value = emptyMap()
@@ -3608,6 +4316,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         // them would show the next signed-in user someone else's hearts.
         likedSyncJob?.cancel()
         LikeState.clear()
+        LikeState.restore(TrackRatingStore.ratings.value.mapValues { it.value.likeStatus })
         _playlists.value = emptyList()
         _playlistOwned.value = emptyMap()
         ownershipInFlight.clear()

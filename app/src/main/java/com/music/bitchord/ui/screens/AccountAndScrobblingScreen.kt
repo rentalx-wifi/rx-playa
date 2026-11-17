@@ -2,6 +2,7 @@ package com.music.bitchord.ui.screens
 
 import com.music.bitchord.ui.icons.SfIcons
 import com.music.bitchord.auth.clearSpotifyWebSession
+import com.music.bitchord.auth.clearYandexMusicWebSession
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.HorizontalDivider
 import com.music.bitchord.sharedui.resources.Res
@@ -15,24 +16,35 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.SwitchAccount
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.MaterialTheme
 import com.music.bitchord.ui.components.IosSwitch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.R
+import com.music.bitchord.BuildConfig
 import com.music.bitchord.data.model.Account
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.data.soundcloud.SoundCloudOAuth
+import com.music.bitchord.data.yandex.YandexMusicIntegration
+import com.music.bitchord.data.yandex.YandexMusicSyncStage
 import kotlin.math.roundToInt
 
 @Composable
@@ -41,12 +53,25 @@ fun AccountAndScrobblingScreen(
     account: Account?,
     channelName: String?,
     onSignIn: () -> Unit,
+    onImportGoogleCookie: () -> Unit,
     onSwitchChannel: () -> Unit,
     onSignOut: () -> Unit,
     onOpenListenBrainzLogin: () -> Unit,
     onOpenLastfmLogin: () -> Unit,
     onOpenDiscord: () -> Unit,
     onOpenSpotify: () -> Unit,
+    onOpenSoundCloudLogin: () -> Unit,
+    onDisconnectSoundCloud: () -> Unit,
+    onImportSoundCloudPlaylist: () -> Unit,
+    onOpenVkLogin: () -> Unit,
+    onOpenVkMusic: () -> Unit,
+    onImportVkPlaylist: () -> Unit,
+    onDisconnectVk: () -> Unit,
+    onOpenYandexMusicLogin: () -> Unit,
+    onImportYandexPlaylist: () -> Unit,
+    guestProfile: Boolean,
+    onEditGuestProfile: () -> Unit,
+    onDeleteGuestProfile: () -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -66,6 +91,21 @@ fun AccountAndScrobblingScreen(
     val discordUsername by AppSettings.discordUsername.collectAsStateWithLifecycle()
     val discordRpcEnabled by AppSettings.discordRpcEnabled.collectAsStateWithLifecycle()
     val spotifyConnected by AppSettings.spotifySpdcToken.collectAsStateWithLifecycle()
+    val yandexToken by AppSettings.yandexMusicToken.collectAsStateWithLifecycle()
+    val yandexAccount by AppSettings.yandexMusicAccountName.collectAsStateWithLifecycle()
+    val yandexHasPlus by AppSettings.yandexMusicHasPlus.collectAsStateWithLifecycle()
+    val yandexSyncEnabled by AppSettings.yandexMusicSyncEnabled.collectAsStateWithLifecycle()
+    val soundCloudToken by AppSettings.soundCloudAccessToken.collectAsStateWithLifecycle()
+    val soundCloudAccount by AppSettings.soundCloudAccountName.collectAsStateWithLifecycle()
+    val vkToken by AppSettings.vkAccessToken.collectAsStateWithLifecycle()
+    val vkAccount by AppSettings.vkAccountName.collectAsStateWithLifecycle()
+    val yandexState by YandexMusicIntegration.state.collectAsStateWithLifecycle()
+    val yandexNowPlaying by YandexMusicIntegration.nowPlaying.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var soundCloudLoginAvailable by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        soundCloudLoginAvailable = SoundCloudOAuth.isConfigured()
+    }
 
     Column(
         modifier = modifier
@@ -78,14 +118,19 @@ fun AccountAndScrobblingScreen(
         // One card: who is signed in, which profile is listening, and the way
         // out, with the explanation of profiles underneath.
         SettingsGroup(
-            footer = if (signedIn) stringResource(R.string.account_profiles_help) else null,
+            footer = when {
+                signedIn -> stringResource(R.string.account_profiles_help)
+                guestProfile -> stringResource(R.string.guest_profile_help)
+                else -> null
+            },
             topSpacing = 0.dp,
         ) {
             AccountCard(
                 signedIn = signedIn,
                 account = account,
                 onSignIn = onSignIn,
-                onClick = onSwitchChannel,
+                onClick = if (guestProfile) onEditGuestProfile else onSwitchChannel,
+                guest = guestProfile,
                 grouped = true,
             )
             if (signedIn) {
@@ -98,7 +143,37 @@ fun AccountAndScrobblingScreen(
                 )
                 FullWidthDivider()
                 DestructiveRow(label = stringResource(R.string.sign_out), onClick = onSignOut)
+            } else {
+                if (!guestProfile) {
+                    FullWidthDivider()
+                    SettingsRow(
+                        icon = SfIcons.Person,
+                        title = stringResource(R.string.guest_profile),
+                        subtitle = stringResource(R.string.guest_profile_subtitle),
+                        onClick = onEditGuestProfile,
+                    )
+                } else {
+                    FullWidthDivider()
+                    SettingsRow(
+                        icon = SfIcons.SwitchAccount,
+                        title = stringResource(R.string.sign_in_youtube_music),
+                        subtitle = stringResource(R.string.tap_to_sign_in_google),
+                        onClick = onSignIn,
+                    )
+                    FullWidthDivider()
+                    DestructiveRow(
+                        label = stringResource(R.string.delete_guest_profile),
+                        onClick = onDeleteGuestProfile,
+                    )
+                }
             }
+            FullWidthDivider()
+            SettingsRow(
+                icon = SfIcons.SwitchAccount,
+                title = stringResource(R.string.google_cookie_import_title),
+                subtitle = stringResource(R.string.google_cookie_import_subtitle),
+                onClick = onImportGoogleCookie,
+            )
         }
 
         SettingsGroup(
@@ -120,6 +195,167 @@ fun AccountAndScrobblingScreen(
                     onClick = {
                         clearSpotifyWebSession()
                         AppSettings.setSpotifySpdcToken("")
+                    },
+                )
+            }
+        }
+
+        SettingsGroup(
+            header = stringResource(R.string.soundcloud),
+            footer = stringResource(R.string.soundcloud_import_footer),
+        ) {
+            SettingsRow(
+                icon = SfIcons.Cloud,
+                title = stringResource(R.string.soundcloud),
+                subtitle = when {
+                    soundCloudToken.isBlank() -> stringResource(R.string.soundcloud_public_import_subtitle)
+                    soundCloudAccount.isNotBlank() -> soundCloudAccount
+                    else -> stringResource(R.string.connected)
+                },
+                onClick = null,
+            )
+            FullWidthDivider()
+            SettingsRow(
+                icon = SfIcons.Cloud,
+                title = stringResource(R.string.soundcloud_import_title),
+                subtitle = stringResource(R.string.soundcloud_import_description),
+                onClick = onImportSoundCloudPlaylist,
+            )
+            if (soundCloudToken.isBlank() && soundCloudLoginAvailable) {
+                FullWidthDivider()
+                SettingsRow(
+                    icon = SfIcons.SwitchAccount,
+                    title = stringResource(R.string.sign_in),
+                    onClick = onOpenSoundCloudLogin,
+                )
+            }
+            if (soundCloudToken.isNotBlank()) {
+                FullWidthDivider()
+                DestructiveRow(
+                    label = stringResource(R.string.disconnect),
+                    onClick = onDisconnectSoundCloud,
+                )
+            }
+        }
+
+        SettingsGroup(
+            header = "VK Music",
+            footer = if (BuildConfig.VK_AUDIO_SCOPE_APPROVED) null
+            else stringResource(R.string.vk_public_import_subtitle),
+        ) {
+            SettingsRow(
+                icon = Icons.Rounded.MusicNote,
+                title = "VK Music",
+                subtitle = when {
+                    vkToken.isBlank() && BuildConfig.VK_ID_CLIENT_ID.isBlank() ->
+                        stringResource(R.string.vk_public_import_subtitle)
+                    vkToken.isBlank() -> stringResource(R.string.tap_to_connect)
+                    vkAccount.isNotBlank() && !BuildConfig.VK_AUDIO_SCOPE_APPROVED ->
+                        "$vkAccount · ${stringResource(R.string.source_setup_required)}"
+                    vkAccount.isNotBlank() -> vkAccount
+                    else -> stringResource(R.string.connected)
+                },
+                onClick = if (vkToken.isBlank() && BuildConfig.VK_ID_CLIENT_ID.isNotBlank()) {
+                    onOpenVkLogin
+                } else onOpenVkMusic,
+            )
+            FullWidthDivider()
+            SettingsRow(
+                icon = SfIcons.Download,
+                title = stringResource(R.string.vk_import_title),
+                subtitle = stringResource(R.string.vk_import_subtitle),
+                onClick = onImportVkPlaylist,
+            )
+            if (vkToken.isNotBlank()) {
+                FullWidthDivider()
+                DestructiveRow(
+                    label = stringResource(R.string.disconnect),
+                    onClick = onDisconnectVk,
+                )
+            }
+        }
+
+        SettingsGroup(
+            header = stringResource(R.string.yandex_music),
+            footer = stringResource(R.string.yandex_music_integration_footer),
+        ) {
+            SettingsRow(
+                icon = Icons.Rounded.MusicNote,
+                title = stringResource(
+                    if (yandexToken.isBlank()) R.string.yandex_music_sign_in else R.string.yandex_music,
+                ),
+                subtitle = when {
+                    yandexToken.isBlank() -> stringResource(R.string.tap_to_connect)
+                    yandexState.stage == YandexMusicSyncStage.AUTH_EXPIRED ->
+                        stringResource(R.string.yandex_music_status_auth_expired)
+                    yandexAccount.isNotBlank() -> stringResource(
+                        if (yandexHasPlus) R.string.yandex_music_connected_plus
+                        else R.string.yandex_music_connected_free,
+                        yandexAccount,
+                    )
+                    else -> stringResource(R.string.connected)
+                },
+                onClick = {
+                    if (yandexToken.isBlank() || yandexState.stage == YandexMusicSyncStage.AUTH_EXPIRED) {
+                        onOpenYandexMusicLogin()
+                    }
+                },
+            )
+            if (yandexToken.isNotBlank()) {
+                FullWidthDivider()
+                SettingsRow(
+                    icon = SfIcons.GraphicEq,
+                    title = stringResource(R.string.yandex_music_sync_presence),
+                    subtitle = if (!yandexSyncEnabled) {
+                        stringResource(R.string.yandex_music_status_disabled)
+                    } else yandexNowPlaying?.let { "${it.artist} — ${it.title}" } ?: when (yandexState.stage) {
+                        YandexMusicSyncStage.CONNECTING ->
+                            stringResource(R.string.yandex_music_status_connecting)
+                        YandexMusicSyncStage.RECONNECTING ->
+                            stringResource(R.string.yandex_music_status_reconnecting)
+                        YandexMusicSyncStage.PAUSED ->
+                            stringResource(R.string.yandex_music_status_paused)
+                        YandexMusicSyncStage.ADVERTISEMENT ->
+                            stringResource(R.string.yandex_music_status_advertisement)
+                        YandexMusicSyncStage.RESTRICTED ->
+                            stringResource(R.string.yandex_music_status_restricted)
+                        YandexMusicSyncStage.AUTH_EXPIRED ->
+                            stringResource(R.string.yandex_music_status_auth_expired)
+                        YandexMusicSyncStage.DISABLED ->
+                            stringResource(R.string.yandex_music_status_disabled)
+                        else -> stringResource(R.string.yandex_music_status_waiting)
+                    },
+                    trailing = {
+                        IosSwitch(
+                            checked = yandexSyncEnabled,
+                            onCheckedChange = { enabled ->
+                                AppSettings.setYandexMusicSyncEnabled(enabled)
+                                if (enabled) YandexMusicIntegration.ensureRunning(context)
+                                else YandexMusicIntegration.stop(context)
+                            },
+                        )
+                    },
+                    onClick = {
+                        val enabled = !yandexSyncEnabled
+                        AppSettings.setYandexMusicSyncEnabled(enabled)
+                        if (enabled) YandexMusicIntegration.ensureRunning(context)
+                        else YandexMusicIntegration.stop(context)
+                    },
+                )
+                FullWidthDivider()
+                SettingsRow(
+                    icon = SfIcons.Download,
+                    title = stringResource(R.string.yandex_import_title),
+                    subtitle = stringResource(R.string.yandex_import_description),
+                    onClick = onImportYandexPlaylist,
+                )
+                FullWidthDivider()
+                DestructiveRow(
+                    label = stringResource(R.string.sign_out),
+                    onClick = {
+                        clearYandexMusicWebSession()
+                        AppSettings.clearYandexMusicAccount()
+                        YandexMusicIntegration.stop(context)
                     },
                 )
             }

@@ -2,16 +2,22 @@ package com.music.bitchord.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchColors
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,6 +39,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
+import com.music.bitchord.ui.theme.LocalMaterial3StyleEnabled
+import com.music.bitchord.ui.theme.LocalNothingStyleEnabled
+import com.music.bitchord.ui.theme.NothingRed
+import com.music.bitchord.ui.theme.NothingWhite
 
 /**
  * The iOS 26 switch: a wide green capsule and a white pill of a thumb, which
@@ -67,21 +77,43 @@ fun IosSwitch(
     enabled: Boolean = true,
     @Suppress("UNUSED_PARAMETER") colors: SwitchColors? = null,
 ) {
+    val nothing = LocalNothingStyleEnabled.current
+    // Material 3's own switch, in the skin that asks for it: the rest of this
+    // file is the iOS capsule, and a Material surface with an iOS switch on it
+    // reads as a half-finished job rather than as a choice.
+    if (LocalMaterial3StyleEnabled.current) {
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = modifier,
+            enabled = enabled,
+            colors = SwitchDefaults.colors(),
+        )
+        return
+    }
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val motion: AnimationSpec<Float> = remember(nothing) {
+        if (nothing) tween(180) else spring(dampingRatio = 0.78f, stiffness = 700f)
+    }
+    val pressMotion: AnimationSpec<Float> = remember(nothing) {
+        if (nothing) tween(120) else spring(dampingRatio = 0.7f, stiffness = 900f)
+    }
     val position by animateFloatAsState(
         targetValue = if (checked) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.78f, stiffness = 700f),
+        animationSpec = motion,
         label = "iosSwitchThumb",
     )
     val stretch by animateFloatAsState(
         targetValue = if (pressed) 1.18f else 1f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 900f),
+        animationSpec = pressMotion,
         label = "iosSwitchStretch",
     )
     val track by animateColorAsState(
         targetValue = when {
+            checked && nothing -> NothingRed
+            nothing -> MaterialTheme.colorScheme.surfaceVariant
             checked && dark -> Color(0xFF30D158)
             checked -> Color(0xFF34C759)
             else -> Color(0xFF8E8E93).copy(alpha = if (dark) 0.36f else 0.22f)
@@ -89,6 +121,8 @@ fun IosSwitch(
         label = "iosSwitchTrack",
     )
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
+    val trackShape = CircleShape
+    val thumbShape = CircleShape
 
     val haptics = rememberHaptics()
     // Skips the first run, so a switch scrolling into view stays quiet.
@@ -116,8 +150,15 @@ fun IosSwitch(
                 },
             )
             .size(TrackWidth, TrackHeight)
-            .clip(CircleShape)
-            .background(track),
+            .clip(trackShape)
+            .background(track)
+            .then(
+                if (nothing) Modifier.border(
+                    1.dp,
+                    if (checked) NothingRed else NothingWhite.copy(alpha = 0.24f),
+                    trackShape,
+                ) else Modifier,
+            ),
         contentAlignment = Alignment.CenterStart,
     ) {
         Box(
@@ -132,8 +173,15 @@ fun IosSwitch(
                     scaleX = stretch
                 }
                 .size(ThumbWidth, ThumbHeight)
-                .shadow(2.dp, CircleShape)
-                .background(Color.White, CircleShape),
+                .shadow(if (nothing) 1.dp else 2.dp, thumbShape)
+                .background(
+                    if (nothing) {
+                        if (checked) NothingWhite else MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        Color.White
+                    },
+                    thumbShape,
+                ),
         )
     }
 }

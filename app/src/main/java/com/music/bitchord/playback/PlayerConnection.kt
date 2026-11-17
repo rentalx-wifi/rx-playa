@@ -18,6 +18,7 @@ import androidx.core.net.toUri
 import androidx.core.os.bundleOf
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.session.MediaController
@@ -33,6 +34,10 @@ import com.music.bitchord.data.sources.SourceKind
 import com.music.bitchord.data.sources.SourceRegistry
 import com.music.bitchord.data.sources.SourceResolver
 import com.music.bitchord.data.sources.TrackMatcher
+import com.music.bitchord.data.soundcloud.SOUNDCLOUD_TRACK_PREFIX
+import com.music.bitchord.data.soundcloud.SoundCloudPlayback
+import com.music.bitchord.data.spotify.SPOTIFY_TRACK_PREFIX
+import com.music.bitchord.data.vk.VK_TRACK_PREFIX
 import com.music.bitchord.download.Downloads
 import com.music.bitchord.ui.rememberIsForeground
 import kotlinx.coroutines.Dispatchers
@@ -121,6 +126,7 @@ suspend fun MediaController.playBoundedContext(
     source: QueueSource,
     continuationToken: String?,
     shuffle: Boolean = QueueShuffle.enabled.value,
+    preserveUserQueue: Boolean = true,
 ) {
     val token = BoundedContextRequests.put(
         BoundedContextRequests.Request(
@@ -129,6 +135,7 @@ suspend fun MediaController.playBoundedContext(
             source = source,
             continuationToken = continuationToken,
             shuffle = shuffle,
+            preserveUserQueue = preserveUserQueue,
         ),
     )
     try {
@@ -272,6 +279,14 @@ fun songFromBundle(b: Bundle): Song {
         isExplicit = if (b.containsKey("isExplicit")) b.getBoolean("isExplicit") else null,
         queueTier = queueTier,
         queueEntryId = b.getString("queueEntryId"),
+    )
+}
+
+/** Removes the disliked recording and all of its provider aliases from playback. */
+fun MediaController.removeDisliked(song: Song) {
+    sendCustomCommand(
+        SessionCommand(ACTION_REMOVE_DISLIKED, Bundle.EMPTY),
+        bundleOf(EXTRA_DISLIKED_SONG to song.toSongBundle()),
     )
 }
 
@@ -646,6 +661,8 @@ private fun Song.pickedMixQuery(configId: String): String {
 
 fun Song.toMediaItem(): MediaItem {
     val sourceTrack = SourceRegistry.parseTrackKey(videoId)
+    val nativeSoundCloud = videoId.startsWith(SOUNDCLOUD_TRACK_PREFIX) &&
+        SoundCloudPlayback.isTrustedSoundCloudUrl(playbackSourceId.orEmpty())
     // A row from search or a playlist carries no file of its own, but the track
     // may still be on disk from a download — see [Downloads.saved].
     //
@@ -674,6 +691,9 @@ fun Song.toMediaItem(): MediaItem {
         ?: Downloads.verifiedSavedUri(videoId)
     val uriString = offlineUri ?: when {
         videoId.startsWith("content://") || videoId.startsWith("file://") -> videoId
+        nativeSoundCloud ->
+            SoundCloudPlayback.playbackUri(videoId, playbackSourceId.orEmpty()) + matchQuery()
+        isExternalProviderTrackId(videoId) -> externalYouTubeFallbackUri()
         // Title, artist and runtime ride along in the URI because they are what
         // a cross-source match is made on, and the resolver runs on ExoPlayer's
         // loader thread with nothing but a DataSpec in hand — see
@@ -699,6 +719,9 @@ fun Song.toMediaItem(): MediaItem {
     return MediaItem.Builder()
         .setMediaId(videoId)
         .setUri(resolvePlaybackUri(uriString, localPath))
+        .apply {
+            if (nativeSoundCloud) setMimeType(MimeTypes.APPLICATION_M3U8)
+        }
     .setMediaMetadata(
         MediaMetadata.Builder()
             .setTitle(title)
@@ -793,6 +816,13 @@ fun Song.toDirectYouTubeMediaItem(): MediaItem =
 private fun Song.directYouTubeUri(): String =
     "bitchord://watch?v=$videoId${matchQuery()}&$DIRECT_YOUTUBE_PARAMETER=1&q=original"
 
+private fun Song.externalYouTubeFallbackUri(): String =
+    "bitchord://source?id=${Uri.encode(videoId)}&$DIRECT_YOUTUBE_PARAMETER=1${matchQuery()}"
+
+internal fun isExternalProviderTrackId(id: String): Boolean =
+    id.startsWith(SPOTIFY_TRACK_PREFIX) || id.startsWith(VK_TRACK_PREFIX) ||
+        id.startsWith(SOUNDCLOUD_TRACK_PREFIX)
+
 /**
  * Whether there is a YouTube upload behind this song to go back *to* — the
  * question "Revert to original" only means something for.
@@ -821,11 +851,7 @@ private fun Song.directYouTubeUri(): String =
  *    `VideoAudioVersionButton`.
  */
 fun Song.hasYouTubeOriginal(): Boolean =
-    videoId.isNotBlank() &&
-        !videoId.startsWith("content://") &&
-        !videoId.startsWith("file://") &&
-        !isVideo &&
-        SourceRegistry.parseTrackKey(videoId) == null
+    isYouTubeVideoId(videoId) && !isVideo
 
 /** A playback URI carrying this is explicitly requested YouTube, never a substitute. */
 const val DIRECT_YOUTUBE_PARAMETER = "direct_youtube"
@@ -845,12 +871,18 @@ const val DIRECT_YOUTUBE_PARAMETER = "direct_youtube"
  * source-backed track differently again, so filing lines under it would scatter
  * one song's story across several names.
  */
-fun mediaIdIn(uri: Uri): String? = if (uri.authority == "source") {
-    val configId = uri.getQueryParameter("s")
-    val trackId = uri.getQueryParameter("t")
-    if (configId != null && trackId != null) SourceRegistry.trackKey(configId, trackId) else null
-} else {
-    uri.getQueryParameter("v")
+fun mediaIdIn(uri: Uri): String? = when (uri.authority) {
+    "source" -> {
+        val configId = uri.getQueryParameter("s")
+        val trackId = uri.getQueryParameter("t")
+        if (configId != null && trackId != null) {
+            SourceRegistry.trackKey(configId, trackId)
+        } else {
+            uri.getQueryParameter("id")
+        }
+    }
+    "soundcloud" -> uri.getQueryParameter("id")
+    else -> uri.getQueryParameter("v")
 }
 
 /**

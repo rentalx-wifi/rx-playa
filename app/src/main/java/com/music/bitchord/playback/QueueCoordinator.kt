@@ -32,8 +32,9 @@ object QueueCoordinator {
         newContextSongs: List<Song>,
         selectedIndex: Int,
         contextSource: QueueSource,
+        preserveUserQueue: Boolean = true,
     ): ContextQueueResult = QueueTimeline.buildContextQueue(
-        currentTimeline, currentIndex, newContextSongs, selectedIndex, contextSource,
+        currentTimeline, currentIndex, newContextSongs, selectedIndex, contextSource, preserveUserQueue,
     )
 
     /** @see QueueTimeline.buildOneOffQueue */
@@ -49,11 +50,27 @@ object QueueCoordinator {
         tappedSong: Song,
         source: QueueSource,
         upcomingPartyTracks: List<PartyTrack>,
+        preservePartyQueue: Boolean = true,
     ): List<Song> = QueueTimeline.buildPartyPlaybackQueue(
         tappedSong,
         source,
         upcomingPartyTracks.map { it.toSong() },
+        preservePartyQueue,
     )
+
+    /** Removes every physical alias of disliked recordings, including the current item. */
+    fun removeMatchingRecordings(player: Player, targets: List<Song>): Int {
+        if (targets.isEmpty()) return 0
+        val indices = (0 until player.mediaItemCount).filter { index ->
+            val queued = player.getMediaItemAt(index).toSong()
+            targets.any { QueueBuilder.isSameRecording(queued, it) }
+        }
+        player.removeRuns(indices)
+        return indices.size
+    }
+
+    fun removeMatchingRecordings(player: Player, target: Song): Int =
+        removeMatchingRecordings(player, listOf(target))
 
     /** @see QueueTimeline.findUserQueueInsertionIndex */
     fun findUserQueueInsertionIndex(

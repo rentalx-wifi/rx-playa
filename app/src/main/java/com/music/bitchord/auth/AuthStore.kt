@@ -6,8 +6,8 @@ import android.content.SharedPreferences
 /**
  * Encrypted-at-rest storage for credentials.
  *
- * Two live here: the YouTube Music session cookie, and — if the user turns on
- * the Discord integration — that account's own bearer token. Neither is a
+ * Account credentials live here: the YouTube Music session cookie and the
+ * bearer tokens for Discord and Yandex Music. None of them is a
  * password: the Google one is typed into accounts.google.com inside a WebView,
  * and the Discord one is read out of a completed login session. But both grant
  * full access to their account, so they don't go in the plain prefs the
@@ -102,6 +102,61 @@ class AuthStore(context: Context) {
     var discordToken: String?
         get() = prefs.getString(KEY_DISCORD_TOKEN, null)
         set(value) = prefs.edit().putString(KEY_DISCORD_TOKEN, value).apply()
+
+    /** OAuth bearer token used only with Yandex Music REST and Ynison hosts. */
+    var yandexMusicToken: String?
+        get() = prefs.getString(KEY_YANDEX_MUSIC_TOKEN, null)
+        set(value) = prefs.edit().putString(KEY_YANDEX_MUSIC_TOKEN, value).apply()
+
+    /** Official SoundCloud OAuth 2.1 session. Refresh tokens are single-use. */
+    var soundCloudAccessToken: String?
+        get() = prefs.getString(KEY_SOUNDCLOUD_ACCESS_TOKEN, null)
+        set(value) = prefs.edit().putString(KEY_SOUNDCLOUD_ACCESS_TOKEN, value).apply()
+
+    var soundCloudRefreshToken: String?
+        get() = prefs.getString(KEY_SOUNDCLOUD_REFRESH_TOKEN, null)
+        set(value) = prefs.edit().putString(KEY_SOUNDCLOUD_REFRESH_TOKEN, value).apply()
+
+    var soundCloudTokenExpiresAtMs: Long
+        get() = prefs.getLong(KEY_SOUNDCLOUD_EXPIRES_AT, 0L)
+        set(value) = prefs.edit().putLong(KEY_SOUNDCLOUD_EXPIRES_AT, value).apply()
+
+    var soundCloudOAuthState: String?
+        get() = prefs.getString(KEY_SOUNDCLOUD_OAUTH_STATE, null)
+        set(value) = prefs.edit().putString(KEY_SOUNDCLOUD_OAUTH_STATE, value).apply()
+
+    var soundCloudOAuthVerifier: String?
+        get() = prefs.getString(KEY_SOUNDCLOUD_OAUTH_VERIFIER, null)
+        set(value) = prefs.edit().putString(KEY_SOUNDCLOUD_OAUTH_VERIFIER, value).apply()
+
+    /** VK ID session. Audio access remains separately gated by VK approval. */
+    var vkAccessToken: String?
+        get() = prefs.getString(KEY_VK_ACCESS_TOKEN, null)
+        set(value) = prefs.edit().putString(KEY_VK_ACCESS_TOKEN, value).apply()
+
+    var vkRefreshToken: String?
+        get() = prefs.getString(KEY_VK_REFRESH_TOKEN, null)
+        set(value) = prefs.edit().putString(KEY_VK_REFRESH_TOKEN, value).apply()
+
+    var vkIdToken: String?
+        get() = prefs.getString(KEY_VK_ID_TOKEN, null)
+        set(value) = prefs.edit().putString(KEY_VK_ID_TOKEN, value).apply()
+
+    var vkDeviceId: String?
+        get() = prefs.getString(KEY_VK_DEVICE_ID, null)
+        set(value) = prefs.edit().putString(KEY_VK_DEVICE_ID, value).apply()
+
+    var vkTokenExpiresAtMs: Long
+        get() = prefs.getLong(KEY_VK_EXPIRES_AT, 0L)
+        set(value) = prefs.edit().putLong(KEY_VK_EXPIRES_AT, value).apply()
+
+    var vkOAuthState: String?
+        get() = prefs.getString(KEY_VK_OAUTH_STATE, null)
+        set(value) = prefs.edit().putString(KEY_VK_OAUTH_STATE, value).apply()
+
+    var vkOAuthVerifier: String?
+        get() = prefs.getString(KEY_VK_OAUTH_VERIFIER, null)
+        set(value) = prefs.edit().putString(KEY_VK_OAUTH_VERIFIER, value).apply()
 
     /**
      * The WebDAV server password. Encrypted like every other credential here:
@@ -216,6 +271,32 @@ class AuthStore(context: Context) {
                 name in API_SID_NAMES && value.isNotEmpty()
             }
 
+        /** Accepts a browser's Cookie header, never a full request or Set-Cookie attributes. */
+        fun normalizeGoogleCookieHeader(input: String): String? {
+            if (input.length > 65_536 || input.any { it.code < 32 || it.code > 126 }) return null
+            val header = input.trim().let {
+                if (it.startsWith("Cookie:", ignoreCase = true)) it.substringAfter(':').trim() else it
+            }
+            if (header.isEmpty() || header.any { it.code < 32 || it.code > 126 }) return null
+            val entries = LinkedHashMap<String, String>()
+            for (entry in header.split(';')) {
+                if (entry.isBlank()) continue
+                val separator = entry.indexOf('=')
+                if (separator <= 0) return null
+                val name = entry.substring(0, separator).trim()
+                val value = entry.substring(separator + 1).trim()
+                if (!COOKIE_NAME.matches(name) || name.lowercase() in COOKIE_ATTRIBUTES ||
+                    value.any { it <= ' ' || it == ',' || it == '"' || it == '\\' }
+                ) return null
+                val previous = entries.put(name, value)
+                if (previous != null && previous != value) return null
+            }
+            val normalized = entries.entries.joinToString("; ") { (name, value) -> "$name=$value" }
+            return normalized.takeIf(::hasApiSid)
+        }
+
+        private val COOKIE_NAME = Regex("[!#$%&'*+.^_`|~0-9A-Za-z-]+")
+        private val COOKIE_ATTRIBUTES = setOf("path", "domain", "expires", "max-age", "samesite")
         private val API_SID_NAMES =
             setOf("SAPISID", "__Secure-3PAPISID", "__Secure-1PAPISID")
 
@@ -228,6 +309,19 @@ class AuthStore(context: Context) {
         private const val KEY_CHANNEL_NAME = "channel_name"
         private const val KEY_CHANNEL_AUTH_USER = "channel_auth_user"
         private const val KEY_DISCORD_TOKEN = "discord_token"
+        private const val KEY_YANDEX_MUSIC_TOKEN = "yandex_music_token"
+        private const val KEY_SOUNDCLOUD_ACCESS_TOKEN = "soundcloud_access_token"
+        private const val KEY_SOUNDCLOUD_REFRESH_TOKEN = "soundcloud_refresh_token"
+        private const val KEY_SOUNDCLOUD_EXPIRES_AT = "soundcloud_expires_at"
+        private const val KEY_SOUNDCLOUD_OAUTH_STATE = "soundcloud_oauth_state"
+        private const val KEY_SOUNDCLOUD_OAUTH_VERIFIER = "soundcloud_oauth_verifier"
+        private const val KEY_VK_ACCESS_TOKEN = "vk_access_token"
+        private const val KEY_VK_REFRESH_TOKEN = "vk_refresh_token"
+        private const val KEY_VK_ID_TOKEN = "vk_id_token"
+        private const val KEY_VK_DEVICE_ID = "vk_device_id"
+        private const val KEY_VK_EXPIRES_AT = "vk_expires_at"
+        private const val KEY_VK_OAUTH_STATE = "vk_oauth_state"
+        private const val KEY_VK_OAUTH_VERIFIER = "vk_oauth_verifier"
         private const val KEY_WEBDAV_PASSWORD = "webdav_password"
         private const val KEY_SMB_PASSWORD = "smb_password"
     }

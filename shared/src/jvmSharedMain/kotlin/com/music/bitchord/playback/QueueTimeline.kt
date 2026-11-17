@@ -14,6 +14,15 @@ data class QueueSource(
     val id: String? = null,
 )
 
+/** Applies queue provenance without replacing transport metadata owned by the track itself. */
+fun Song.withQueueSource(source: QueueSource): Song = copy(
+    playbackSource = source.title,
+    playbackSourceType = source.type,
+    // Native SoundCloud playback resolves this permalink at play time. A queue
+    // context describes where the row was tapped, not how its audio is found.
+    playbackSourceId = if (videoId.startsWith("soundcloud:")) playbackSourceId else source.id,
+)
+
 /**
  * Result of constructing a context queue, containing the reconstructed timeline
  * and the 0-based start index representing the user's tapped track.
@@ -66,12 +75,6 @@ object QueueTimeline {
             emptyList()
         }
 
-    private fun Song.from(source: QueueSource): Song = copy(
-        playbackSource = source.title,
-        playbackSourceType = source.type,
-        playbackSourceId = source.id,
-    )
-
     /**
      * Constructs an interleaved queue for starting a Context (Album, Playlist, Artist):
      *
@@ -85,11 +88,18 @@ object QueueTimeline {
         newContextSongs: List<Song>,
         selectedIndex: Int,
         contextSource: QueueSource,
+        preserveUserQueue: Boolean = true,
     ): ContextQueueResult {
         if (newContextSongs.isEmpty()) return ContextQueueResult(emptyList(), 0)
 
-        val upcomingUserQueue = upcomingUserQueue(currentTimeline, currentIndex)
-        val contextEntries = newContextSongs.map { it.from(contextSource).asQueueEntry(QueueTier.CONTEXT) }
+        val upcomingUserQueue = if (preserveUserQueue) {
+            upcomingUserQueue(currentTimeline, currentIndex)
+        } else {
+            emptyList()
+        }
+        val contextEntries = newContextSongs.map {
+            it.withQueueSource(contextSource).asQueueEntry(QueueTier.CONTEXT)
+        }
 
         val safeIndex = selectedIndex.coerceIn(contextEntries.indices)
         val precedingContext = contextEntries.subList(0, safeIndex)
@@ -113,7 +123,7 @@ object QueueTimeline {
         tappedSong: Song,
         source: QueueSource,
     ): List<Song> =
-        listOf(tappedSong.from(source).asQueueEntry(QueueTier.CONTEXT)) +
+        listOf(tappedSong.withQueueSource(source).asQueueEntry(QueueTier.CONTEXT)) +
             upcomingUserQueue(currentTimeline, currentIndex)
 
     /**
@@ -128,9 +138,10 @@ object QueueTimeline {
         tappedSong: Song,
         source: QueueSource,
         upcomingPartySongs: List<Song>,
+        preservePartyQueue: Boolean = true,
     ): List<Song> =
-        listOf(tappedSong.from(source).asQueueEntry(QueueTier.CONTEXT)) +
-            upcomingPartySongs
+        listOf(tappedSong.withQueueSource(source).asQueueEntry(QueueTier.CONTEXT)) +
+            upcomingPartySongs.takeIf { preservePartyQueue }.orEmpty()
                 .filterNot { it.fromAutoplay }
                 .map { it.asQueueEntry(QueueTier.USER_QUEUE) }
 

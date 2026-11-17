@@ -50,3 +50,6 @@ AGENTS.md
 
 # Claude Code session files (launch configs, worktrees)
 .claude/
+
+# Internal notes (local paths, workflow) — not part of the project
+HANDOFF.md

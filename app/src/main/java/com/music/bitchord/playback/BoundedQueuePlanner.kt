@@ -88,9 +88,10 @@ object BoundedQueuePlanner {
         window: QueueWindow,
         materialized: List<QueueWindowEntry>,
         repeatAll: Boolean,
+        excludedCanonicalIndices: Set<Int> = emptySet(),
     ): List<QueueWindowEntry> {
         if (materialized.size >= LOW_WATER) return emptyList()
-        val desired = physicalUpcoming(window, repeatAll)
+        val desired = physicalUpcoming(window, repeatAll, excludedCanonicalIndices = excludedCanonicalIndices)
         if (materialized.size > desired.size) return emptyList()
         if (materialized.indices.any { !sameEntry(materialized[it], desired[it]) }) {
             return emptyList()
@@ -102,8 +103,13 @@ object BoundedQueuePlanner {
         window: QueueWindow,
         continuationState: ContinuationState,
         repeatAll: Boolean,
+        excludedCanonicalIndices: Set<Int> = emptySet(),
     ): Boolean = !repeatAll &&
-        window.upcoming(1, repeatAll = false).isEmpty() &&
+        window.upcoming(
+            1,
+            repeatAll = false,
+            excludedCanonicalIndices = excludedCanonicalIndices,
+        ).isEmpty() &&
         continuationState.isTerminal()
 
     /** Repeat-all may cross a cycle boundary only after continuation is terminal. */
@@ -114,8 +120,15 @@ object BoundedQueuePlanner {
      * is current. Logical look-ahead may inspect a later cycle, but exposing it
      * in Media3 before this point makes the queue UI show duplicate songs.
      */
-    fun shouldMaterializeNextCycle(window: QueueWindow, repeatAll: Boolean): Boolean =
-        repeatAll && window.upcoming(1, repeatAll = false).isEmpty()
+    fun shouldMaterializeNextCycle(
+        window: QueueWindow,
+        repeatAll: Boolean,
+        excludedCanonicalIndices: Set<Int> = emptySet(),
+    ): Boolean = repeatAll && window.upcoming(
+        1,
+        repeatAll = false,
+        excludedCanonicalIndices = excludedCanonicalIndices,
+    ).isEmpty()
 
     /**
      * Return a physical look-ahead containing the active cycle and, at the
@@ -128,15 +141,29 @@ object BoundedQueuePlanner {
         window: QueueWindow,
         repeatAll: Boolean,
         count: Int = WINDOW_AHEAD,
+        excludedCanonicalIndices: Set<Int> = emptySet(),
     ): List<QueueWindowEntry> {
         if (count <= 0) return emptyList()
-        val active = window.upcoming(count, repeatAll = false)
-        if (active.size >= count || !shouldMaterializeNextCycle(window, repeatAll)) {
+        val active = window.upcoming(
+            count,
+            repeatAll = false,
+            excludedCanonicalIndices = excludedCanonicalIndices,
+        )
+        if (active.size >= count || !shouldMaterializeNextCycle(
+                window,
+                repeatAll,
+                excludedCanonicalIndices,
+            )
+        ) {
             return active
         }
         val nextCycle = window.cycleId.takeIf { it < Long.MAX_VALUE }?.plus(1L)
             ?: return active
-        val next = window.upcoming(count - active.size, repeatAll = true)
+        val next = window.upcoming(
+            count - active.size,
+            repeatAll = true,
+            excludedCanonicalIndices = excludedCanonicalIndices,
+        )
             .filter { it.cycleId == nextCycle }
         return active + next
     }

@@ -23,11 +23,24 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.Composable
+import kotlin.time.TimeSource
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.compositeOver
@@ -43,6 +56,9 @@ import androidx.compose.ui.unit.dp
 /** How long one highlight sweep takes to cross a placeholder. */
 private const val SHIMMER_PERIOD_MS = 1400
 
+// How often the shared sweep moves. 33 ms reads as smooth for a band this wide.
+private const val SHIMMER_TICK_MS = 33
+
 private val BlockShape = RoundedCornerShape(6.dp)
 private val LineShape = RoundedCornerShape(4.dp)
 
@@ -51,11 +67,58 @@ private val TitleWidths = listOf(0.68f, 0.46f, 0.58f, 0.74f, 0.52f)
 private val SubtitleWidths = listOf(0.34f, 0.44f, 0.27f, 0.38f, 0.31f)
 
 /**
+ * One sweep clock, shared by every placeholder on screen.
+ *
+ * A loading page draws twenty or thirty [ShimmerBox]es, and each one getting
+ * its own `rememberInfiniteTransition` meant twenty or thirty animation
+ * channels waking on every frame and each of them re-caching its own gradient.
+ * One sweep for the whole page costs one channel, and the boxes also line up,
+ * which reads as one sweep crossing the page instead of a field of flickering
+ * rectangles. It only runs while at least one box is composed.
+ */
+private object ShimmerClock {
+    val phase = mutableFloatStateOf(0f)
+    private var subscribers = 0
+    private var job: Job? = null
+    private var scope: CoroutineScope? = null
+
+    fun acquire() {
+        subscribers++
+        if (job != null) return
+        val own = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+        scope = own
+        job = own.launch {
+            // A tick, not a frame: this scope has no MonotonicFrameClock to
+            // wait on, and `withFrameNanos` here throws — which is exactly what
+            // crashed the app on launch. The phase comes from the elapsed
+            // clock, so a late tick lands on the right part of the sweep.
+            val start = TimeSource.Monotonic.markNow()
+            while (isActive) {
+                delay(SHIMMER_TICK_MS.toLong())
+                val elapsedMs = start.elapsedNow().inWholeMilliseconds
+                phase.floatValue = (elapsedMs % SHIMMER_PERIOD_MS).toFloat() / SHIMMER_PERIOD_MS
+            }
+        }
+    }
+
+    fun release() {
+        subscribers = (subscribers - 1).coerceAtLeast(0)
+        if (subscribers > 0) return
+        job?.cancel()
+        job = null
+        scope?.cancel()
+        scope = null
+        phase.floatValue = 0f
+    }
+}
+
+/**
  * One placeholder block, with a highlight sweeping across it.
  *
- * The sweep is read inside the draw block rather than the composable body: a
- * screenful of these would otherwise recompose on every animation frame, and
- * all any of them needs per frame is a fresh gradient.
+ * The sweep is read in the draw block rather than the composable body — a
+ * screenful of these would otherwise recompose on every frame — and the brush
+ * is built once per size and slid across by a translate, so an animating frame
+ * allocates nothing.
  */
 @Composable
 fun ShimmerBox(modifier: Modifier = Modifier, shape: Shape = BlockShape) {
@@ -63,12 +126,10 @@ fun ShimmerBox(modifier: Modifier = Modifier, shape: Shape = BlockShape) {
     val highlight = MaterialTheme.colorScheme.onSurfaceVariant
         .copy(alpha = 0.16f)
         .compositeOver(base)
-    val sweep = rememberInfiniteTransition(label = "skeleton").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(SHIMMER_PERIOD_MS, easing = LinearEasing)),
-        label = "sweep",
-    )
+    DisposableEffect(Unit) {
+        ShimmerClock.acquire()
+        onDispose { ShimmerClock.release() }
+    }
     Box(
         modifier
             .clip(shape)
@@ -77,13 +138,17 @@ fun ShimmerBox(modifier: Modifier = Modifier, shape: Shape = BlockShape) {
                 // other, which leaves a beat of flat grey between passes rather
                 // than a highlight permanently parked somewhere on the block.
                 val band = size.width * 0.5f
-                val startX = -band + sweep.value * (size.width + band * 2)
                 val brush = Brush.horizontalGradient(
                     colors = listOf(base, highlight, base),
-                    startX = startX,
-                    endX = startX + band,
+                    startX = 0f,
+                    endX = band,
                 )
-                onDrawBehind { drawRect(brush) }
+                onDrawBehind {
+                    val startX = -band + ShimmerClock.phase.floatValue * (size.width + band * 2)
+                    translate(left = startX) {
+                        drawRect(brush, size = Size(band, size.height))
+                    }
+                }
             },
     )
 }

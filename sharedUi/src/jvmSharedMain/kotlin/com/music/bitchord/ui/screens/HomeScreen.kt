@@ -7,6 +7,7 @@ import com.music.bitchord.sharedui.resources.*
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.DrawableResource
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -22,15 +23,22 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import com.music.bitchord.ui.components.HomeSourceBadges
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyListState
 import com.music.bitchord.ui.components.ShelfRow
+import com.music.bitchord.ui.components.shelfKey
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,6 +46,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.Composable
@@ -46,15 +55,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cached
@@ -83,6 +97,7 @@ import com.music.bitchord.ui.components.RowMoreButton
 import com.music.bitchord.ui.components.PullToRefresh
 import com.music.bitchord.ui.components.SHELF_CARD_WIDTH
 import com.music.bitchord.ui.components.SearchPlayingBars
+import com.music.bitchord.ui.theme.LocalMaterial3StyleEnabled
 import com.music.bitchord.ui.components.SignInBanner
 import com.music.bitchord.ui.components.feedMoreSkeleton
 import com.music.bitchord.ui.components.feedSkeleton
@@ -92,12 +107,253 @@ import com.music.bitchord.ui.components.thumbnailBorder
 import com.music.bitchord.ui.components.trackColumnWidth
 import com.music.bitchord.ui.player.MeshGradientBackground
 import com.music.bitchord.ui.player.MeshPalette
+import com.music.bitchord.ui.player.PlayerSettings
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import kotlin.math.PI
+import kotlin.math.sin
 
 /** How far the Listen now heading and feed sit above the shared top inset. */
 private val HOME_TITLE_LIFT = 28.dp
 
 private const val RECENTS_TITLE = "Recents"
 private const val RECENT_TRACKS_PER_COLUMN = 4
+private const val SPOTIFY_QUICK_ITEMS = 6
+
+@Composable
+private fun SpotifyHomeHeader(
+    title: String,
+    labels: List<String>,
+    selected: Int,
+    onSelected: (Int) -> Unit,
+    personalizationHint: String? = null,
+    waveLabel: String? = null,
+    onWaveClick: (() -> Unit)? = null,
+) {
+    Column(
+        Modifier.fillMaxWidth().padding(start = PAGE_GUTTER, end = PAGE_GUTTER, top = 12.dp, bottom = 12.dp),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.W800),
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (!personalizationHint.isNullOrBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(personalizationHint, style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 5, overflow = TextOverflow.Ellipsis)
+        }
+        if (!waveLabel.isNullOrBlank() && onWaveClick != null) {
+            Spacer(Modifier.height(12.dp))
+            RxWavePill(waveLabel, onWaveClick)
+        }
+        if (labels.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                itemsIndexed(labels) { index, label ->
+                    val active = index == selected
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (active) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = if (active) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.clickable { onSelected(index) },
+                    ) {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier.padding(horizontal = 15.dp, vertical = 9.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A tiny living station indicator; only this pill redraws while it breathes. */
+@Composable
+private fun RxWavePill(label: String, onClick: () -> Unit) {
+    val reduceMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val transition = rememberInfiniteTransition(label = "rxWaveBreath")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = (PI * 2).toFloat(),
+        animationSpec = infiniteRepeatable(tween(2_400, easing = LinearEasing), RepeatMode.Restart),
+        label = "rxWavePhase",
+    )
+    val breath by transition.animateFloat(
+        initialValue = 0.985f,
+        targetValue = 1.025f,
+        animationSpec = infiniteRepeatable(tween(1_650), RepeatMode.Reverse),
+        label = "rxWaveScale",
+    )
+    val animatedPhase = if (reduceMotion) 0f else phase
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        tonalElevation = 2.dp,
+        modifier = Modifier
+            .graphicsLayer {
+                val scale = if (reduceMotion) 1f else breath
+                scaleX = scale
+                scaleY = scale
+                shadowElevation = if (reduceMotion) 0f else 3.dp.toPx()
+            }
+            .clickable(onClick = onClick),
+    ) {
+        val waveInk = MaterialTheme.colorScheme.onPrimary
+        Row(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Canvas(Modifier.size(22.dp)) {
+                drawCircle(
+                    color = waveInk.copy(alpha = 0.22f),
+                    radius = size.minDimension / 2f,
+                )
+                val barWidth = size.width * 0.09f
+                val gap = size.width * 0.13f
+                repeat(4) { index ->
+                    val wave = sin(animatedPhase + index * 1.25f) * 0.5f + 0.5f
+                    val height = size.height * (0.22f + wave * 0.48f)
+                    val x = size.width / 2f + (index - 1.5f) * gap
+                    drawRoundRect(
+                        color = waveInk,
+                        topLeft = androidx.compose.ui.geometry.Offset(x - barWidth / 2f, (size.height - height) / 2f),
+                        size = androidx.compose.ui.geometry.Size(barWidth, height),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth),
+                    )
+                }
+            }
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.W800),
+            )
+            Box(
+                Modifier
+                    .size(5.dp)
+                    .clip(CircleShape)
+                    .background(
+                        MaterialTheme.colorScheme.onPrimary.copy(
+                            alpha = if (reduceMotion) 0.75f
+                            else 0.45f + 0.35f * (sin(animatedPhase) * 0.5f + 0.5f),
+                        ),
+                    ),
+            )
+        }
+    }
+}
+
+/**
+ * The same footprint as a six-item quick grid, drawn while the feed resolves.
+ *
+ * It exists so the first shelf below it does not start under the greeting and
+ * then jump downwards once the real tiles arrive - the most visible shift on a
+ * cold start.
+ */
+@Composable
+private fun SpotifyQuickGridPlaceholder() {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = PAGE_GUTTER, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        repeat(3) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(2) {
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .heightIn(min = 64.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpotifyQuickGrid(
+    items: List<Pair<ShelfItem, String>>,
+    onClick: (ShelfItem, String) -> Unit,
+    onLongPress: ((ShelfItem) -> Unit)?,
+) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = PAGE_GUTTER, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        val skin = LocalMaterial3StyleEnabled.current
+        val cardShape = if (skin) RoundedCornerShape(20.dp) else RoundedCornerShape(8.dp)
+        items.chunked(2).forEach { pair ->
+            // Intrinsic height, and every card fills it: the two tiles of a row
+            // hold different numbers of lines, and left to themselves they
+            // ended at different heights with the images sitting off-centre.
+            Row(
+                Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                pair.forEach { (item, shelf) ->
+                    Row(
+                        modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = if (skin) 72.dp else 64.dp)
+                            .clip(cardShape)
+                            .background(
+                                if (skin) MaterialTheme.colorScheme.surfaceContainer
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                            )
+                            .longPressMenuClickable(
+                                onClick = { onClick(item, shelf) },
+                                onLongClick = onLongPress?.let { handler -> { handler(item) } },
+                            )
+                            .contextClick { onLongPress?.invoke(item) },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        val artSide = if (skin) 72.dp else 64.dp
+                        if (item.thumbnailUrl != null) {
+                            AsyncImage(
+                                model = item.thumbnailUrl.artworkAt(ROW_ART_PX),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.width(artSide).fillMaxHeight(),
+                            )
+                        } else {
+                            Box(
+                                Modifier.width(artSide).fillMaxHeight().background(MaterialTheme.colorScheme.surface),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(Icons.Rounded.LibraryMusic, contentDescription = null)
+                            }
+                        }
+                        Column(Modifier.padding(horizontal = 8.dp, vertical = 5.dp).weight(1f)) {
+                            Text(
+                                text = item.title,
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.W700),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (item.sources.isNotEmpty()) {
+                                Spacer(Modifier.height(4.dp))
+                                HomeSourceBadges(item.sources)
+                            }
+                        }
+                    }
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
 
 private fun List<ShelfItem>.playingItemMatcher(song: Song?): (ShelfItem) -> Boolean {
     song ?: return { false }
@@ -162,7 +418,41 @@ fun HomeScreen(
     onMoodsShowAll: () -> Unit = {},
     /** Whether the Top Picks and mood artwork may animate — see [LocalArtworkMotion]. */
     artworkMotion: Boolean = true,
+    /** Spotify-inspired greeting, functional filter chips and compact recent grid. */
+    spotifyStyle: Boolean = false,
+    greeting: String? = null,
+    homeFilterLabels: List<String> = emptyList(),
+    personalizationHint: String? = null,
+    waveLabel: String? = null,
+    onWaveClick: (() -> Unit)? = null,
 ) {
+    var selectedHomeFilter by rememberSaveable { mutableIntStateOf(0) }
+    val displayedState = remember(state, selectedHomeFilter, spotifyStyle) {
+        if (!spotifyStyle || state !is UiState.Success) {
+            state
+        } else {
+            val shelves = state.data.mapNotNull { shelf ->
+                val items = when (selectedHomeFilter) {
+                    1 -> shelf.items.filter { it.videoId != null }
+                    2 -> shelf.items.filter { it.browseId != null }
+                    else -> shelf.items
+                }
+                shelf.copy(items = items).takeIf { items.isNotEmpty() }
+            }
+            UiState.Success(shelves)
+        }
+    }
+    val quickItems = remember(displayedState, spotifyStyle) {
+        if (!spotifyStyle || displayedState !is UiState.Success) {
+            emptyList()
+        } else {
+            displayedState.data.flatMap { shelf -> shelf.items.map { item -> item to shelf.title } }
+                .distinctBy { (item, _) -> item.song?.let { song ->
+                    "${song.title.trim().lowercase(Locale.ROOT)}:${song.artist.trim().lowercase(Locale.ROOT)}"
+                } ?: item.videoId ?: item.browseId ?: "${item.title}:${item.subtitle}" }
+                .take(SPOTIFY_QUICK_ITEMS)
+        }
+    }
     // Top Picks' pictures and motion wait for the feed — see LocalArtworkImages.
     val feedReady = state !is UiState.Loading
     CompositionLocalProvider(
@@ -182,9 +472,9 @@ fun HomeScreen(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            // The heading sits higher than the other tabs' first row: pull the
-            // whole feed up by [HOME_TITLE_LIFT] with it.
-            contentPadding = if (title != null) {
+            // Only the legacy wordmark is lifted; the Spotify greeting must
+            // stay below the measured frosted bar.
+            contentPadding = if (title != null && !spotifyStyle) {
                 PaddingValues(
                     top = (contentPadding.calculateTopPadding() - HOME_TITLE_LIFT).coerceAtLeast(0.dp),
                     bottom = contentPadding.calculateBottomPadding(),
@@ -194,20 +484,51 @@ fun HomeScreen(
             },
         ) {
             if (title != null) {
-                item { HomeTitle(title) }
+                item {
+                    if (spotifyStyle) {
+                        SpotifyHomeHeader(
+                            title = greeting ?: title,
+                            labels = homeFilterLabels,
+                            selected = selectedHomeFilter,
+                            onSelected = { selectedHomeFilter = it },
+                            personalizationHint = personalizationHint,
+                            waveLabel = waveLabel,
+                            onWaveClick = onWaveClick,
+                        )
+                    } else {
+                        HomeTitle(title)
+                    }
+                }
             }
             if (!signedIn && onSignIn != null) {
                 item {
                     // Read in this item, so a scroll starting or ending
                     // recomposes the banner alone.
-                    SignInBanner(
-                        onSignIn = onSignIn,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                        motion = LocalArtworkMotion.current && !listState.isScrollInProgress,
-                    )
+                    androidx.compose.foundation.layout.Box(Modifier.animateItem()) {
+                        SignInBanner(
+                            onSignIn = onSignIn,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            motion = LocalArtworkMotion.current && !listState.isScrollInProgress,
+                        )
+                    }
                 }
             }
-            if (onTopPickClick != null) {
+            if (spotifyStyle) {
+                item(key = "spotify-quick-grid") {
+                    androidx.compose.foundation.layout.Box(Modifier.animateItem()) {
+                        if (quickItems.isNotEmpty()) {
+                            SpotifyQuickGrid(
+                                items = quickItems,
+                                onClick = onItemClick,
+                                onLongPress = onItemLongPress,
+                            )
+                        } else {
+                            SpotifyQuickGridPlaceholder()
+                        }
+                    }
+                }
+            }
+            if (onTopPickClick != null && (!spotifyStyle || selectedHomeFilter != 2)) {
                 when {
                     !topPicks.isNullOrEmpty() -> item(key = "top-picks") {
                         TopPicksShelf(
@@ -220,7 +541,7 @@ fun HomeScreen(
                     topPicks == null && topPicksLoading -> topPicksSkeleton()
                 }
             }
-            when (state) {
+            when (displayedState) {
                 is UiState.Loading -> {
                     if (recentlyPlayedLoading) {
                         recentlyPlayedSkeleton()
@@ -233,7 +554,7 @@ fun HomeScreen(
                     }
                 }
                 is UiState.Error -> item {
-                    MessageState(state.message, actionLabel = stringResource(Res.string.retry), onAction = onRetry)
+                    MessageState(displayedState.message, actionLabel = stringResource(Res.string.retry), onAction = onRetry)
                 }
                 is UiState.Success -> {
                     if (recentlyPlayedLoading) {
@@ -243,7 +564,7 @@ fun HomeScreen(
                     // Recently Played lands, every real shelf must retain its
                     // compact-card layout instead of briefly becoming a hero.
                     itemsIndexedShelves(
-                        shelves = state.data,
+                        shelves = displayedState.data,
                         onMoodClick = onMoodClick,
                         onMoodsShowAll = onMoodsShowAll,
                         onItemClick = onItemClick,
@@ -302,6 +623,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
         }
         item(key = shelf.title + index) {
             val openItem: (ShelfItem) -> Unit = { item -> onItemClick(item, shelf.title) }
+            // Placement is animated, so a section resolving above the viewport
+            // slides what is on screen instead of teleporting it.
             // Listen again and Quick picks are lists on the web player, as
             // Recents is here: one pager for all three.
             if (shelf.layout == ShelfLayout.LIST ||
@@ -414,6 +737,7 @@ private fun RecentTrackRow(
         isCurrent = isCurrent,
         isPlaying = isPlaying,
         isVideo = item.isVideo,
+        sources = item.sources,
     )
 }
 
@@ -433,6 +757,7 @@ fun CompactTrackRow(
     isPlaying: Boolean = false,
     /** A music video: its thumbnail at 16:9 rather than squared off. */
     isVideo: Boolean = false,
+    sources: Set<com.music.bitchord.data.model.HomeSource> = emptySet(),
 ) {
     Row(
         modifier = Modifier
@@ -471,6 +796,7 @@ fun CompactTrackRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            HomeSourceBadges(sources)
         }
         if (onLongPress != null) {
             RowMoreButton(onClick = onLongPress)
@@ -535,7 +861,11 @@ internal fun SectionHeader(title: String, subtitle: String = "", onShowAll: (() 
         Column(Modifier.weight(1f)) {
             Text(
                 text = displayTitle,
-                style = MaterialTheme.typography.titleMedium,
+                style = if (LocalMaterial3StyleEnabled.current) {
+                    MaterialTheme.typography.headlineSmall
+                } else {
+                    MaterialTheme.typography.titleMedium
+                },
                 color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -754,7 +1084,7 @@ private fun HeroShelf(
                 contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                items(shelf.items) { item ->
+                items(shelf.items, key = { it.shelfKey() }) { item ->
                     HeroCard(
                         item = item,
                         onClick = { onItemClick(item) },
@@ -853,7 +1183,7 @@ internal fun Shelf(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             leadingCard?.let { card -> item(key = "leading") { card() } }
-            items(shelf.items) { item ->
+            items(shelf.items, key = { it.shelfKey() }) { item ->
                 if (shelf.layout == ShelfLayout.VIDEO) {
                     VideoShelfCard(
                         item = item,
@@ -903,8 +1233,8 @@ fun VideoShelfCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(VIDEO_ASPECT)
-                .clip(RoundedCornerShape(12.dp))
-                .thumbnailBorder(RoundedCornerShape(12.dp))
+                .clip(shelfArtShape())
+                .thumbnailBorder(shelfArtShape())
                 .background(placeholderColor),
         ) {
             AsyncImage(
@@ -963,7 +1293,7 @@ internal fun NewShelfCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(shelfArtShape())
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
@@ -1015,7 +1345,7 @@ private fun ServiceCard(colors: List<Color>, trackKey: String, icon: ImageVector
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(12.dp)),
+            .clip(shelfArtShape()),
         contentAlignment = Alignment.Center,
     ) {
         MeshGradientBackground(
@@ -1032,6 +1362,16 @@ private fun ServiceCard(colors: List<Color>, trackKey: String, icon: ImageVector
         )
     }
 }
+
+/**
+ * Corner radius of a shelf's artwork.
+ *
+ * The classic skin keeps the tight 12 dp the cards were drawn with; the
+ * Material 3 skin rounds them to 20 dp, which is what gives a row of cards the
+ * softer shape the appearance it follows is known for.
+ */
+@Composable
+private fun shelfArtShape() = RoundedCornerShape(if (LocalMaterial3StyleEnabled.current) 20.dp else 12.dp)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -1057,7 +1397,7 @@ internal fun ShelfCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
-                        .clip(RoundedCornerShape(12.dp)),
+                        .clip(shelfArtShape()),
                     contentAlignment = Alignment.Center,
                 ) {
                     MeshGradientBackground(
@@ -1099,8 +1439,8 @@ internal fun ShelfCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .thumbnailBorder(RoundedCornerShape(12.dp))
+                        .clip(shelfArtShape())
+                        .thumbnailBorder(shelfArtShape())
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                 ) {
                     AsyncImage(
@@ -1136,6 +1476,7 @@ internal fun ShelfCard(
                 modifier = Modifier.weight(1f, fill = false),
             )
         }
+        HomeSourceBadges(item.sources, Modifier.padding(top = 4.dp))
         val displaySubtitle = localizeCardSubtitle(item.subtitle)
         Text(
             text = displaySubtitle,

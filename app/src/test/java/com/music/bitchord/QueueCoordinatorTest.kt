@@ -258,6 +258,47 @@ class QueueCoordinatorTest {
     }
 
     @Test
+    fun `one-off SoundCloud row keeps its transport permalink`() {
+        val permalink = "https://soundcloud.com/artist/track"
+        val row = testSong("soundcloud:tracks:123").copy(
+            playbackSource = "SoundCloud",
+            playbackSourceType = PlaybackSourceType.SEARCH,
+            playbackSourceId = permalink,
+        )
+
+        val result = QueueCoordinator.buildOneOffQueue(
+            currentTimeline = emptyList(),
+            currentIndex = -1,
+            tappedSong = row,
+            source = QueueSource("Search", PlaybackSourceType.SEARCH),
+        )
+
+        assertEquals(permalink, result.single().playbackSourceId)
+        assertEquals("Search", result.single().playbackSource)
+    }
+
+    @Test
+    fun `SoundCloud context keeps each track transport permalink`() {
+        val tracks = listOf(
+            testSong("soundcloud:tracks:1").copy(playbackSourceId = "https://soundcloud.com/a/one"),
+            testSong("soundcloud:tracks:2").copy(playbackSourceId = "https://soundcloud.com/a/two"),
+        )
+
+        val result = QueueCoordinator.buildContextQueue(
+            currentTimeline = emptyList(),
+            currentIndex = -1,
+            newContextSongs = tracks,
+            selectedIndex = 0,
+            contextSource = QueueSource("Imported playlist", PlaybackSourceType.BROWSE, "local:playlist"),
+        )
+
+        assertEquals(
+            listOf("https://soundcloud.com/a/one", "https://soundcloud.com/a/two"),
+            result.timeline.map { it.playbackSourceId },
+        )
+    }
+
+    @Test
     fun `findUserQueueInsertionIndex for playNext inserts at currentIndex + 1`() {
         val timeline = listOf(
             testSong("song0"),

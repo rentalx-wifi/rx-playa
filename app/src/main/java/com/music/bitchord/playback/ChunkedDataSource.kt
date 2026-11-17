@@ -11,7 +11,9 @@ import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.TransferListener
 import com.music.bitchord.data.innertube.PlayerClient
 import com.music.bitchord.data.innertube.StreamResolver
+import com.music.bitchord.data.soundcloud.SoundCloudManifestStore
 import java.io.InterruptedIOException
+import java.io.IOException
 
 /**
  * Fetches a stream as a run of bounded ranges instead of one open-ended read.
@@ -53,6 +55,11 @@ class ChunkedDataSource(
     private var chunkRemaining = 0L
     private var chunkOpen = false
     private var rangeBytes = chunkBytes
+    /** A bounded stream whose total was learned from its first Content-Range. */
+    private var discoveredRangeStream = false
+    private var unknownRangeTotal = false
+    private var memoryBytes: ByteArray? = null
+    private var memoryOffset = 0
 
     /** Set when the request can't be improved on, and is simply forwarded. */
     private var passthrough = false
@@ -62,16 +69,33 @@ class ChunkedDataSource(
     }
 
     /**
-     * The total size has to be known up front, or there is no way to say where
-     * the last range ends. Every progressive googlevideo URL carries it as
-     * `clen`, which costs nothing to read; anything else is forwarded as-is.
+     * YouTube states its total in `clen`. SoundCloud does not, so its first
+     * bounded response supplies the total through `Content-Range`. Other hosts
+     * without either signal are forwarded unchanged.
      */
     override fun open(dataSpec: DataSpec): Long {
         baseSpec = dataSpec
         position = dataSpec.position
+        memoryBytes = null
+        memoryOffset = 0
+        if (dataSpec.uri.scheme == SoundCloudManifestStore.SCHEME) {
+            val bytes = SoundCloudManifestStore.bytes(dataSpec.uri)
+                ?: throw IOException("SoundCloud manifest expired")
+            val start = dataSpec.position.coerceIn(0L, bytes.size.toLong()).toInt()
+            val available = bytes.size - start
+            val requested = if (dataSpec.length == C.LENGTH_UNSET.toLong()) available
+            else minOf(available.toLong(), dataSpec.length).toInt()
+            memoryBytes = if (start == 0 && requested == bytes.size) bytes
+            else bytes.copyOfRange(start, start + requested)
+            memoryOffset = 0
+            passthrough = false
+            bytesRemaining = requested.toLong()
+            return bytesRemaining
+        }
 
         val total = dataSpec.uri.getQueryParameter("clen")?.toLongOrNull()
-        if (total == null) {
+        val soundCloudMedia = isSoundCloudMediaHost(dataSpec.uri.host)
+        if (total == null && !soundCloudMedia) {
             passthrough = true
             chunkOpen = true
             // Reported, not just thrown. Nothing but googlevideo carries `clen`,
@@ -96,25 +120,48 @@ class ChunkedDataSource(
         }
 
         passthrough = false
-        val end = if (dataSpec.length == C.LENGTH_UNSET.toLong()) {
+        discoveredRangeStream = soundCloudMedia && total == null
+        val end = if (dataSpec.length == C.LENGTH_UNSET.toLong() && total != null) {
             total
+        } else if (dataSpec.length == C.LENGTH_UNSET.toLong()) {
+            Long.MAX_VALUE
         } else {
-            minOf(total, position + dataSpec.length)
+            minOf(total ?: Long.MAX_VALUE, position + dataSpec.length)
         }
         bytesRemaining = (end - position).coerceAtLeast(0L)
-        rangeBytes = minOf(chunkBytes, PlayerClient.rangeBytesFor(dataSpec.uri.toString()))
-        if (bytesRemaining > 0) openChunk()
-        return bytesRemaining
+        rangeBytes = if (soundCloudMedia) {
+            SOUNDCLOUD_RANGE_BYTES
+        } else {
+            minOf(chunkBytes, PlayerClient.rangeBytesFor(dataSpec.uri.toString()))
+        }
+        if (bytesRemaining > 0) {
+            val opened = openChunk()
+            if (discoveredRangeStream && dataSpec.length == C.LENGTH_UNSET.toLong()) {
+                val discoveredTotal = contentRangeTotal(upstream.responseHeaders)
+                    ?: opened.takeIf { it in 0 until rangeBytes }?.let { position + it }
+                if (discoveredTotal != null) {
+                    bytesRemaining = (discoveredTotal - position).coerceAtLeast(0L)
+                    chunkRemaining = minOf(chunkRemaining, bytesRemaining)
+                } else {
+                    unknownRangeTotal = true
+                }
+            }
+        }
+        return bytesRemaining.takeUnless { it == Long.MAX_VALUE } ?: C.LENGTH_UNSET.toLong()
     }
 
-    private fun openChunk() {
+    private fun openChunk(): Long {
         val length = minOf(rangeBytes, bytesRemaining)
         val spec = requireNotNull(baseSpec).buildUpon()
             .setPosition(position)
             .setLength(length)
             .build()
         try {
-            upstream.open(spec)
+            val opened = upstream.open(spec)
+            if (unknownRangeTotal && opened in 0 until length) bytesRemaining = opened
+            chunkRemaining = if (opened == C.LENGTH_UNSET.toLong()) length else minOf(length, opened)
+            chunkOpen = true
+            return opened
         } catch (e: Exception) {
             // Which client minted the URL is the first thing worth knowing when
             // a range is refused, and it isn't recoverable from anywhere else by
@@ -133,8 +180,6 @@ class ChunkedDataSource(
             }
             throw e
         }
-        chunkRemaining = length
-        chunkOpen = true
     }
 
     /**
@@ -151,6 +196,14 @@ class ChunkedDataSource(
     }
 
     override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+        memoryBytes?.let { bytes ->
+            if (memoryOffset >= bytes.size) return C.RESULT_END_OF_INPUT
+            val count = minOf(length, bytes.size - memoryOffset)
+            bytes.copyInto(buffer, offset, memoryOffset, memoryOffset + count)
+            memoryOffset += count
+            bytesRemaining -= count
+            return count
+        }
         if (passthrough) return upstream.read(buffer, offset, length)
         if (bytesRemaining == 0L) return C.RESULT_END_OF_INPUT
 
@@ -170,6 +223,11 @@ class ChunkedDataSource(
                 bytesRemaining -= read
                 return read
             }
+            if (unknownRangeTotal) {
+                bytesRemaining = 0L
+                chunkRemaining = 0L
+                return C.RESULT_END_OF_INPUT
+            }
             chunkRemaining = 0L
         }
         return C.RESULT_END_OF_INPUT
@@ -182,15 +240,20 @@ class ChunkedDataSource(
         }
     }
 
-    override fun getUri(): Uri? = upstream.uri ?: baseSpec?.uri
+    override fun getUri(): Uri? = if (memoryBytes != null) baseSpec?.uri else upstream.uri ?: baseSpec?.uri
 
-    override fun getResponseHeaders(): Map<String, List<String>> = upstream.responseHeaders
+    override fun getResponseHeaders(): Map<String, List<String>> =
+        if (memoryBytes != null) emptyMap() else upstream.responseHeaders
 
     override fun close() {
         closeChunk()
         baseSpec = null
         bytesRemaining = 0L
         chunkRemaining = 0L
+        discoveredRangeStream = false
+        unknownRangeTotal = false
+        memoryBytes = null
+        memoryOffset = 0
     }
 
     private companion object {
@@ -198,6 +261,14 @@ class ChunkedDataSource(
 
         /** Enough to ride out a truncated range, not enough to hang on a dead one. */
         const val MAX_EMPTY_RANGES = 3
+
+        /**
+         * Some filtered routes accept SoundCloud's CloudFront response and then
+         * stop forwarding it at roughly 15.8 KiB. A range below that boundary
+         * completes normally; reopening the next range reconstructs the exact
+         * same HLS manifest/segment without a VPN or relay.
+         */
+        const val SOUNDCLOUD_RANGE_BYTES = 14L * 1024L
     }
 
     /** Wraps [upstream]'s sources so everything opened through it is ranged. */
@@ -209,3 +280,18 @@ class ChunkedDataSource(
             ChunkedDataSource(upstream.createDataSource(), chunkBytes)
     }
 }
+
+internal fun isSoundCloudMediaHost(raw: String?): Boolean {
+    val host = raw?.trim()?.lowercase()?.trimEnd('.').orEmpty()
+    return host == "soundcloud.cloud" || host.endsWith(".soundcloud.cloud") ||
+        host == "sndcdn.com" || host.endsWith(".sndcdn.com")
+}
+
+internal fun contentRangeTotal(headers: Map<String, List<String>>): Long? {
+    val value = headers.entries.firstOrNull { it.key.equals("Content-Range", ignoreCase = true) }
+        ?.value?.firstOrNull()
+        ?: return null
+    return CONTENT_RANGE.matchEntire(value.trim())?.groupValues?.getOrNull(1)?.toLongOrNull()
+}
+
+private val CONTENT_RANGE = Regex("""bytes\s+\d+-\d+/(\d+)""", RegexOption.IGNORE_CASE)

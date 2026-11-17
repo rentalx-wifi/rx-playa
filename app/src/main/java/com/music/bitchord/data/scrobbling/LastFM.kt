@@ -1,5 +1,6 @@
 package com.music.bitchord.data.scrobbling
 
+import com.music.bitchord.BuildConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -86,7 +87,7 @@ object LastFM {
         extra: Map<String, String> = emptyMap(),
         format: String = "json",
     ) {
-        headers.append(HttpHeaders.UserAgent, "BitChord (https://github.com/kushagrasinghx/BitChord)")
+        headers.append(HttpHeaders.UserAgent, "RXMusic/${BuildConfig.VERSION_NAME}")
         val paramsForSig =
             mutableMapOf(
                 "method" to method,

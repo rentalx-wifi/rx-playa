@@ -15,9 +15,13 @@ import kotlinx.coroutines.flow.asStateFlow
 object LikeState {
     private val _overrides = MutableStateFlow<Map<String, LikeStatus>>(emptyMap())
     val overrides: StateFlow<Map<String, LikeStatus>> = _overrides.asStateFlow()
+    private val _userChanges = MutableStateFlow<Map<String, LikeStatus>>(emptyMap())
+    /** Explicit actions only: background library seeding is not a new user preference. */
+    val userChanges: StateFlow<Map<String, LikeStatus>> = _userChanges.asStateFlow()
 
     fun set(videoId: String, status: LikeStatus) {
         _overrides.value += (videoId to status)
+        _userChanges.value += (videoId to status)
     }
 
     /**
@@ -29,7 +33,7 @@ object LikeState {
      */
     fun rememberStated(videoId: String, stated: LikeStatus?) {
         if (stated != null && stated != LikeStatus.INDIFFERENT && videoId !in _overrides.value) {
-            set(videoId, stated)
+            _overrides.value += (videoId to stated)
         }
     }
 
@@ -41,7 +45,14 @@ object LikeState {
         if (next != _overrides.value) _overrides.value = next
     }
 
+    /** Restores durable local/provider ratings without presenting them as new taps. */
+    fun restore(statuses: Map<String, LikeStatus>) {
+        if (statuses.isEmpty()) return
+        _overrides.value = _overrides.value + statuses
+    }
+
     fun clear() {
         _overrides.value = emptyMap()
+        _userChanges.value = emptyMap()
     }
 }
