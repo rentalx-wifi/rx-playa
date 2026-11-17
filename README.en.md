@@ -12,29 +12,29 @@ One list, one search. Which source actually plays a track is decided by the app.
 
 ## What it does
 
-▸ **RX Wave** — a station built from your likes. Your own tracks seed it, each
+▸ **RX Wave** - a station built from your likes. Your own tracks seed it, each
 seed's radio supplies what is similar, and a strict filter follows: artists you
 already know come first, never two rows by one artist in a row, no stranger's
 slowed or cover re-uploads, and nothing from the global chart.
 
-▸ **Source rescue** — YouTube will not serve a track: region, age gate, pulled
-upload. It is then looked for on every other enabled source — the same artist, or
+▸ **Source rescue** - YouTube will not serve a track: region, age gate, pulled
+upload. It is then looked for on every other enabled source - the same artist, or
 a runtime matching to the second. Nothing is swapped silently: the app tells you
 where it plays from.
 
-▸ **Appearance** — Material 3 ported from Pixel Music: palette, Montserrat,
+▸ **Appearance** - Material 3 ported from Pixel Music: palette, Montserrat,
 8/16/24 corners, a floating icon dock, settings as tonal cards. Wallpaper colours
 (Material You) or your own accent.
 
-▸ **Sound** — Automix and crossfade, bit-perfect, USB DAC, PCM selection,
+▸ **Sound** - Automix and crossfade, bit-perfect, USB DAC, PCM selection,
 equalizer, Dolby Atmos, spatial audio, loudness normalisation, skip silence,
 speed without pitch.
 
-▸ **The rest** — lyrics with translation and line highlighting, downloads and
+▸ **The rest** - lyrics with translation and line highlighting, downloads and
 offline playback, Discord RPC, Listen Together (a shared queue), canvas
 artwork, a player with queue and lyrics on one screen.
 
-▸ **Account and import** — likes, playlists and history come from the signed-in
+▸ **Account and import** - likes, playlists and history come from the signed-in
 service; other services' playlists import by link; search can run across every
 source at once or across one.
 
@@ -45,8 +45,8 @@ source at once or across one.
 Stated plainly, so nothing is a surprise:
 
 1. **The YouTube throttling bypass (zapret).** Root is required. The script was
-   rewritten from scratch — `su -c` used to swallow its arguments, so `nfqws`
-   never started once — but it still refuses to run on some ROMs. That is
+   rewritten from scratch - `su -c` used to swallow its arguments, so `nfqws`
+   never started once - but it still refuses to run on some ROMs. That is
    expected, not a bug unique to you.
 2. **Widgets.** Being ported from Pixel Music, still in progress. The old ones
    keep working: square, wide and pill.
@@ -99,15 +99,15 @@ init script:
 ```
 
 `keystore.properties`, `*.jks`, `local.properties` and `build/` never enter the
-repository — they are in `.gitignore`.
+repository - they are in `.gitignore`.
 
 ---
 
 ## Documentation
 
-- [`docs/ACCOUNT_INTEGRATIONS.md`](docs/ACCOUNT_INTEGRATIONS.md) — Spotify, SoundCloud, VK
-- [`docs/YANDEX_MUSIC.md`](docs/YANDEX_MUSIC.md) — Yandex Music
-- [`docs/LYRICS_TRANSLATION.md`](docs/LYRICS_TRANSLATION.md) — lyrics translation
+- [`docs/ACCOUNT_INTEGRATIONS.md`](docs/ACCOUNT_INTEGRATIONS.md) - Spotify, SoundCloud, VK
+- [`docs/YANDEX_MUSIC.md`](docs/YANDEX_MUSIC.md) - Yandex Music
+- [`docs/LYRICS_TRANSLATION.md`](docs/LYRICS_TRANSLATION.md) - lyrics translation
 
 ---
 
@@ -121,15 +121,15 @@ what you did just before.
 
 ## Credits
 
-- [BitChord](https://github.com/kushagrasinghx/BitChord) — the base this fork
+- [BitChord](https://github.com/kushagrasinghx/BitChord) - the base this fork
   grew from.
-- [Pixel Music](https://github.com/ianshulyadav/PixelMusic) — the appearance
+- [Pixel Music](https://github.com/ianshulyadav/PixelMusic) - the appearance
   ported here: palette, typography, shapes.
-- Montserrat — the font, under the OFL; its licence sits next to the font file.
+- Montserrat - the font, under the OFL; its licence sits next to the font file.
 
 ## Licence
 
-GPL-3.0 — see [`LICENSE`](LICENSE).
+GPL-3.0 - see [`LICENSE`](LICENSE).
 
 ## Disclaimer
 
