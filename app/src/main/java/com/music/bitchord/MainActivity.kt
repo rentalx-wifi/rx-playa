@@ -128,6 +128,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.music.bitchord.auth.DiscordLoginScreen
@@ -1449,9 +1450,13 @@ private fun BitChordApp(
     }
 
     val scope = rememberCoroutineScope()
-    // One request at launch; a phone with no network just gets no update offer.
-    LaunchedEffect(Unit) {
-        runCatching { AppUpdateChecker.check() }
+    // Asked at launch and again on every return to the foreground (the checker
+    // throttles itself to an hour), so a launch with a dead connection is not a
+    // launch that never learns about an update.
+    val updateContext = LocalContext.current
+    LifecycleResumeEffect(Unit) {
+        scope.launch { runCatching { AppUpdateChecker.check(updateContext) } }
+        onPauseOrDispose { }
     }
     val oauthRedirect by OAuthRedirect.pending.collectAsStateWithLifecycle()
     LaunchedEffect(oauthRedirect) {

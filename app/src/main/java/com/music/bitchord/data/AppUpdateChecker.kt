@@ -66,11 +66,18 @@ object AppUpdateChecker {
      * Nothing here is fatal: a phone with no network, a rate-limited API or a
      * repository that has no release yet simply leaves no update on offer.
      */
-    suspend fun check(context: Context? = null) {
+    suspend fun check(context: Context? = null, force: Boolean = false) {
         context?.let { app ->
             prefs = app.getSharedPreferences("bitchord_settings", Context.MODE_PRIVATE)
             dismissedTag = prefs?.getString(KEY_DISMISSED_UPDATE, null)
         }
+        // Once an hour at most unless asked for. The check runs on every return
+        // to the foreground, and without this a flapping connection would mean a
+        // GitHub request per resume.
+        val now = System.currentTimeMillis()
+        val last = prefs?.getLong(KEY_LAST_CHECK, 0L) ?: 0L
+        if (!force && now - last < CHECK_INTERVAL_MS) return
+        prefs?.edit()?.putLong(KEY_LAST_CHECK, now)?.apply()
         val json = runCatching {
             withContext(Dispatchers.IO) {
                 val request = Request.Builder()
@@ -131,6 +138,8 @@ object AppUpdateChecker {
     private var dismissedTag: String? = null
     private var prefs: android.content.SharedPreferences? = null
     private const val KEY_DISMISSED_UPDATE = "dismissed_update_tag"
+    private const val KEY_LAST_CHECK = "last_update_check_at"
+    private const val CHECK_INTERVAL_MS = 60 * 60 * 1000L
 
     /**
      * What this phone's architecture is called in release asset names.
@@ -242,8 +251,8 @@ object AppUpdateChecker {
      * Some TV builds have no such settings screen; there the installer is
      * launched anyway and shows its own "not allowed" prompt with a way in.
      */
-    fun installApk(context: Context, file: File) {
-        if (_available.value == null || !file.exists()) return
+    fun installApk(context: Context, file: File): Boolean {
+        if (_available.value == null || !file.exists()) return false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             !context.packageManager.canRequestPackageInstalls()
         ) {
@@ -254,12 +263,12 @@ object AppUpdateChecker {
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
             }.isSuccess
-            if (opened) return
+            if (opened) return true
         }
         // Wrapped: a ROM without an installer activity answers
         // ActivityNotFoundException, and a crash on the Install button is a
         // worse outcome than nothing happening at all.
-        runCatching {
+        return runCatching {
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             context.startActivity(
                 Intent(Intent.ACTION_INSTALL_PACKAGE)
@@ -274,7 +283,8 @@ object AppUpdateChecker {
                     .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
                     .putExtra(Intent.EXTRA_RETURN_RESULT, true),
             )
-        }
+            true
+        }.getOrDefault(false)
     }
 
 }

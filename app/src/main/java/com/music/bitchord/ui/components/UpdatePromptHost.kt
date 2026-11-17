@@ -3,12 +3,14 @@ package com.music.bitchord.ui.components
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.music.bitchord.R
 import com.music.bitchord.data.AppUpdateChecker
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
@@ -51,8 +53,17 @@ fun UpdatePromptHost(
             onCancelDownload = { AppUpdateChecker.cancelDownload() },
             onInstall = {
                 val ready = AppUpdateChecker.download.value as? AppUpdateChecker.DownloadState.Ready
-                if (ready != null) {
-                    runCatching { AppUpdateChecker.installApk(context, ready.file) }
+                // Silently doing nothing here is exactly what a user reports as
+                // "the update button does not work": the installer can refuse
+                // to open (a ROM without one, a revoked unknown-sources grant),
+                // and without this it looks like a dead button.
+                val started = ready != null && AppUpdateChecker.installApk(context, ready.file)
+                if (!started) {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.something_went_wrong),
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 }
             },
             onOpenReleasePage = {
