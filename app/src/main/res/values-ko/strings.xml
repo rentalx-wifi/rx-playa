@@ -1395,4 +1395,10 @@
     <string name="custom_accent_hint">드래그하여 원하는 색 선택</string>
     <string name="custom_accent_reset">기본값</string>
     <string name="playing_from_source">%1$s에서 재생 중</string>
+    <string name="offline_downloaded_title">다운로드됨</string>
+    <string name="offline_downloaded_subtitle">연결 없음 · 이 기기에 있는 것만</string>
+    <string name="offline_nothing_downloaded">연결이 없고 아직 다운로드한 곡도 없습니다. 한 번 연결하거나 미리 재생목록을 저장하세요.</string>
+    <string name="download_limit_message">여기에 %1$d곡이 있습니다. 기기에 몇 곡을 남길까요?</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">모두 %1$d</string>
 </resources>

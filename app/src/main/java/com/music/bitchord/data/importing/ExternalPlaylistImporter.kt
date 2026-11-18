@@ -113,9 +113,11 @@ object ExternalPlaylistImporter {
             durationSec = track.durationMs.takeIf { it > 0L }?.div(1000L)?.toInt(),
             album = track.album,
         )
-        TrackMatcher.best(candidatesFor(track.title, track.artist), target)?.let { return it }
+        // Strict on purpose: this is another service's playlist being recreated,
+        // and a near miss puts the wrong song in it permanently. See [TrackMatcher.strictBest].
+        TrackMatcher.strictBest(candidatesFor(track.title, track.artist), target)?.let { return it }
         val fallback = fallbackCandidatesFor ?: return null
-        return TrackMatcher.best(fallback(track.title, track.artist), target)
+        return TrackMatcher.strictBest(fallback(track.title, track.artist), target)
     }
 
     private const val MATCH_PARALLELISM = 4

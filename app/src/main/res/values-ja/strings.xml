@@ -1523,4 +1523,10 @@
     <string name="custom_accent_hint">ドラッグして色を選ぶ</string>
     <string name="custom_accent_reset">既定</string>
     <string name="playing_from_source">%1$s から再生中</string>
+    <string name="offline_downloaded_title">ダウンロード済み</string>
+    <string name="offline_downloaded_subtitle">接続なし · この端末にあるものだけ</string>
+    <string name="offline_nothing_downloaded">接続がなく、まだ何もダウンロードしていません。一度接続するか、先にプレイリストを保存してください。</string>
+    <string name="download_limit_message">ここに %1$d 曲あります。端末に残すのは何曲ですか？</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">すべて (%1$d)</string>
 </resources>

@@ -1522,4 +1522,10 @@
     <string name="custom_accent_hint">Geser untuk memilih warna apa pun</string>
     <string name="custom_accent_reset">Bawaan</string>
     <string name="playing_from_source">Diputar dari %1$s</string>
+    <string name="offline_downloaded_title">Diunduh</string>
+    <string name="offline_downloaded_subtitle">Tanpa koneksi · hanya yang sudah ada di perangkat ini</string>
+    <string name="offline_nothing_downloaded">Tidak ada koneksi dan belum ada yang diunduh. Sambungkan sekali atau simpan playlist lebih dulu.</string>
+    <string name="download_limit_message">Ada %1$d lagu di sini. Berapa yang mau disimpan di perangkat?</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">Semua %1$d</string>
 </resources>

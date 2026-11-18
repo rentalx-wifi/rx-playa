@@ -1545,4 +1545,10 @@
     <string name="custom_accent_hint">Ziehen, um eine beliebige Farbe zu wählen</string>
     <string name="custom_accent_reset">Standard</string>
     <string name="playing_from_source">Wiedergabe über %1$s</string>
+    <string name="offline_downloaded_title">Heruntergeladen</string>
+    <string name="offline_downloaded_subtitle">Keine Verbindung · nur, was schon auf diesem Gerät ist</string>
+    <string name="offline_nothing_downloaded">Keine Verbindung und noch nichts heruntergeladen. Verbinde dich einmal oder speichere eine Playlist vorher.</string>
+    <string name="download_limit_message">%1$d Titel hier. Wie viele sollen auf dem Gerät bleiben?</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">Alle %1$d</string>
 </resources>

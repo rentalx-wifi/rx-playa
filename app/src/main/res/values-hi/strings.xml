@@ -1545,4 +1545,10 @@
     <string name="custom_accent_hint">कोई भी रंग चुनने के लिए खींचें</string>
     <string name="custom_accent_reset">डिफ़ॉल्ट</string>
     <string name="playing_from_source">%1$s से चल रहा है</string>
+    <string name="offline_downloaded_title">डाउनलोड किया गया</string>
+    <string name="offline_downloaded_subtitle">कनेक्शन नहीं · सिर्फ़ वही जो इस डिवाइस पर है</string>
+    <string name="offline_nothing_downloaded">कनेक्शन नहीं है और कुछ डाउनलोड भी नहीं हुआ। एक बार जुड़ें या पहले कोई प्लेलिस्ट सेव करें।</string>
+    <string name="download_limit_message">यहाँ %1$d ट्रैक हैं। डिवाइस पर कितने रखें?</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">सभी %1$d</string>
 </resources>

@@ -1515,4 +1515,10 @@
     <string name="liquid_glass_title">Liquid Glass</string>
     <string name="liquid_glass_subtitle">Refracting frosted chrome on the bars, the mini player and the top bar. Falls back to plain frosting on devices without the required GPU features.</string>
     <string name="playing_from_source">正在從 %1$s 播放</string>
+    <string name="offline_downloaded_title">已下載</string>
+    <string name="offline_downloaded_subtitle">沒有網路 · 只有這台裝置上已有的內容</string>
+    <string name="offline_nothing_downloaded">沒有網路，也還沒有下載任何內容。請連線一次或先儲存播放清單。</string>
+    <string name="download_limit_message">這裡有 %1$d 首。要在裝置上保留幾首？</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">全部 %1$d</string>
 </resources>

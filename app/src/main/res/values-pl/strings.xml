@@ -1585,4 +1585,10 @@
     <string name="custom_accent_hint">Przeciągnij, aby wybrać dowolny kolor</string>
     <string name="custom_accent_reset">Domyślny</string>
     <string name="playing_from_source">Odtwarzane z %1$s</string>
+    <string name="offline_downloaded_title">Pobrane</string>
+    <string name="offline_downloaded_subtitle">Brak połączenia · tylko to, co jest na tym urządzeniu</string>
+    <string name="offline_nothing_downloaded">Brak połączenia i nic nie zostało pobrane. Połącz się raz albo zapisz playlistę wcześniej.</string>
+    <string name="download_limit_message">Tu jest %1$d utworów. Ile zostawić na urządzeniu?</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">Wszystkie (%1$d)</string>
 </resources>

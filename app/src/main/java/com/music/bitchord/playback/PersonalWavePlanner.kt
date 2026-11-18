@@ -3,6 +3,7 @@ package com.music.bitchord.playback
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.durationMillis
 import com.music.bitchord.data.model.normalizedArtistName
+import kotlin.random.Random
 
 /**
  * The planning half of RX Wave: everything that decides what plays, with no
@@ -37,6 +38,13 @@ import com.music.bitchord.data.model.normalizedArtistName
  *    them — a neighbour of the taste, not a chart pick — and never more than
  *    one such artist in [DISCOVERY_EVERY] rows.
  * 10. An artist takes at most [MAX_PER_ARTIST] rows, and never two in a row.
+ * 11. A track that was served by an earlier wave or played since goes to the
+ *     back of the station. Press the pill twice and the second one opens with
+ *     tracks the first one did not use; a repeat only appears once the fresh
+ *     pool is smaller than the station.
+ * 12. The order carries a little jitter, so the head of the station and the
+ *     handful of newcomers are not the same rows on every press. Which liked
+ *     artists get asked at all is also a sample — see [rotateSeeds].
  *
  * There is no branch that returns an unfiltered radio list. When the filtered
  * pool is too small the planner asks for more seeds; when the seeds run out it
@@ -46,6 +54,28 @@ internal object PersonalWavePlanner {
 
     /** One liked track used to ask a radio. */
     data class Seed(val song: Song, val liked: Boolean)
+
+    /** A seed offered to [rotateSeeds], with how much its radio is worth asking. */
+    data class SeedCandidate(val song: Song, val weight: Double)
+
+    /**
+     * Picks the seeds of one wave: a weighted sample without replacement.
+     *
+     * Always taking the first N likes was half of why the station never
+     * changed — the same radios answered the same tracks and scored them the
+     * same way. A like still outranks a neighbour of a like, so the sample leans
+     * on the taste, but which liked artists get asked moves from press to press.
+     */
+    fun rotateSeeds(candidates: List<SeedCandidate>, limit: Int, random: Random): List<Song> {
+        if (candidates.size <= limit) return candidates.shuffled(random).map { it.song }
+        // Efraimidis–Spirakis: one uniform per candidate raised to 1/weight,
+        // sorted down. One pass, no rejection loop, and the weights hold.
+        return candidates
+            .map { it.song to Math.pow(random.nextDouble(), 1.0 / it.weight.coerceAtLeast(MIN_SEED_WEIGHT)) }
+            .sortedByDescending { it.second }
+            .take(limit)
+            .map { it.first }
+    }
 
     /** Everything the planner is allowed to look at. */
     data class Input(
@@ -59,12 +89,17 @@ internal object PersonalWavePlanner {
         val dislikedArtists: Set<String>,
         val dislikedRecordings: Set<RecordingKey>,
         val limit: Int,
+        /** Tracks served by an earlier wave or played recently, for rule 11. */
+        val recentVideoIds: Set<String> = emptySet(),
+        val recentRecordings: Set<RecordingKey> = emptySet(),
+        /** Rule 12. Fixed in tests, unpredictable in the app. */
+        val random: Random = Random.Default,
     )
 
     /** Title plus runtime bucket: the same master under two uploads is one track. */
     data class RecordingKey(val title: String, val seconds: Int)
 
-    data class Pick(val song: Song, val score: Double, val reason: String)
+    data class Pick(val song: Song, val score: Double, val reason: String, val fresh: Boolean = true)
     data class Reject(val song: Song, val reason: String)
 
     data class Result(
@@ -75,6 +110,8 @@ internal object PersonalWavePlanner {
     )
 
     private const val MAX_PER_ARTIST = 2
+    private const val SCORE_JITTER = 1.0
+    private const val MIN_SEED_WEIGHT = 0.25
     private const val DISCOVERY_EVERY = 5
     private const val MIN_TRACK_MS = 60_000L
     private const val MAX_TRACK_MS = 15 * 60_000L
@@ -88,7 +125,8 @@ internal object PersonalWavePlanner {
         """\b(karaoke|cover|tribute|nightcore|8d|sped ?up|speed ?up|slowed|reverb|""" +
             """instrumental|ringtone|mashup|reaction|lyrics? ?video|phonk|brazil|brasil|""" +
             """br ?funk|funk ?brasileiro|tiktok|meme|remix|bootleg|flip|""" +
-            """mixtape|1 ?hour|hour-?long|loop)\b""",
+            """mixtape|1 ?hour|hour-?long|loop|suno|udio|нейросет\w*|нейро-|""" +
+            """ai ?cover|ai[ -]generated|ai ?song)\b""",
         RegexOption.IGNORE_CASE,
     )
 
@@ -99,9 +137,12 @@ internal object PersonalWavePlanner {
         RegexOption.IGNORE_CASE,
     )
 
-    fun recordingKey(song: Song): RecordingKey {
-        val seconds = song.durationMillis().let { if (it <= 0L) 0 else (it / 1000L).toInt() }
-        return RecordingKey(TrackText.titleKey(song.title), seconds / 2)
+    fun recordingKey(song: Song): RecordingKey = recordingKey(song.title, song.durationMillis())
+
+    /** Same key without a [Song] at hand: what [WaveMemory] keeps between runs. */
+    fun recordingKey(title: String, durationMs: Long): RecordingKey {
+        val seconds = durationMs.let { if (it <= 0L) 0 else (it / 1000L).toInt() }
+        return RecordingKey(TrackText.titleKey(title), seconds / 2)
     }
 
     /**
@@ -157,17 +198,28 @@ internal object PersonalWavePlanner {
             }
             // Passed every rule — score it. A liked artist is the strongest
             // signal; radios agreeing on one is the next; the seed's own artist
-            // gets a nudge so a station on an artist starts with their kin.
+            // gets a nudge so a station on an artist starts with their kin. The
+            // jitter is rule 12 and smaller than any one of those signals, so it
+            // reorders equals without promoting a lesser track over a better one.
             val artist = normalizedArtistName(song.artist)
-            val score = buildScore(artist, song, input, seedArtists, historyConfirmed, artistHits)
+            val score = buildScore(artist, song, input, seedArtists, historyConfirmed, artistHits) +
+                input.random.nextDouble() * SCORE_JITTER
+            val fresh = song.videoId !in input.recentVideoIds &&
+                recordingKey(song) !in input.recentRecordings
             passed += Pick(
                 song = song,
                 score = score,
-                reason = reasonFor(artist, song, input, seedArtists, historyConfirmed, artistHits),
+                reason = reasonFor(artist, song, input, seedArtists, historyConfirmed, artistHits) +
+                    if (fresh) "" else ", звучал недавно",
+                fresh = fresh,
             )
         }
 
-        val ordered = passed.sortedByDescending { it.score }
+        // Rule 11 is an order: everything fresh first, repeats only once no fresh
+        // row is left for that slot.
+        val ordered = passed.sortedWith(
+            compareByDescending<Pick> { it.fresh }.thenByDescending { it.score },
+        )
         val picks = ArrayList<Pick>(input.limit)
         val perArtist = HashMap<String, Int>()
         var lastArtist = ""
@@ -236,7 +288,12 @@ internal object PersonalWavePlanner {
         // not by all of them. An unknown artist that *every* radio pushes is
         // the platform's own promotion — a chart act — and that is exactly the
         // "leftover pop" this station kept serving.
-        if (hits < 2) return "артист не из вкуса и не подтверждён нишей ($hits радио)" to true
+        // History alone is still not a pass: an artist the device has actually
+        // played needs one radio to name them, and that widens the pool without
+        // letting autoplay's own leftovers back in.
+        if (hits < 2 && !(hits >= 1 && artist in historyConfirmed)) {
+            return "артист не из вкуса и не подтверждён нишей ($hits радио)" to true
+        }
         if (radiosAsked > 2 && hits * 2 >= radiosAsked) {
             return "платформенный мейнстрим: почти в каждом радио ($hits из $radiosAsked)" to true
         }

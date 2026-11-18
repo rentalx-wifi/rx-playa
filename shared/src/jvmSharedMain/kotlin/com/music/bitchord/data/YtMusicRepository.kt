@@ -396,11 +396,13 @@ object YtMusicRepository {
     /**
      * Search candidates for a track imported from another service.
      *
-     * The exact `title + full byline` query is tried first. Collaborations and
-     * edition suffixes are common sources of empty searches, so only on a miss
-     * do we retry with a primary artist, a cleaned title, and finally the title
-     * alone. There is no arbitrary playlist-size cap; this helper bounds work
-     * per track instead.
+     * Two queries, merged: the exact `title + full byline`, and the same with a
+     * primary artist and the edition suffix cleaned off. It used to stop at the
+     * first query that returned *anything*, which is a different thing from
+     * returning the right row — a messy YouTube title brought a page of near
+     * misses, that page suppressed the clean query, and the import was left
+     * choosing between wrong rows or reporting the track missing. The title
+     * alone is still only asked when both of those come back empty.
      */
     suspend fun songCandidates(title: String, artist: String): List<Song> {
         val cleanTitle = title.trim()
@@ -422,8 +424,11 @@ object YtMusicRepository {
             cleanTitle,
             plainTitle,
         ).map(String::trim).filter(String::isNotEmpty).distinct()
-        for (candidateQuery in queries) {
-            val songs = search(candidateQuery, SearchFilter.SONGS).getOrNull().orEmpty()
+
+        val found = LinkedHashMap<String, Song>()
+        suspend fun ask(query: String): Boolean {
+            val songs = runCatching { search(query, SearchFilter.SONGS) }.getOrNull()
+                ?.getOrNull().orEmpty()
                 .mapNotNull {
                     when (it) {
                         is SearchResult.Track -> it.song
@@ -432,9 +437,17 @@ object YtMusicRepository {
                     }
                 }
                 .distinctBy { it.videoId }
-            if (songs.isNotEmpty()) return songs
+            songs.forEach { found.putIfAbsent(it.videoId, it) }
+            return songs.isNotEmpty()
         }
-        return emptyList()
+
+        queries.take(2).forEach { ask(it) }
+        if (found.isEmpty()) {
+            for (query in queries.drop(2)) {
+                if (ask(query)) break
+            }
+        }
+        return found.values.toList()
     }
 
     private fun SearchResult.identityKey(): String = when (this) {

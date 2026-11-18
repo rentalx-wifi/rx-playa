@@ -1414,4 +1414,10 @@
     <string name="liquid_glass_title">Liquid Glass</string>
     <string name="liquid_glass_subtitle">Refracting frosted chrome on the bars, the mini player and the top bar. Falls back to plain frosting on devices without the required GPU features.</string>
     <string name="playing_from_source">Playing from %1$s</string>
+    <string name="offline_downloaded_title">Downloaded</string>
+    <string name="offline_downloaded_subtitle">No connection · only what is already on this device</string>
+    <string name="offline_nothing_downloaded">No connection, and nothing is downloaded yet. Connect once, or save a playlist before you lose the network.</string>
+    <string name="download_limit_message">%1$d tracks here. How many do you want on this device?</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">All %1$d</string>
 </resources>

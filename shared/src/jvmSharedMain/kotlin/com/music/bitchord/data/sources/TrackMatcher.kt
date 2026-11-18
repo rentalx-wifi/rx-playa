@@ -130,8 +130,23 @@ object TrackMatcher {
      * Scoring them all and taking the top lets the runtime and the fuller
      * artist credit break that tie instead.
      */
-    fun best(candidates: List<Song>, target: Target): Song? =
-        ranked(candidates, target).firstOrNull()
+    fun best(candidates: List<Song>, target: Target, strict: Boolean = false): Song? =
+        ranked(candidates, target, strict).firstOrNull()
+
+    /**
+     * [best] with the looseness taken out, for a track imported from another
+     * service.
+     *
+     * An import names one recording and the listener expects that recording
+     * back in their playlist, so the two allowances that keep everyday source
+     * switching working are wrong here. Both let a *different* recording pass:
+     * a title accepted because one core contains the other ("Любовь" for
+     * "Любовь как сон"), and a row credited to another artist accepted because
+     * its runtime happened to be exact to the second. In a playlist that reads
+     * as «перенос не соответствует»; a missing row is the better answer.
+     */
+    fun strictBest(candidates: List<Song>, target: Target): Song? =
+        best(candidates, target, strict = true)
 
     /**
      * The least wrong copy of [target] among [candidates], for the paths whose
@@ -196,9 +211,9 @@ object TrackMatcher {
      * to [SourceResolver], which knows what was asked for. Confidence orders
      * what it is given; it does not get to spend it.
      */
-    fun ranked(candidates: List<Song>, target: Target): List<Song> =
+    fun ranked(candidates: List<Song>, target: Target, strict: Boolean = false): List<Song> =
         candidates
-            .mapNotNull { candidate -> score(candidate, target)?.let { candidate to it } }
+            .mapNotNull { candidate -> score(candidate, target, strict)?.let { candidate to it } }
             // A runtime-identical cover is only a last-resort explanation for
             // catalogues crediting the same master differently. If this search
             // also returned anything carrying the requested artist, there is
@@ -221,7 +236,7 @@ object TrackMatcher {
      * and the next source — ultimately YouTube, which by definition has the
      * track — still plays what the user asked for.
      */
-    fun score(candidate: Song, target: Target): Int? {
+    fun score(candidate: Song, target: Target, strict: Boolean = false): Int? {
         val wanted = parseTitle(target.title, target.artist)
         val got = parseTitle(candidate.title, candidate.artist)
         if (wanted.core.isBlank() || got.core.isBlank()) return null
@@ -237,6 +252,9 @@ object TrackMatcher {
             wanted.core == got.core -> true
             romajiOf(wanted.core) == romajiOf(got.core) -> true
             isTranslationMatch(wanted, got) -> true
+            // Containment is the loose reading of a title, kept for the
+            // everyday source switch and refused for an import.
+            strict -> false
             wanted.core.length <= 3 || got.core.length <= 3 -> false
             else -> wanted.core.contains(got.core) || got.core.contains(wanted.core)
         }
@@ -272,7 +290,7 @@ object TrackMatcher {
             // the only way through the wider window. Exact title/version plus
             // a shared artist is strong enough; a different artist still gets
             // the ordinary 30-second ceiling below.
-            allowVideoDrift = creditedArtist != null,
+            allowVideoDrift = creditedArtist != null && !strict,
         ) ?: return null
         val artist = creditedArtist
         // The credits don't merely differ in spelling, they name different
@@ -299,7 +317,7 @@ object TrackMatcher {
         // people. This exact exception is what admitted the 3:30 Lovely
         // track for Yo Yo Honey Singh's 3:31 "Brown Rang" video.
             ?: CREDITS_DISAGREE.takeIf {
-                !target.isVideo && withinSeconds(candidate, target, CREDIT_OVERRIDE_SEC)
+                !strict && !target.isVideo && withinSeconds(candidate, target, CREDIT_OVERRIDE_SEC)
             }
             ?: return null
         val explicit = explicitScore(target.isExplicit, candidate.isExplicit) ?: return null
@@ -876,7 +894,16 @@ object TrackMatcher {
 
     private val BRACKETED = Regex("""[(\[]([^()\[\]]*)[)\]]""")
     private val DASH = Regex("""\s+[-–—|]+\s+""")
-    private val FEATURING = Regex("""\b(feat|ft|featuring|with)\b.*""")
+    /**
+     * A feat. credit belongs to the artist field wherever a catalogue chooses
+     * to print it (see [parseTitle]). `with` was in this list and had to go: a
+     * guest credit printed plainly reads "Song with Artist", but the same word
+     * is ordinary English inside real titles, and stripping from it turned
+     * "Stay With Me" into "stay" — a core so short that half the catalogue
+     * answered to it. A bracketed "(with X)" is still handled by the bracket
+     * pass above.
+     */
+    private val FEATURING = Regex("""\b(feat|ft|featuring)\b.*""")
     /**
      * The Portuguese spelling of the same credit, see [parseTitle]. Only the
      * dotted form and an explicit `part esp.` count: an undotted `part` is

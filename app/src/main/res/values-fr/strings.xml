@@ -1546,4 +1546,10 @@
     <string name="custom_accent_hint">Faites glisser pour choisir une couleur</string>
     <string name="custom_accent_reset">Par défaut</string>
     <string name="playing_from_source">Lecture depuis %1$s</string>
+    <string name="offline_downloaded_title">Téléchargé</string>
+    <string name="offline_downloaded_subtitle">Sans connexion · uniquement ce qui est déjà sur cet appareil</string>
+    <string name="offline_nothing_downloaded">Pas de connexion et rien de téléchargé pour l\'instant. Connecte-toi une fois ou enregistre une playlist avant.</string>
+    <string name="download_limit_message">%1$d titres ici. Combien veux-tu garder sur l\'appareil ?</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">Tout (%1$d)</string>
 </resources>

@@ -299,8 +299,11 @@ private fun SpotifyQuickGrid(
             // Intrinsic height, and every card fills it: the two tiles of a row
             // hold different numbers of lines, and left to themselves they
             // ended at different heights with the images sitting off-centre.
+            // A fixed height, not IntrinsicSize: an intrinsic pass inside a
+            // LazyColumn item measured the grid before its parent settled, and
+            // the tiles drew at the wrong size until a scroll recomposed them.
             Row(
-                Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                Modifier.fillMaxWidth().height(76.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 pair.forEach { (item, shelf) ->
@@ -434,7 +437,10 @@ fun HomeScreen(
             val shelves = state.data.mapNotNull { shelf ->
                 val items = when (selectedHomeFilter) {
                     1 -> shelf.items.filter { it.videoId != null }
-                    2 -> shelf.items.filter { it.browseId != null }
+                    // Playlists, not "everything with a browse id": albums
+                    // and artist pages carry one too, and that is what made
+                    // this chip look like a pile of things nobody asked for.
+                    2 -> shelf.items.filter { it.isPlaylistCard() }
                     else -> shelf.items
                 }
                 shelf.copy(items = items).takeIf { items.isNotEmpty() }
@@ -1267,6 +1273,21 @@ fun VideoShelfCard(
 
 /** A music video's frame. */
 const val VIDEO_ASPECT = 16f / 9f
+
+/**
+ * Whether a card is a playlist rather than an album, an artist page or a track.
+ *
+ * YouTube addresses playlists as `VL…` and radios as `RD…`; this app's own
+ * collections use a `scheme:` prefix. Everything else with a browse id is an
+ * album (`MPRE`), a single (`OLAK`) or an artist (`UC`), none of which belongs
+ * under a chip that says "Playlists".
+ */
+private fun ShelfItem.isPlaylistCard(): Boolean {
+    val id = browseId ?: return false
+    return id.startsWith("VL") || id.startsWith("RD") ||
+        id.startsWith("local:") || id.startsWith("spotify:") ||
+        id.startsWith("yandex:") || id.startsWith("soundcloud:")
+}
 
 /** Wide enough that a 16:9 card stands about as tall as a square [SHELF_CARD_WIDTH] one. */
 val VIDEO_CARD_WIDTH = 248.dp

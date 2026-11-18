@@ -112,6 +112,10 @@ fun PlaylistPickerSheet(
     song: Song? = null,
     startCreating: Boolean = false,
     offline: Boolean = false,
+    /** True when the playlist being made will live on this device, not on YouTube. */
+    localTarget: Boolean = false,
+    /** Asked to remove a playlist this device owns. */
+    onDelete: ((UserPlaylist) -> Unit)? = null,
 ) {
     var creating by remember { mutableStateOf(startCreating) }
     // By id rather than by value: the list is re-fetched under an open sheet,
@@ -161,6 +165,7 @@ fun PlaylistPickerSheet(
                     onClose = { closeAfter {} },
                     onCreate = { name, privacy -> closeAfter { onCreate(name, privacy) } },
                     offline = offline,
+                    localTarget = localTarget,
                 )
             } else {
                 SheetTopBar(
@@ -231,6 +236,12 @@ fun PlaylistPickerSheet(
                                     onClick = {
                                         selected = if (ticked) selected - playlist.playlistId else selected + playlist.playlistId
                                     },
+                                    // Only this device's own lists can be removed
+                                    // from here; an account's playlist has the
+                                    // page's own delete, which the server owns.
+                                    onDelete = onDelete?.takeIf {
+                                        playlist.playlistId.startsWith("sp_local_")
+                                    }?.let { delete -> { delete(playlist) } },
                                 )
                             }
                         }
@@ -285,7 +296,12 @@ private fun SheetTopBar(
 }
 
 @Composable
-private fun PlaylistRow(playlist: UserPlaylist, selected: Boolean, onClick: () -> Unit) {
+private fun PlaylistRow(
+    playlist: UserPlaylist,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onDelete: (() -> Unit)? = null,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -322,6 +338,16 @@ private fun PlaylistRow(playlist: UserPlaylist, selected: Boolean, onClick: () -
             }
         }
         Spacer(Modifier.width(12.dp))
+        if (onDelete != null) {
+            IconButton(onClick = onDelete, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    imageVector = SfIcons.Trash,
+                    contentDescription = stringResource(R.string.delete_playlist),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
         Icon(
             imageVector = if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
             contentDescription = null,
@@ -341,6 +367,7 @@ private fun NewPlaylistForm(
     onClose: () -> Unit,
     onCreate: (String, PlaylistPrivacy) -> Unit,
     offline: Boolean,
+    localTarget: Boolean = false,
 ) {
     var name by remember { mutableStateOf("") }
     var privacy by remember { mutableStateOf(PlaylistPrivacy.PRIVATE) }
@@ -378,7 +405,8 @@ private fun NewPlaylistForm(
                     )
                     Text(
                         text = stringResource(
-                            if (offline) R.string.saved_on_this_device else R.string.saved_to_youtube_music_account,
+                            if (offline || localTarget) R.string.saved_on_this_device
+                            else R.string.saved_to_youtube_music_account,
                         ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

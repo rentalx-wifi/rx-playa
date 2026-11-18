@@ -152,6 +152,7 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory, Configu
         // only surface that can configure it now.
         com.music.bitchord.data.net.VlessStore.init(this)
         TrackRatingStore.init(this)
+        com.music.bitchord.data.personalization.WaveMemory.init(this)
         DiscordPresenceCoordinator.init(this)
         // Before anything resolves a track: an addon with `checkValidLossless`
         // is gated on this, and the gate reads "no" until it has looked.

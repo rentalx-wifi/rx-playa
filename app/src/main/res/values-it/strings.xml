@@ -1484,4 +1484,10 @@
     <string name="custom_accent_hint">Trascina per scegliere un colore</string>
     <string name="custom_accent_reset">Predefinito</string>
     <string name="playing_from_source">Riproduzione da %1$s</string>
+    <string name="offline_downloaded_title">Scaricato</string>
+    <string name="offline_downloaded_subtitle">Nessuna connessione · solo ciò che è già su questo dispositivo</string>
+    <string name="offline_nothing_downloaded">Nessuna connessione e niente di scaricato. Connettiti una volta o salva una playlist prima.</string>
+    <string name="download_limit_message">Qui ci sono %1$d brani. Quanti vuoi tenere sul dispositivo?</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">Tutti (%1$d)</string>
 </resources>

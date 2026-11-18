@@ -1522,4 +1522,10 @@
     <string name="custom_accent_hint">拖动选择任意颜色</string>
     <string name="custom_accent_reset">默认</string>
     <string name="playing_from_source">正在从 %1$s 播放</string>
+    <string name="offline_downloaded_title">已下载</string>
+    <string name="offline_downloaded_subtitle">无网络 · 仅限本机已有的内容</string>
+    <string name="offline_nothing_downloaded">没有网络，也还没有下载内容。请联网一次或提前保存歌单。</string>
+    <string name="download_limit_message">这里有 %1$d 首。要在本机保留几首？</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">全部 %1$d</string>
 </resources>

@@ -86,6 +86,33 @@ object LocalPlaylistStore {
         return playlist
     }
 
+    /**
+     * Appends [songs] to the local playlist addressed by [id], skipping what is
+     * already in it.
+     *
+     * [id] is accepted in every shape a row hands one back: the store's own id,
+     * the `local:playlist:` browse id of a card, or a bare `VL` id. Returns how
+     * many rows were actually added, so a caller can tell "added" from "was
+     * already there" without reading the playlist back.
+     */
+    fun addSongs(id: String, songs: List<Song>): Int {
+        if (songs.isEmpty()) return 0
+        val clean = id.removePrefix("local:playlist:").removePrefix("VL")
+        val index = _playlists.value.indexOfFirst {
+            it.id == clean || it.browseId == id || it.id == id
+        }
+        if (index < 0) return 0
+        val playlist = _playlists.value[index]
+        val known = playlist.songs.mapTo(HashSet()) { it.videoId }
+        val fresh = songs.filter { known.add(it.videoId) }
+        if (fresh.isEmpty()) return 0
+        val updated = _playlists.value.toMutableList()
+        updated[index] = playlist.copy(songs = playlist.songs + fresh)
+        _playlists.value = updated
+        persist(updated)
+        return fresh.size
+    }
+
     /** Adds imported playlists, keeping this device's own ones untouched. */
     fun importAll(imported: List<LocalPlaylist>) {
         if (imported.isEmpty()) return

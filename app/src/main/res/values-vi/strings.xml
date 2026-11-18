@@ -1462,4 +1462,10 @@
     <string name="custom_accent_hint">Kéo để chọn màu bất kỳ</string>
     <string name="custom_accent_reset">Mặc định</string>
     <string name="playing_from_source">Đang phát từ %1$s</string>
+    <string name="offline_downloaded_title">Đã tải</string>
+    <string name="offline_downloaded_subtitle">Không có kết nối · chỉ những gì đã có trên máy này</string>
+    <string name="offline_nothing_downloaded">Không có kết nối và chưa tải gì cả. Hãy kết nối một lần hoặc lưu danh sách phát trước.</string>
+    <string name="download_limit_message">Có %1$d bài ở đây. Giữ lại bao nhiêu bài trên máy?</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">Tất cả %1$d</string>
 </resources>

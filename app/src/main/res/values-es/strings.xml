@@ -1517,4 +1517,10 @@
     <string name="custom_accent_hint">Arrastra para elegir cualquier color</string>
     <string name="custom_accent_reset">Predeterminado</string>
     <string name="playing_from_source">Reproduciendo desde %1$s</string>
+    <string name="offline_downloaded_title">Descargado</string>
+    <string name="offline_downloaded_subtitle">Sin conexión · solo lo que ya está en este dispositivo</string>
+    <string name="offline_nothing_downloaded">Sin conexión y todavía no hay nada descargado. Conéctate una vez o guarda una lista antes.</string>
+    <string name="download_limit_message">%1$d canciones aquí. ¿Cuántas quieres dejar en el dispositivo?</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">Todas (%1$d)</string>
 </resources>

@@ -115,7 +115,12 @@ class PersonalWavePlannerTest {
         return kin + neighbours + junk
     }
 
-    private fun plan() = runBlocking {
+    private fun plan(
+        recentVideoIds: Set<String> = emptySet(),
+        recentRecordings: Set<PersonalWavePlanner.RecordingKey> = emptySet(),
+        random: kotlin.random.Random = kotlin.random.Random(11),
+        limit: Int = 30,
+    ) = runBlocking {
         val likedArtists = seeds.groupingBy { normalizedArtistName(it.artist) }.eachCount()
             .mapValues { it.value.toDouble() }
         PersonalWavePlanner.plan(
@@ -126,7 +131,10 @@ class PersonalWavePlannerTest {
                 historyArtists = setOf("MC Phonkzilla", "Mainstream Pop Singer"),
                 dislikedArtists = setOf("mc phonkzilla"),
                 dislikedRecordings = emptySet(),
-                limit = 30,
+                limit = limit,
+                recentVideoIds = recentVideoIds,
+                recentRecordings = recentRecordings,
+                random = random,
             ),
             radio = { seed -> radioFor(seed, seeds.indexOf(seed)) },
         )
@@ -212,4 +220,57 @@ class PersonalWavePlannerTest {
         thumbnailUrl = null,
         durationText = "%d:%02d".format(seconds / 60, seconds % 60),
     )
+
+    // ── Variety: the complaint this station had to answer ───────────────────
+
+    /**
+     * The reported bug: pressing RX Wave again served the tracks that had just
+     * played. Rule 11 has to put the tracks of the previous station behind every
+     * fresh one, and still leave a full station behind it.
+     */
+    @Test
+    fun `a second press is not the first station again`() {
+        val first = plan()
+        val seen = first.picks.mapTo(HashSet()) { it.song.videoId }
+        val second = plan(
+            recentVideoIds = seen,
+            recentRecordings = first.picks.mapTo(HashSet()) { PersonalWavePlanner.recordingKey(it.song) },
+            random = kotlin.random.Random(12),
+        )
+        val flags = second.picks.map { it.song.videoId in seen }
+        val firstRepeat = flags.indexOf(true)
+        val lastFresh = flags.lastIndexOf(false)
+        assertTrue(
+            "a fresh row was pushed behind a repeat: ${flags.joinToString("") { if (it) "R" else "F" }}",
+            firstRepeat < 0 || lastFresh < firstRepeat,
+        )
+        assertEquals("the second station is still a full station", 30, second.picks.size)
+    }
+
+    /**
+     * Rule 12 on the seed side: a library larger than the seed budget must not
+     * be asked in the same order every press, while a heavier seed still has to
+     * come up more often than a light one.
+     */
+    @Test
+    fun `seed rotation asks a different slice of the likes`() {
+        val candidates = (1..40).map { index ->
+            PersonalWavePlanner.SeedCandidate(song("c$index", "track $index", "artist $index", 180), 1.0)
+        }
+        val first = PersonalWavePlanner.rotateSeeds(candidates, 24, kotlin.random.Random(1))
+            .mapTo(HashSet()) { it.videoId }
+        val second = PersonalWavePlanner.rotateSeeds(candidates, 24, kotlin.random.Random(2))
+            .mapTo(HashSet()) { it.videoId }
+        assertEquals("a full seed budget is expected", 24, first.size)
+        assertTrue("two presses asked exactly the same seeds", first != second)
+
+        val weighted = candidates.mapIndexed { index, candidate ->
+            if (index == 0) candidate.copy(weight = 20.0) else candidate
+        }
+        val hits = (1..200).count { round ->
+            PersonalWavePlanner.rotateSeeds(weighted, 10, kotlin.random.Random(round))
+                .any { it.videoId == "c1" }
+        }
+        assertTrue("the strongest liked artist is skipped far too often: $hits of 200", hits > 150)
+    }
 }

@@ -1502,4 +1502,10 @@
     <string name="custom_accent_hint">Herhangi bir rengi seçmek için sürükle</string>
     <string name="custom_accent_reset">Varsayılan</string>
     <string name="playing_from_source">%1$s üzerinden çalıyor</string>
+    <string name="offline_downloaded_title">İndirildi</string>
+    <string name="offline_downloaded_subtitle">Bağlantı yok · yalnızca bu cihazda olanlar</string>
+    <string name="offline_nothing_downloaded">Bağlantı yok ve henüz indirilen bir şey de yok. Bir kez bağlan ya da çalma listesini önceden kaydet.</string>
+    <string name="download_limit_message">Burada %1$d parça var. Cihazda kaç tanesi kalsın?</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">Tümü (%1$d)</string>
 </resources>

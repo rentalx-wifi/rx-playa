@@ -1550,4 +1550,10 @@
     <string name="custom_accent_hint">Arraste para escolher qualquer cor</string>
     <string name="custom_accent_reset">Predefinido</string>
     <string name="playing_from_source">A reproduzir de %1$s</string>
+    <string name="offline_downloaded_title">Baixado</string>
+    <string name="offline_downloaded_subtitle">Sem conexão · só o que já está neste aparelho</string>
+    <string name="offline_nothing_downloaded">Sem conexão e nada baixado ainda. Conecte-se uma vez ou salve uma playlist antes.</string>
+    <string name="download_limit_message">%1$d faixas aqui. Quantas ficam no aparelho?</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">Todas (%1$d)</string>
 </resources>

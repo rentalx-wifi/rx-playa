@@ -11,10 +11,12 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.durationMillis
 import com.music.bitchord.data.model.normalizedArtistName
 import com.music.bitchord.data.personalization.TasteProfile
+import com.music.bitchord.data.personalization.WaveMemory
 import com.music.bitchord.data.sources.TrackMatcher
 import com.music.bitchord.playback.TrackText
 import com.music.bitchord.playback.QueueCoordinator.asQueueEntry
 import kotlinx.coroutines.CancellationException
+import kotlin.random.Random
 
 /** Most AutoPlay-suggested tracks kept queued ahead of the current one at once. */
 const val MAX_QUEUED_AUTOPLAY = 10
@@ -24,6 +26,9 @@ private const val MAX_PERSONAL_WAVE_SEEDS = 24
 
 /** How many tracks the RX Wave station is built from before the queue trims it. */
 private const val PERSONAL_WAVE_TRACKS = 40
+
+/** How long after playing a track a wave is not allowed to serve it again. */
+private const val PLAYED_COOLDOWN_MS = 72L * 60L * 60L * 1000L
 
 
 private val YOUTUBE_VIDEO_ID = Regex("[A-Za-z0-9_-]{11}")
@@ -41,7 +46,8 @@ private val YOUTUBE_VIDEO_ID = Regex("[A-Za-z0-9_-]{11}")
 private val STRANGER_EDIT = Regex(
     """\b(karaoke|cover|tribute|nightcore|8d|sped ?up|speed ?up|slowed|reverb|""" +
         """instrumental|ringtone|mashup|reaction|lyrics? video|phonk|brazil|brasil|""" +
-        """br ?funk|funk ?brasileiro|tiktok|meme)\b""",
+        """br ?funk|funk ?brasileiro|tiktok|meme|suno|udio|нейросет\w*|нейро-|""" +
+        """ai ?cover|ai[ -]generated|ai ?song)\b""",
     RegexOption.IGNORE_CASE,
 )
 
@@ -185,27 +191,61 @@ suspend fun loadAutoplayTracks(
 suspend fun loadPersonalWave(
     profile: TasteProfile,
     disliked: List<Song> = TrackRatingStore.dislikedSongs(),
+    exclude: Collection<Song> = emptyList(),
     limit: Int = PERSONAL_WAVE_TRACKS,
+    random: Random = Random.Default,
+    nowMs: Long = System.currentTimeMillis(),
 ): Result<List<Song>> {
     val liked = profile.tracks.filter { it.liked && it.song.videoId.isNotBlank() }
     if (liked.isEmpty()) return Result.success(emptyList())
-
-    val seeds = (profile.recentLikes.map { it.song } +
-        liked.sortedByDescending { it.score }.map { it.song })
-        .filter { it.videoId.isNotBlank() && it.title.isNotBlank() && it.artist.isNotBlank() }
-        .distinctBy { normalizedArtistName(it.artist) }
-        .take(MAX_PERSONAL_WAVE_SEEDS)
-    if (seeds.isEmpty()) return Result.success(emptyList())
 
     val likedArtists = liked
         .groupBy({ normalizedArtistName(it.song.artist) }, { it })
         .filterKeys { it.isNotEmpty() }
         .mapValues { (_, tracks) -> tracks.size.toDouble() }
+
+    // Rule 12: every press asks a different sample of the liked artists. Taking
+    // the first N likes in the same order was half of why the station never changed.
+    val seeds = PersonalWavePlanner.rotateSeeds(
+        candidates = (profile.recentLikes.map { it.song } + liked.sortedByDescending { it.score }.map { it.song })
+            .filter { it.videoId.isNotBlank() && it.title.isNotBlank() && it.artist.isNotBlank() }
+            .distinctBy { normalizedArtistName(it.artist) }
+            .map { song ->
+                PersonalWavePlanner.SeedCandidate(
+                    song = song,
+                    weight = 1.0 + (likedArtists[normalizedArtistName(song.artist)] ?: 0.0),
+                )
+            },
+        limit = MAX_PERSONAL_WAVE_SEEDS,
+        random = random,
+    )
+    if (seeds.isEmpty()) return Result.success(emptyList())
+
     val historyArtists = profile.tracks
         .filterNot { it.liked }
         .map { normalizedArtistName(it.song.artist) }
         .filter { it.isNotEmpty() }
         .toSet()
+
+    // Rule 11: a station is what comes next, not a replay. What an earlier press
+    // served, what the player has played since, and what is still sitting in the
+    // queue are all out — that is the whole difference between "my wave" and
+    // "the same forty tracks in a circle".
+    val served = WaveMemory.recentlyServed(nowMs)
+    val playedRecently = profile.tracks.filter { track ->
+        val at = track.lastPlayedAtMs ?: 0L
+        at > 0L && at >= nowMs - PLAYED_COOLDOWN_MS
+    }
+    val recentVideoIds = buildSet {
+        addAll(served.videoIds)
+        playedRecently.forEach { add(it.song.videoId) }
+        exclude.forEach { add(it.videoId) }
+    }
+    val recentRecordings = buildSet {
+        addAll(served.recordings)
+        playedRecently.forEach { add(PersonalWavePlanner.recordingKey(it.song)) }
+        exclude.forEach { add(PersonalWavePlanner.recordingKey(it)) }
+    }
 
     val plan = PersonalWavePlanner.plan(
         input = PersonalWavePlanner.Input(
@@ -216,16 +256,20 @@ suspend fun loadPersonalWave(
             dislikedArtists = disliked.mapTo(HashSet()) { normalizedArtistName(it.artist) },
             dislikedRecordings = disliked.mapTo(HashSet()) { PersonalWavePlanner.recordingKey(it) },
             limit = limit,
+            recentVideoIds = recentVideoIds,
+            recentRecordings = recentRecordings,
+            random = random,
         ),
         radio = { seed ->
             val videoId = youtubeSeedFor(seed) ?: return@plan emptyList()
             YtMusicRepository.radio(videoId, preferVideo = seed.isVideo).getOrNull().orEmpty()
         },
     )
+    WaveMemory.remember(plan.picks.map { it.song }, nowMs)
     TrackLog.d(
         "BitChord",
         "wave: ${plan.seedsAsked.size} seeds asked, ${plan.picks.size} picked, " +
-            "${plan.rejects.size} rejected",
+            "${plan.rejects.size} rejected, ${recentVideoIds.size} recent ids skipped",
     )
     return Result.success(plan.picks.map { it.song })
 }

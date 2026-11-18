@@ -182,6 +182,8 @@ import com.music.bitchord.data.yandex.YandexMusicIntegration
 import com.music.bitchord.data.yandex.YandexMusicApi
 import com.music.bitchord.data.yandex.YandexMusicApiException
 import com.music.bitchord.ui.components.UpdatePromptHost
+import com.music.bitchord.ui.components.DownloadLimitDialog
+import com.music.bitchord.ui.components.DownloadLimitRequest
 import com.music.bitchord.ui.components.AccountProfileSelector
 import com.music.bitchord.ui.components.DacVolumeHud
 import com.music.bitchord.ui.components.DacVolumeKeys
@@ -2017,7 +2019,10 @@ private fun BitChordApp(
             val wave = if (profile.isEmpty) {
                 emptyList()
             } else {
-                runCatching { loadPersonalWave(profile) }.getOrNull()?.getOrNull().orEmpty()
+                // The queue itself is out of the new station: a wave pressed while
+                // the last one is still playing must not hand back its own tracks.
+                runCatching { loadPersonalWave(profile, exclude = player.queue) }
+                    .getOrNull()?.getOrNull().orEmpty()
             }
             if (request != playRequestGeneration) return@launch
             val activeController = controller
@@ -2025,10 +2030,15 @@ private fun BitChordApp(
                 // Nothing of their own to build on, or nowhere to put it: a
                 // station from their strongest track, never the catalogue mix —
                 // that mix is what this whole path exists to get away from.
-                val seed = profile.tracks.firstOrNull { track ->
-                    track.song.videoId.isNotBlank() && track.song.title.isNotBlank() &&
-                        track.song.artist.isNotBlank()
-                }?.song ?: player.song
+                // A station from their own taste, and when every like has just
+                // played, from the one that has been quiet the longest.
+                val seed = profile.tracks
+                    .filter { track ->
+                        track.song.videoId.isNotBlank() && track.song.title.isNotBlank() &&
+                            track.song.artist.isNotBlank()
+                    }
+                    .minByOrNull { it.lastPlayedAtMs ?: 0L }
+                    ?.song ?: player.song
                 if (seed == null) {
                     showQueueNotice(context.getString(R.string.no_tracks_here))
                 } else {
@@ -2586,6 +2596,10 @@ private fun BitChordApp(
     // it decomposed into — see [Downloads.rememberCollection]. Null for a single
     // track, which is not a release however many of them are asked for one at a
     // time.
+    // "Download all" asks how much first: a release can be hundreds of tracks
+    // and a phone rarely wants all of them cached. Null request means no dialog.
+    var downloadLimitRequest by remember { mutableStateOf<DownloadLimitRequest?>(null) }
+
     val startDownload: (List<Song>, DownloadTarget?) -> Unit = { requested, from ->
         val saved = Downloads.saved.value
         // Already on disk, and already queued or running: neither needs asking
@@ -5423,10 +5437,23 @@ private fun BitChordApp(
                 playlistTarget = null
                 creatingPlaylist = false
             }
+            // Local playlists belong in this list: without an account they are
+            // the only ones there are, and with one they are still where music
+            // dropped on this device lives.
+            val sheetPlaylists = playlists + localPlaylists.map { local ->
+                com.music.bitchord.data.model.UserPlaylist(
+                    playlistId = local.id,
+                    title = local.title,
+                    subtitle = if (local.songs.isEmpty()) "" else "${local.songs.size}",
+                    thumbnailUrl = local.songs.firstOrNull()?.thumbnailUrl,
+                )
+            }
             PlaylistPickerSheet(
-                playlists = playlists,
+                playlists = sheetPlaylists,
                 loading = playlistsLoading,
                 song = target,
+                localTarget = !signedIn,
+                onDelete = { viewModel.deletePlaylist(it) },
                 startCreating = target == null,
                 onDismiss = dismiss,
                 onAdd = { picked ->
@@ -5750,20 +5777,27 @@ private fun BitChordApp(
                 // release's own name and cover, which is exactly what the
                 // record wants.
                 onDownloadAll = act { songs ->
-                    startDownload(
-                        songs,
-                        target.browseId
-                            ?.takeIf { target.type != BrowseType.ARTIST }
-                            ?.let { id ->
-                                DownloadTarget(
-                                    id = id,
-                                    title = target.title,
-                                    subtitle = target.subtitle,
-                                    thumbnailUrl = target.thumbnailUrl,
-                                    playlist = target.type == BrowseType.PLAYLIST,
-                                )
-                            },
-                    )
+                    val release = target.browseId
+                        ?.takeIf { target.type != BrowseType.ARTIST }
+                        ?.let { id ->
+                            DownloadTarget(
+                                id = id,
+                                title = target.title,
+                                subtitle = target.subtitle,
+                                thumbnailUrl = target.thumbnailUrl,
+                                playlist = target.type == BrowseType.PLAYLIST,
+                            )
+                        }
+                    if (songs.size > 10) {
+                        downloadLimitRequest = DownloadLimitRequest(
+                            title = target.title,
+                            total = songs.size,
+                        ) { limit ->
+                            startDownload(limit?.let(songs::take) ?: songs, release)
+                        }
+                    } else {
+                        startDownload(songs, release)
+                    }
                 }.takeIf { downloadable },
                 // The same link a share off YouTube Music's own overflow
                 // gives — built from the browse id rather than fetched,
@@ -6519,6 +6553,10 @@ private fun BitChordApp(
         }
 
         UpdatePromptHost(hazeState = hazeState)
+
+        downloadLimitRequest?.let { request ->
+            DownloadLimitDialog(request = request, onDismiss = { downloadLimitRequest = null })
+        }
 
         soundCloudUnavailableAction?.let { song ->
             AlertDialog(

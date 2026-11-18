@@ -1550,4 +1550,10 @@
     <string name="custom_accent_hint">גרור כדי לבחור כל צבע</string>
     <string name="custom_accent_reset">ברירת מחדל</string>
     <string name="playing_from_source">מתנגן מ-%1$s</string>
+    <string name="offline_downloaded_title">הורד</string>
+    <string name="offline_downloaded_subtitle">אין חיבור · רק מה שכבר במכשיר הזה</string>
+    <string name="offline_nothing_downloaded">אין חיבור ועדיין לא הורד כלום. התחבר פעם אחת או שמור פלייליסט מראש.</string>
+    <string name="download_limit_message">%1$d שירים כאן. כמה להשאיר במכשיר?</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">הכול (%1$d)</string>
 </resources>

@@ -1528,4 +1528,10 @@
     <string name="custom_accent_hint">ลากเพื่อเลือกสีใดก็ได้</string>
     <string name="custom_accent_reset">ค่าเริ่มต้น</string>
     <string name="playing_from_source">กำลังเล่นจาก %1$s</string>
+    <string name="offline_downloaded_title">ดาวน์โหลดแล้ว</string>
+    <string name="offline_downloaded_subtitle">ไม่มีการเชื่อมต่อ · เฉพาะที่มีอยู่ในเครื่องนี้</string>
+    <string name="offline_nothing_downloaded">ไม่มีการเชื่อมต่อและยังไม่ได้ดาวน์โหลดอะไรเลย เชื่อมต่อสักครั้งหรือบันทึกเพลย์ลิสต์ไว้ก่อน</string>
+    <string name="download_limit_message">มี %1$d เพลงที่นี่ จะเก็บไว้ในเครื่องกี่เพลง?</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">ทั้งหมด %1$d</string>
 </resources>

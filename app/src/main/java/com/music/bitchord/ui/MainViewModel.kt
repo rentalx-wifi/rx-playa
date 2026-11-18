@@ -65,6 +65,7 @@ import com.music.bitchord.data.model.AccountChannel
 import com.music.bitchord.data.model.BrowseType
 import com.music.bitchord.data.model.DetailPage
 import com.music.bitchord.data.model.HomeShelf
+import com.music.bitchord.data.model.ShelfLayout
 import com.music.bitchord.data.model.withoutRepeatsOf
 import com.music.bitchord.data.model.LibraryPage
 import com.music.bitchord.data.model.LibraryState
@@ -191,6 +192,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _homeRecentlyPlayedLoading = MutableStateFlow(false)
     val homeRecentlyPlayedLoading: StateFlow<Boolean> = _homeRecentlyPlayedLoading.asStateFlow()
     private val homeLoadGeneration = AtomicLong(0L)
+
+    /** Whether [home] on screen was built with no connection — see [loadOfflineHome]. */
+    private var homeBuiltOffline = false
 
     /**
      * Home's "Top Picks for You" row: null until built, empty if there was
@@ -1133,12 +1137,31 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         song: Song,
         onResult: (added: Int, alreadyThere: Int, failed: Int) -> Unit = { _, _, _ -> },
     ) {
-        if (!requireSignIn() || playlists.isEmpty()) return
+        if (playlists.isEmpty()) return
+        // Local playlists take the row whether or not there is a session; only
+        // the account's own lists need one.
+        val local = playlists.filter { it.playlistId.startsWith("sp_local_") || it.browseId.startsWith("local:playlist:") }
+        val remote = playlists - local.toSet()
+        var localAdded = 0
+        var localAlready = 0
+        local.forEach { playlist ->
+            val added = com.music.bitchord.data.spotify.LocalPlaylistStore
+                .addSongs(playlist.browseId, listOf(song))
+            if (added > 0) localAdded++ else localAlready++
+        }
+        if (remote.isEmpty()) {
+            onResult(localAdded, localAlready, 0)
+            return
+        }
+        if (!requireSignIn()) {
+            onResult(localAdded, localAlready, remote.size)
+            return
+        }
         viewModelScope.launch {
-            val outcomes = playlists.map { addOne(it, song) }
+            val outcomes = remote.map { addOne(it, song) }
             onResult(
-                outcomes.count { it == AddOutcome.ADDED },
-                outcomes.count { it == AddOutcome.ALREADY_THERE },
+                localAdded + outcomes.count { it == AddOutcome.ADDED },
+                localAlready + outcomes.count { it == AddOutcome.ALREADY_THERE },
                 outcomes.count { it == AddOutcome.FAILED },
             )
         }
@@ -1171,8 +1194,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * playlist the user has to add to again.
      */
     fun createPlaylist(title: String, privacy: PlaylistPrivacy, song: Song? = null) {
-        if (!requireSignIn()) return
         val name = title.trim().ifBlank { text(R.string.new_playlist) }
+        // Without an account a playlist is still a playlist. It lives on this
+        // device, holds whatever is dropped into it, and moves with a backup;
+        // requiring a YouTube session for a list of songs was the thing people
+        // kept asking not to need.
+        if (!_signedIn.value) {
+            val local = com.music.bitchord.data.spotify.LocalPlaylistStore
+                .savePlaylist(name, listOfNotNull(song))
+            editPlaylistShelf { items ->
+                listOf(
+                    ShelfItem(
+                        title = local.title,
+                        subtitle = if (local.songs.isEmpty()) "" else "${local.songs.size}",
+                        thumbnailUrl = local.songs.firstOrNull()?.thumbnailUrl,
+                        videoId = null,
+                        browseId = local.browseId,
+                    ),
+                ) + items.filterNot { it.browseId == local.browseId }
+            }
+            return
+        }
+        if (!requireSignIn()) return
         viewModelScope.launch {
             YtMusicRepository.createPlaylist(
                 title = name,
@@ -1462,6 +1505,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun deletePlaylist(playlist: UserPlaylist) {
+        // A local playlist is deleted here and now: sending it to YouTube would
+        // fail for a row that never existed there, and would leave the card on
+        // screen with no way to remove it.
+        if (playlist.playlistId.startsWith("sp_local_") ||
+            playlist.browseId.startsWith("local:playlist:")
+        ) {
+            com.music.bitchord.data.spotify.LocalPlaylistStore.deletePlaylist(playlist.playlistId)
+            editPlaylistShelf { items -> items.filterNot { it.browseId == playlist.browseId } }
+            return
+        }
         if (!requireSignIn()) return
         viewModelScope.launch {
             YtMusicRepository.deletePlaylist(playlist.playlistId).fold(
@@ -1602,6 +1655,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         startSuggestPipeline()
         startTypeaheadMediaPipeline()
         loadHome()
+        // A page built offline is the downloads and nothing else. The feed is
+        // fetched as soon as the connection comes back, without a tap, but only
+        // when the page on screen is that offline one.
+        viewModelScope.launch {
+            AppSettings.meteredConnection.drop(1).collect { metered ->
+                if (metered != null && homeBuiltOffline) loadHome()
+            }
+        }
         // Explore waits for its tab (see [onExploreShown]): its category list
         // and the dozen-odd artwork browses after it went out at launch with
         // Home's own requests, to the same host, for a page not yet opened.
@@ -1698,6 +1759,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Call when the home tab becomes visible. */
     fun onHomeShown() {
+        // Showing the tab is not a reason to fetch while there is nothing to
+        // fetch from, and the refresh below would put account shelves back on
+        // top of the offline page.
+        if (AudioCache.isOffline()) {
+            loadOfflineHome()
+            return
+        }
         personalizedHome.refresh()
         if (libraryStale && _signedIn.value) {
             libraryStale = false
@@ -1867,6 +1935,55 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         return true
     }
 
+    /**
+     * Home with no connection: the downloaded tracks, and nothing else.
+     *
+     * The personalised shelves are cleared with it — they are built from
+     * account data and would otherwise be merged back into the same page by
+     * [home], which is the one thing an offline listener must not see.
+     */
+    private fun loadOfflineHome() {
+        val generation = homeLoadGeneration.incrementAndGet()
+        homeBuiltOffline = true
+        homeContinuation = null
+        homeSeenTitles.clear()
+        _homeLoadingMore.value = false
+        _homeRecentlyPlayedLoading.value = false
+        _homePendingShelves.value = 0
+        _topPicks.value = null
+        _topPicksLoading.value = false
+        _personalizedHome.value = PersonalizedHomeState()
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            val songs = runCatching { Downloads.getDownloadedSongs(context) }.getOrDefault(emptyList())
+            if (generation != homeLoadGeneration.get()) return@launch
+            _home.value = if (songs.isEmpty()) {
+                UiState.Error(text(R.string.offline_nothing_downloaded))
+            } else {
+                UiState.Success(
+                    listOf(
+                        HomeShelf(
+                            title = text(R.string.offline_downloaded_title),
+                            subtitle = text(R.string.offline_downloaded_subtitle),
+                            layout = ShelfLayout.LIST,
+                            moreBrowseId = "local:downloads",
+                            items = songs.take(30).map { song ->
+                                ShelfItem(
+                                    title = song.title,
+                                    subtitle = song.artist,
+                                    thumbnailUrl = song.thumbnailUrl,
+                                    videoId = song.videoId,
+                                    browseId = null,
+                                    song = song,
+                                )
+                            },
+                        ),
+                    ),
+                )
+            }
+        }
+    }
+
     /** Tapping a tab should leave any pushed page behind. */
     fun clearDetail() {
         if (_detailStack.value.isNotEmpty()) _detailStack.value = emptyList()
@@ -1874,6 +1991,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun loadHome() {
+        // Offline the feed has nothing to say: every shelf on it comes from a
+        // service. What this device still has is the downloads, and they are
+        // the whole page — asking the network anyway would replace them with
+        // an error a second later.
+        if (AudioCache.isOffline()) {
+            loadOfflineHome()
+            return
+        }
+        homeBuiltOffline = false
         personalizedHome.refresh()
         val identity = listenerKey()
         val generation = homeLoadGeneration.incrementAndGet()
@@ -1986,6 +2112,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * next one. A no-op otherwise, and while one is building.
      */
     fun refreshTopPicksIfStale() {
+        if (AudioCache.isOffline()) return
         personalizedHome.refresh()
         if (_signedIn.value && _library.value !is UiState.Loading) loadLibrary()
         if (topPicksJob?.isActive == true) return

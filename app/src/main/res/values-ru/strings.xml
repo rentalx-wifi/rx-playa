@@ -1577,4 +1577,10 @@
     <string name="liquid_glass_title">Жидкое стекло</string>
     <string name="liquid_glass_subtitle">Преломляющее морозное стекло на барах, мини-плеере и верхней панели. На устройствах без нужных GPU-возможностей остаётся обычное размытие.</string>
     <string name="playing_from_source">Играет с %1$s</string>
+    <string name="offline_downloaded_title">Скачанное</string>
+    <string name="offline_downloaded_subtitle">Нет сети · только то, что уже на этом телефоне</string>
+    <string name="offline_nothing_downloaded">Нет сети, а скачанного пока нет. Подключись один раз или сохрани плейлист заранее.</string>
+    <string name="download_limit_message">Здесь %1$d треков. Сколько оставить на телефоне?</string>
+    <string name="download_limit_count">%1$d</string>
+    <string name="download_limit_all">Все %1$d</string>
 </resources>
