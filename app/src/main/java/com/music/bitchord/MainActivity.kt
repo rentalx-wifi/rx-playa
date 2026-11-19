@@ -196,6 +196,7 @@ import com.music.bitchord.ui.screens.EqualizerPresetPage
 import com.music.bitchord.ui.screens.SettingsChoicePage
 import com.music.bitchord.ui.components.SpotifyImportAlert
 import com.music.bitchord.ui.components.YandexPlaylistImportAlert
+import com.music.bitchord.ui.components.YouTubeMusicImportAlert
 import com.music.bitchord.ui.components.SoundCloudImportAlert
 import com.music.bitchord.ui.components.GoogleCookieImportAlert
 import com.music.bitchord.ui.components.VkPlaylistImportAlert
@@ -837,6 +838,7 @@ private fun BitChordApp(
     var creatingOfflinePlaylist by remember { mutableStateOf(false) }
     var showSpotifyImportDialog by remember { mutableStateOf(false) }
     var showYandexImportDialog by remember { mutableStateOf(false) }
+    var showYoutubeImportDialog by remember { mutableStateOf(false) }
     var showSoundCloudImportDialog by remember { mutableStateOf(false) }
     var showVkImportDialog by remember { mutableStateOf(false) }
     var showGoogleCookieImport by remember { mutableStateOf(false) }
@@ -3431,6 +3433,7 @@ private fun BitChordApp(
                                     showYandexMusicLogin = true
                                 },
                                 onImportYandexPlaylist = { showYandexImportDialog = true },
+                                onImportYoutubePlaylist = { showYoutubeImportDialog = true },
                                 guestProfile = guestProfile,
                                 onEditGuestProfile = { showGuestProfileEditor = true },
                                 onDeleteGuestProfile = {
@@ -5592,6 +5595,37 @@ private fun BitChordApp(
                     }
                 },
                 onDismiss = { showYandexImportDialog = false },
+            )
+        }
+
+        if (showYoutubeImportDialog) {
+            BackHandler { showYoutubeImportDialog = false }
+            YouTubeMusicImportAlert(
+                hazeState = hazeState,
+                signedIn = signedIn,
+                onImported = { title, privacy, songs ->
+                    // The rows already are YouTube videos, so this is a copy and
+                    // not a match: no "not found" list can come out of it.
+                    viewModel.createPlaylistWithVideoIds(
+                        title,
+                        privacy,
+                        songs.map { it.videoId },
+                        songs,
+                        source = HomeSource.YOUTUBE,
+                    ) { browseId, pTitle, savedLocally ->
+                        showQueueNotice(
+                            context.getString(
+                                if (savedLocally && signedIn) R.string.spotify_import_local_fallback
+                                else R.string.spotify_import_done,
+                                pTitle,
+                            ),
+                        )
+                        browseId?.let { id ->
+                            viewModel.openDetail(id, pTitle, "${songs.size} songs", songs.firstOrNull()?.thumbnailUrl)
+                        }
+                    }
+                },
+                onDismiss = { showYoutubeImportDialog = false },
             )
         }
 

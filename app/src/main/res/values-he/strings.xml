@@ -1556,4 +1556,19 @@
     <string name="download_limit_message">%1$d שירים כאן. כמה להשאיר במכשיר?</string>
     <string name="download_limit_count">%1$d</string>
     <string name="download_limit_all">הכול (%1$d)</string>
+    <string name="offline_search_empty">אין חיבור. אין התאמה לא בהורדות ולא במכשיר הזה.</string>
+    <string name="youtube_import_title">ייבוא מ-YouTube Music</string>
+    <string name="youtube_import_description">הדבק קישור לפלייליסט. השירים כבר מיוטיוב ולכן מגיעים כמו שהם.</string>
+    <string name="youtube_import_reading">קורא את הפלייליסט…</string>
+    <string name="youtube_import_invalid_link">זה לא קישור לפלייליסט של יוטיוב.</string>
+    <string name="youtube_import_button">ייבוא</string>
+    <plurals name="youtube_import_progress">
+        <item quantity="one">%1$d שיר עד כה</item>
+        <item quantity="two">%1$d שירים עד כה</item>
+        <item quantity="many">%1$d שירים עד כה</item>
+        <item quantity="other">%1$d שירים עד כה</item>
+    </plurals>
+    <string name="beta_updates">גרסאות בטא</string>
+    <string name="beta_updates_subtitle">קבל גרסאות ניסיון לפני השחרור היציב</string>
+    <string name="update_beta_note">גרסת ניסיון. משהו עלול להישבר.</string>
 </resources>

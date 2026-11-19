@@ -1508,4 +1508,16 @@
     <string name="download_limit_message">Burada %1$d parça var. Cihazda kaç tanesi kalsın?</string>
     <string name="download_limit_count">%1$d</string>
     <string name="download_limit_all">Tümü (%1$d)</string>
+    <string name="offline_search_empty">Bağlantı yok. Ne indirilenlerde ne de bu cihazda eşleşen bir şey var.</string>
+    <string name="youtube_import_title">YouTube Music\'ten taşı</string>
+    <string name="youtube_import_description">Bir çalma listesi bağlantısı yapıştır. Parçalar zaten YouTube\'dan, olduğu gibi geliyor.</string>
+    <string name="youtube_import_reading">Çalma listesi okunuyor…</string>
+    <string name="youtube_import_invalid_link">Bu bir YouTube çalma listesi bağlantısı değil.</string>
+    <string name="youtube_import_button">Taşı</string>
+    <plurals name="youtube_import_progress">
+        <item quantity="other">şu ana kadar %1$d parça</item>
+    </plurals>
+    <string name="beta_updates">Beta sürümler</string>
+    <string name="beta_updates_subtitle">Kararlı sürümden önce test sürümlerini al</string>
+    <string name="update_beta_note">Test sürümü. Bir şeyler bozulabilir.</string>
 </resources>

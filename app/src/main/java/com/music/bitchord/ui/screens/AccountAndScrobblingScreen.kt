@@ -69,6 +69,8 @@ fun AccountAndScrobblingScreen(
     onDisconnectVk: () -> Unit,
     onOpenYandexMusicLogin: () -> Unit,
     onImportYandexPlaylist: () -> Unit,
+    /** Copies a YouTube Music playlist by its link — needs no account. */
+    onImportYoutubePlaylist: () -> Unit,
     guestProfile: Boolean,
     onEditGuestProfile: () -> Unit,
     onDeleteGuestProfile: () -> Unit,
@@ -173,6 +175,15 @@ fun AccountAndScrobblingScreen(
                 title = stringResource(R.string.google_cookie_import_title),
                 subtitle = stringResource(R.string.google_cookie_import_subtitle),
                 onClick = onImportGoogleCookie,
+            )
+            // Works signed out too: a playlist link needs no account, which is
+            // exactly why it is here rather than under the account rows.
+            FullWidthDivider()
+            SettingsRow(
+                icon = SfIcons.Download,
+                title = stringResource(R.string.youtube_import_title),
+                subtitle = stringResource(R.string.youtube_import_description),
+                onClick = onImportYoutubePlaylist,
             )
         }
 

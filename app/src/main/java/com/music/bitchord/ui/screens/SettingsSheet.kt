@@ -159,6 +159,7 @@ import com.music.bitchord.ui.performance.resolvePerformanceRefreshRate
 import com.music.bitchord.ui.performance.supportedPerformanceRefreshRates
 import com.music.bitchord.data.model.Account
 import com.music.bitchord.data.LocalMediaRepository
+import com.music.bitchord.data.AppUpdateChecker
 import com.music.bitchord.data.NerdStats
 import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.listentogether.ListenTogether
@@ -1498,6 +1499,32 @@ fun SettingsScreen(
         // No footer: it only restated the stop-on-close row's own subtitle,
         // which sits four rows above it and says the same thing in fewer words.
         if (shows(SettingsCategory.MISCELLANEOUS)) SearchableSettingsGroup(search, header = stringResource(R.string.miscellaneous)) {
+            // Test builds are published as pre-releases and the stable checker
+            // never sees them; this is the switch that makes a phone look at
+            // them, and it re-checks at once so the effect is visible.
+            val betaUpdates by AppSettings.betaUpdates.collectAsStateWithLifecycle()
+            val updateScope = rememberCoroutineScope()
+            val betaUpdatesTitle = stringResource(R.string.beta_updates)
+            row(betaUpdatesTitle, "beta", "updates", "test") {
+                SettingsRow(
+                    icon = SfIcons.Download,
+                    title = betaUpdatesTitle,
+                    subtitle = stringResource(R.string.beta_updates_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = betaUpdates,
+                            onCheckedChange = { AppSettings.setBetaUpdates(it) },
+                        )
+                    },
+                    onClick = {
+                        val next = !betaUpdates
+                        AppSettings.setBetaUpdates(next)
+                        updateScope.launch {
+                            runCatching { AppUpdateChecker.check(context, force = true, beta = next) }
+                        }
+                    },
+                )
+            }
             val playNextOnSwipeTitle = stringResource(R.string.play_next_on_swipe)
             row(playNextOnSwipeTitle, "swipe", "queue") {
                 SettingsRow(

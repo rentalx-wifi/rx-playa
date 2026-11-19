@@ -1583,4 +1583,18 @@
     <string name="download_limit_message">Здесь %1$d треков. Сколько оставить на телефоне?</string>
     <string name="download_limit_count">%1$d</string>
     <string name="download_limit_all">Все %1$d</string>
+    <string name="offline_search_empty">Нет сети. Среди скачанного и файлов на телефоне ничего не нашлось.</string>
+    <string name="youtube_import_title">Перенести из YouTube Music</string>
+    <string name="youtube_import_description">Вставь ссылку на плейлист. Треки и так из YouTube, поэтому переносятся как есть.</string>
+    <string name="youtube_import_reading">Читаю плейлист…</string>
+    <string name="youtube_import_invalid_link">Это не ссылка на плейлист YouTube.</string>
+    <string name="youtube_import_button">Перенести</string>
+    <plurals name="youtube_import_progress">
+        <item quantity="one">%1$d трек</item>
+        <item quantity="few">%1$d трека</item>
+        <item quantity="many">%1$d треков</item>
+    </plurals>
+    <string name="beta_updates">Тестовые сборки</string>
+    <string name="beta_updates_subtitle">Получать тестовые сборки до стабильного релиза</string>
+    <string name="update_beta_note">Тестовая сборка. Что-то может сломаться.</string>
 </resources>

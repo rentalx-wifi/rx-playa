@@ -1591,4 +1591,18 @@
     <string name="download_limit_message">Tu jest %1$d utworów. Ile zostawić na urządzeniu?</string>
     <string name="download_limit_count">%1$d</string>
     <string name="download_limit_all">Wszystkie (%1$d)</string>
+    <string name="offline_search_empty">Brak połączenia. Nic nie pasuje, ani w pobranych, ani na tym urządzeniu.</string>
+    <string name="youtube_import_title">Przenieś z YouTube Music</string>
+    <string name="youtube_import_description">Wklej link do playlisty. Utwory są już z YouTube, więc wchodzą takie, jakie są.</string>
+    <string name="youtube_import_reading">Czytam playlistę…</string>
+    <string name="youtube_import_invalid_link">To nie jest link do playlisty YouTube.</string>
+    <string name="youtube_import_button">Przenieś</string>
+    <plurals name="youtube_import_progress">
+        <item quantity="one">%1$d utwór jak dotąd</item>
+        <item quantity="few">%1$d utwory jak dotąd</item>
+        <item quantity="many">%1$d utworów jak dotąd</item>
+    </plurals>
+    <string name="beta_updates">Wersje beta</string>
+    <string name="beta_updates_subtitle">Otrzymuj wersje testowe przed stabilnym wydaniem</string>
+    <string name="update_beta_note">Wersja testowa. Coś może się zepsuć.</string>
 </resources>

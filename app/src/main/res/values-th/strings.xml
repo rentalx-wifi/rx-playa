@@ -1534,4 +1534,16 @@
     <string name="download_limit_message">มี %1$d เพลงที่นี่ จะเก็บไว้ในเครื่องกี่เพลง?</string>
     <string name="download_limit_count">%1$d</string>
     <string name="download_limit_all">ทั้งหมด %1$d</string>
+    <string name="offline_search_empty">ไม่มีการเชื่อมต่อ ไม่พบสิ่งที่ตรงกันทั้งในไฟล์ที่ดาวน์โหลดและในเครื่องนี้</string>
+    <string name="youtube_import_title">ย้ายมาจาก YouTube Music</string>
+    <string name="youtube_import_description">วางลิงก์เพลย์ลิสต์ เพลงเป็นของ YouTube อยู่แล้ว จึงเข้ามาตามเดิม</string>
+    <string name="youtube_import_reading">กำลังอ่านเพลย์ลิสต์…</string>
+    <string name="youtube_import_invalid_link">นี่ไม่ใช่ลิงก์เพลย์ลิสต์ของ YouTube</string>
+    <string name="youtube_import_button">ย้ายมา</string>
+    <plurals name="youtube_import_progress">
+        <item quantity="other">ตอนนี้ %1$d เพลง</item>
+    </plurals>
+    <string name="beta_updates">รุ่นเบต้า</string>
+    <string name="beta_updates_subtitle">รับรุ่นทดสอบก่อนรุ่นเสถียร</string>
+    <string name="update_beta_note">รุ่นทดสอบ บางอย่างอาจพังได้</string>
 </resources>

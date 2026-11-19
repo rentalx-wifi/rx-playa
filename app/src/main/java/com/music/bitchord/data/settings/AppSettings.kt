@@ -261,6 +261,16 @@ object AppSettings {
     /** Whether the active network charges for data. `null` while offline. */
     val meteredConnection = MutableStateFlow<Boolean?>(null)
 
+    /**
+     * Follow the beta channel: test builds are published before the stable one
+     * and this is the switch that offers them.
+     *
+     * Off by default. A stable phone should never be handed a test build it
+     * did not ask for — the whole point of splitting the two is that only the
+     * people who opted in see the rough ones.
+     */
+    val betaUpdates = MutableStateFlow(false)
+
     // `losslessAudio` used to live here, behind a "Prefer lossless" switch on
     // the Sources screen. It is gone: sources are asked for their best and each
     // degrades on its own terms, so the switch's only real effect was to ask a
@@ -1012,6 +1022,7 @@ object AppSettings {
         wifiOnlyDownloads.value = prefs.getBoolean(KEY_WIFI_ONLY_DOWNLOADS, true)
         exportDownloads.value = prefs.getBoolean(KEY_EXPORT_DOWNLOADS, false)
         syncDownloadedPlaylists.value = prefs.getBoolean(KEY_SYNC_DOWNLOADED_PLAYLISTS, false)
+        betaUpdates.value = prefs.getBoolean(KEY_BETA_UPDATES, false)
         crossfadeSeconds.value = prefs.getInt(KEY_CROSSFADE, 0)
         smartFadeEnabled.value = prefs.getBoolean(KEY_SMART_FADE, false)
         automixPerformanceMode.value = runCatching {
@@ -1336,6 +1347,11 @@ object AppSettings {
     fun setWifiOnlyDownloads(value: Boolean) {
         wifiOnlyDownloads.value = value
         prefs.edit().putBoolean(KEY_WIFI_ONLY_DOWNLOADS, value).apply()
+    }
+
+    fun setBetaUpdates(value: Boolean) {
+        betaUpdates.value = value
+        prefs.edit().putBoolean(KEY_BETA_UPDATES, value).apply()
     }
 
     fun setCrossfadeSeconds(value: Int) {
@@ -2418,6 +2434,7 @@ object AppSettings {
     private const val KEY_UPGRADE_LENGTH_SLACK_SECONDS = "upgrade_length_slack_seconds"
     private const val KEY_QUALITY_DOWNLOAD = "audio_quality_download"
     private const val KEY_WIFI_ONLY_DOWNLOADS = "wifi_only_downloads"
+    private const val KEY_BETA_UPDATES = "beta_updates"
     private const val KEY_EXPORT_DOWNLOADS = "export_downloads"
     private const val KEY_SYNC_DOWNLOADED_PLAYLISTS = "sync_downloaded_playlists"
     private const val KEY_CROSSFADE = "crossfade_seconds"

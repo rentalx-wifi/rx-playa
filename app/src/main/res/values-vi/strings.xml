@@ -1468,4 +1468,16 @@
     <string name="download_limit_message">Có %1$d bài ở đây. Giữ lại bao nhiêu bài trên máy?</string>
     <string name="download_limit_count">%1$d</string>
     <string name="download_limit_all">Tất cả %1$d</string>
+    <string name="offline_search_empty">Không có kết nối. Không có kết quả nào trong mục đã tải lẫn trên máy này.</string>
+    <string name="youtube_import_title">Chuyển từ YouTube Music</string>
+    <string name="youtube_import_description">Dán liên kết danh sách phát. Các bài đã là của YouTube nên được chuyển nguyên trạng.</string>
+    <string name="youtube_import_reading">Đang đọc danh sách phát…</string>
+    <string name="youtube_import_invalid_link">Đây không phải liên kết danh sách phát YouTube.</string>
+    <string name="youtube_import_button">Chuyển</string>
+    <plurals name="youtube_import_progress">
+        <item quantity="other">%1$d bài tính đến giờ</item>
+    </plurals>
+    <string name="beta_updates">Bản beta</string>
+    <string name="beta_updates_subtitle">Nhận bản thử trước bản ổn định</string>
+    <string name="update_beta_note">Bản thử. Có thể có thứ bị lỗi.</string>
 </resources>

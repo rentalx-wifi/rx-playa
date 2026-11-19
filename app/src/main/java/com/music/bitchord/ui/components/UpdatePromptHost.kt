@@ -38,6 +38,7 @@ fun UpdatePromptHost(
         UpdateAvailableDialog(
             version = info.version,
             notes = info.notes,
+            beta = info.isBeta,
             hazeState = hazeState,
             onDismiss = { AppUpdateChecker.dismiss() },
             // A release with no APK attached has nothing to stream: send the

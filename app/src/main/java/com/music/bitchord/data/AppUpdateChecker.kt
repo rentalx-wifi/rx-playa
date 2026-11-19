@@ -7,10 +7,12 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.music.bitchord.BuildConfig
+import com.music.bitchord.data.settings.AppSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import okhttp3.Request
 import java.io.File
@@ -33,6 +35,8 @@ object AppUpdateChecker {
         val apkUrl: String?,
         /** The release's own Markdown body, shown as this update's "what's new". */
         val notes: String?,
+        /** A test build off the beta channel, marked as such in the prompt. */
+        val isBeta: Boolean = false,
     )
 
     private const val CACHE_SUBDIR = "updates"
@@ -55,9 +59,19 @@ object AppUpdateChecker {
     @Volatile
     private var downloadCancelled = false
 
-    /** The repository this fork publishes to; nothing upstream is ever fetched. */
-    private const val RELEASES_API =
+    /**
+     * The two channels.
+     *
+     * Stable reads GitHub's `latest`, which by GitHub's own rule never points
+     * at a pre-release. Beta reads the release list instead, newest first, so
+     * a test build is visible while it is still a pre-release and the stable
+     * one replaces it the moment it is published.
+     */
+    private const val RELEASES_LATEST =
         "https://api.github.com/repos/rentalx-wifi/rx-playa/releases/latest"
+
+    private const val RELEASES_ALL =
+        "https://api.github.com/repos/rentalx-wifi/rx-playa/releases?per_page=20"
 
     /**
      * Asks GitHub for the latest release of this fork and offers it when its
@@ -66,7 +80,11 @@ object AppUpdateChecker {
      * Nothing here is fatal: a phone with no network, a rate-limited API or a
      * repository that has no release yet simply leaves no update on offer.
      */
-    suspend fun check(context: Context? = null, force: Boolean = false) {
+    suspend fun check(
+        context: Context? = null,
+        force: Boolean = false,
+        beta: Boolean = AppSettings.betaUpdates.value,
+    ) {
         context?.let { app ->
             prefs = app.getSharedPreferences("bitchord_settings", Context.MODE_PRIVATE)
             dismissedTag = prefs?.getString(KEY_DISMISSED_UPDATE, null)
@@ -80,7 +98,7 @@ object AppUpdateChecker {
         val json = runCatching {
             withContext(Dispatchers.IO) {
                 val request = Request.Builder()
-                    .url(RELEASES_API)
+                    .url(if (beta) RELEASES_ALL else RELEASES_LATEST)
                     .header("Accept", "application/vnd.github+json")
                     .build()
                 Http.client.newCall(request).execute().use { response ->
@@ -89,14 +107,32 @@ object AppUpdateChecker {
             }
         }.getOrNull() ?: return
 
-        val release = runCatching { JSONObject(json) }.getOrNull() ?: return
+        val release = runCatching {
+            if (beta) {
+                val list = JSONArray(json)
+                (0 until list.length())
+                    .mapNotNull { list.optJSONObject(it) }
+                    .firstOrNull { !it.optBoolean("draft", false) }
+            } else {
+                JSONObject(json)
+            }
+        }.getOrNull() ?: return
         // Only a successful answer counts as a check. Recording the attempt made
         // a launch without a connection look like an up-to-date phone, and the
         // next attempt was an hour away.
         prefs?.edit()?.putLong(KEY_LAST_CHECK, now)?.apply()
         val tag = release.optString("tag_name").ifBlank { return }
         if (tag == dismissedTag) return
-        if (versionOrdinal(tag) <= versionOrdinal(BuildConfig.VERSION_NAME)) return
+        // A release may state the versionCode it was built with, which is the
+        // only number that decides whether Android will install it. Two betas
+        // of one feature share an ordinal (v46b1, v46b2), so the tag alone is
+        // not enough to tell them apart.
+        val publishedCode = versionCodeIn(release.optString("body"))
+        if (publishedCode != null) {
+            if (publishedCode <= BuildConfig.VERSION_CODE) return
+        } else if (versionOrdinal(tag) <= versionOrdinal(BuildConfig.VERSION_NAME)) {
+            return
+        }
 
         val assets = release.optJSONArray("assets")
         // More than one APK can hang off a release, and installing the wrong one
@@ -123,6 +159,7 @@ object AppUpdateChecker {
             releaseUrl = release.optString("html_url"),
             apkUrl = apkUrl,
             notes = release.optString("body").takeIf { it.isNotBlank() },
+            isBeta = release.optBoolean("prerelease", false),
         )
     }
 
@@ -169,6 +206,17 @@ object AppUpdateChecker {
      */
     private fun versionOrdinal(name: String): Int =
         Regex("""v?(\d+)\s*$""").find(name.trim())?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+
+    /**
+     * The versionCode a release states in its notes, when it states one.
+     *
+     * Published as `versionCode: 80` in the body: readable by whoever opens
+     * the release page, and the one number the updater can compare without
+     * trusting a tag naming scheme.
+     */
+    private fun versionCodeIn(body: String): Int? =
+        Regex("""versionCode\s*:\s*(\d+)""", RegexOption.IGNORE_CASE)
+            .find(body)?.groupValues?.getOrNull(1)?.toIntOrNull()
 
     /**
      * Wipes any APK left over from a previous run. Called once at cold start

@@ -1552,4 +1552,17 @@
     <string name="download_limit_message">%1$d titres ici. Combien veux-tu garder sur l\'appareil ?</string>
     <string name="download_limit_count">%1$d</string>
     <string name="download_limit_all">Tout (%1$d)</string>
+    <string name="offline_search_empty">Pas de connexion. Rien ne correspond, ni dans les téléchargements ni sur cet appareil.</string>
+    <string name="youtube_import_title">Importer depuis YouTube Music</string>
+    <string name="youtube_import_description">Colle le lien d\'une playlist. Les titres viennent déjà de YouTube et arrivent tels quels.</string>
+    <string name="youtube_import_reading">Lecture de la playlist…</string>
+    <string name="youtube_import_invalid_link">Ce n\'est pas un lien de playlist YouTube.</string>
+    <string name="youtube_import_button">Importer</string>
+    <plurals name="youtube_import_progress">
+        <item quantity="one">%1$d titre pour l\'instant</item>
+        <item quantity="other">%1$d titres pour l\'instant</item>
+    </plurals>
+    <string name="beta_updates">Versions bêta</string>
+    <string name="beta_updates_subtitle">Recevoir les versions de test avant la version stable</string>
+    <string name="update_beta_note">Version de test. Quelque chose peut casser.</string>
 </resources>

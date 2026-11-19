@@ -90,6 +90,8 @@ fun UpdateAvailableDialog(
     onInstall: () -> Unit,
     onOpenReleasePage: () -> Unit,
     modifier: Modifier = Modifier,
+    /** A test build off the beta channel — said plainly, not hidden in the tag. */
+    beta: Boolean = false,
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val state by AppUpdateChecker.download.collectAsStateWithLifecycle()
@@ -166,6 +168,15 @@ fun UpdateAvailableDialog(
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
                 )
+                if (beta) {
+                    Text(
+                        text = stringResource(R.string.update_beta_note),
+                        modifier = Modifier.padding(top = 6.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 16.sp),
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                    )
+                }
 
                 // The download's progress, drawn as a thin fill across a
                 // hairline track — same weight as [AlertRule], so it reads as

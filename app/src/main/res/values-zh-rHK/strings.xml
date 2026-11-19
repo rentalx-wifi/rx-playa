@@ -1521,4 +1521,16 @@
     <string name="download_limit_message">這裡有 %1$d 首。要在裝置上保留幾首？</string>
     <string name="download_limit_count">%1$d</string>
     <string name="download_limit_all">全部 %1$d</string>
+    <string name="offline_search_empty">沒有網路。已下載內容和本機檔案裡都沒有符合的項目。</string>
+    <string name="youtube_import_title">從 YouTube Music 遷移</string>
+    <string name="youtube_import_description">貼上播放清單連結。曲目本來就是 YouTube 的，會原樣遷入。</string>
+    <string name="youtube_import_reading">正在讀取播放清單…</string>
+    <string name="youtube_import_invalid_link">這不是 YouTube 播放清單連結。</string>
+    <string name="youtube_import_button">遷移</string>
+    <plurals name="youtube_import_progress">
+        <item quantity="other">已讀取 %1$d 首</item>
+    </plurals>
+    <string name="beta_updates">測試版</string>
+    <string name="beta_updates_subtitle">在穩定版之前取得測試版本</string>
+    <string name="update_beta_note">測試版本，可能會有問題。</string>
 </resources>

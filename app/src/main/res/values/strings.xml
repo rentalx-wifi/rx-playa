@@ -1420,4 +1420,18 @@
     <string name="download_limit_message">%1$d tracks here. How many do you want on this device?</string>
     <string name="download_limit_count">%1$d</string>
     <string name="download_limit_all">All %1$d</string>
+    <string name="offline_search_empty">No connection. Nothing in the downloads or on this device matches.</string>
+    <string name="youtube_import_title">Move from YouTube Music</string>
+    <string name="youtube_import_description">Paste a playlist link. The tracks are already YouTube\'s, so they come over as they are.</string>
+    <string name="youtube_import_link_hint" translatable="false">https://music.youtube.com/playlist?list=…</string>
+    <string name="youtube_import_reading">Reading the playlist…</string>
+    <string name="youtube_import_invalid_link">That is not a YouTube playlist link.</string>
+    <string name="youtube_import_button">Move it</string>
+    <plurals name="youtube_import_progress">
+        <item quantity="one">%1$d track so far</item>
+        <item quantity="other">%1$d tracks so far</item>
+    </plurals>
+    <string name="beta_updates">Beta builds</string>
+    <string name="beta_updates_subtitle">Get test builds before the stable release</string>
+    <string name="update_beta_note">Test build. Things may break.</string>
 </resources>

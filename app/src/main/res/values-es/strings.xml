@@ -1523,4 +1523,17 @@
     <string name="download_limit_message">%1$d canciones aquí. ¿Cuántas quieres dejar en el dispositivo?</string>
     <string name="download_limit_count">%1$d</string>
     <string name="download_limit_all">Todas (%1$d)</string>
+    <string name="offline_search_empty">Sin conexión. No hay coincidencias ni en las descargas ni en este dispositivo.</string>
+    <string name="youtube_import_title">Traer desde YouTube Music</string>
+    <string name="youtube_import_description">Pega el enlace de una lista. Las canciones ya son de YouTube, así que vienen tal cual.</string>
+    <string name="youtube_import_reading">Leyendo la lista…</string>
+    <string name="youtube_import_invalid_link">Ese no es un enlace de lista de YouTube.</string>
+    <string name="youtube_import_button">Traerla</string>
+    <plurals name="youtube_import_progress">
+        <item quantity="one">%1$d canción hasta ahora</item>
+        <item quantity="other">%1$d canciones hasta ahora</item>
+    </plurals>
+    <string name="beta_updates">Compilaciones beta</string>
+    <string name="beta_updates_subtitle">Recibe versiones de prueba antes del lanzamiento estable</string>
+    <string name="update_beta_note">Versión de prueba. Algo puede fallar.</string>
 </resources>

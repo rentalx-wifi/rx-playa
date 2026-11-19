@@ -2599,6 +2599,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun submitSearch() {
         val q = _query.value.trim()
         if (q.isEmpty() || _searchSource.value == SearchSource.LIBRARY) return
+        // No connection: the catalogue cannot answer, so the same box answers
+        // from the downloads and the device library instead of spinning and
+        // then failing.
+        if (AudioCache.isOffline()) {
+            runOfflineSearch(q)
+            return
+        }
         searchSubmitted = true
         _suggestions.value = emptyList()
         _typeaheadResults.value = emptyList()
@@ -2611,6 +2618,52 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             SearchSource.VK -> runPlatformSearch(q)
             SearchSource.YOUTUBE -> runSearch(anonymous = false)
             SearchSource.LIBRARY -> Unit
+        }
+    }
+
+    /**
+     * The search that works with no connection: downloads first, then the
+     * files on the device.
+     *
+     * Both are read here rather than cached, because either can have changed
+     * since the last search — a track finished downloading while the field was
+     * open. The source chips move to YouTube, which is the list these rows are
+     * drawn in; leaving the source on a platform that cannot answer would show
+     * an empty page next to the results.
+     */
+    private fun runOfflineSearch(query: String) {
+        searchSubmitted = true
+        _suggestions.value = emptyList()
+        _typeaheadResults.value = emptyList()
+        _addonResults.value = null
+        _platformResults.value = null
+        cancelPlatformSearch()
+        cancelAddonSearch()
+        if (_searchSource.value != SearchSource.YOUTUBE) _searchSource.value = SearchSource.YOUTUBE
+        _searchScrollReset.value += 1
+        _results.value = UiState.Loading
+        val tokens = query.lowercase(Locale.ROOT).split(' ').filter { it.isNotBlank() }
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            val downloaded = runCatching { Downloads.getDownloadedSongs(context) }
+                .getOrDefault(emptyList())
+            val device = if (LocalMediaRepository.hasStoragePermission(context)) {
+                runCatching { LocalMediaRepository.getLocalMusic(context) }.getOrDefault(emptyList())
+            } else {
+                emptyList()
+            }
+            val found = (downloaded + device)
+                .distinctBy { it.videoId }
+                .filter { song ->
+                    val haystack = "${song.title} ${song.artist}".lowercase(Locale.ROOT)
+                    tokens.all { it in haystack }
+                }
+            if (_query.value.trim() != query) return@launch
+            _results.value = if (found.isEmpty()) {
+                UiState.Error(text(R.string.offline_search_empty))
+            } else {
+                UiState.Success(found.map { SearchResult.Track(it) })
+            }
         }
     }
 
@@ -3014,6 +3067,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun startSearchPipeline() = viewModelScope.launch {
         searchRequests
             .collectLatest { request ->
+                // Offline the answer is built locally by [runOfflineSearch]; a
+                // request here would only overwrite it with an error.
+                if (AudioCache.isOffline()) return@collectLatest
                 val key = cacheKey(request.query, request.filter)
                 // Something to look at immediately: the exact answer if this
                 // query has been run before, otherwise the closest earlier
@@ -3104,6 +3160,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         suggestRequests
             .debounce(SUGGEST_DEBOUNCE_MS)
             .collectLatest { input ->
+                if (AudioCache.isOffline()) return@collectLatest
                 if (!stillWanted(input)) return@collectLatest
                 val fetched = YtMusicRepository.searchSuggestions(input).getOrNull()
                     ?: return@collectLatest
@@ -3124,6 +3181,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         suggestRequests
             .debounce(TYPEAHEAD_MEDIA_DEBOUNCE_MS)
             .collectLatest { input ->
+                if (AudioCache.isOffline()) return@collectLatest
                 if (input.isBlank()) {
                     _typeaheadResults.value = emptyList()
                     return@collectLatest
@@ -4452,6 +4510,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun Throwable.friendly(): String = when {
+        // Every page that fails while there is no connection fails this way,
+        // whatever the socket happened to call it. Saying so once here beats
+        // matching on the wording of a dozen different network errors.
+        AudioCache.isOffline() -> text(R.string.no_internet_connection)
         message?.contains("resolve host", true) == true ||
             message?.contains("Unable to resolve", true) == true -> text(R.string.no_internet_connection)
         message?.contains("401") == true || message?.contains("403") == true ->

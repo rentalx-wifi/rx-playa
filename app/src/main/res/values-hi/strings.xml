@@ -1551,4 +1551,17 @@
     <string name="download_limit_message">यहाँ %1$d ट्रैक हैं। डिवाइस पर कितने रखें?</string>
     <string name="download_limit_count">%1$d</string>
     <string name="download_limit_all">सभी %1$d</string>
+    <string name="offline_search_empty">कनेक्शन नहीं। न डाउनलोड में और न इस डिवाइस पर कुछ मेल नहीं खाता।</string>
+    <string name="youtube_import_title">YouTube Music से लाएँ</string>
+    <string name="youtube_import_description">प्लेलिस्ट का लिंक चिपकाएँ। ट्रैक पहले से YouTube के हैं, इसलिए जैसे हैं वैसे आ जाएँगे।</string>
+    <string name="youtube_import_reading">प्लेलिस्ट पढ़ी जा रही है…</string>
+    <string name="youtube_import_invalid_link">यह YouTube प्लेलिस्ट का लिंक नहीं है।</string>
+    <string name="youtube_import_button">लाएँ</string>
+    <plurals name="youtube_import_progress">
+        <item quantity="one">अब तक %1$d ट्रैक</item>
+        <item quantity="other">अब तक %1$d ट्रैक</item>
+    </plurals>
+    <string name="beta_updates">बीटा बिल्ड</string>
+    <string name="beta_updates_subtitle">स्थिर रिलीज़ से पहले टेस्ट बिल्ड पाएँ</string>
+    <string name="update_beta_note">टेस्ट बिल्ड। कुछ टूट सकता है।</string>
 </resources>

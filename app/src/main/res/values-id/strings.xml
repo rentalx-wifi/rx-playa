@@ -1528,4 +1528,16 @@
     <string name="download_limit_message">Ada %1$d lagu di sini. Berapa yang mau disimpan di perangkat?</string>
     <string name="download_limit_count">%1$d</string>
     <string name="download_limit_all">Semua %1$d</string>
+    <string name="offline_search_empty">Tidak ada koneksi. Tidak ada yang cocok, baik di unduhan maupun di perangkat ini.</string>
+    <string name="youtube_import_title">Impor dari YouTube Music</string>
+    <string name="youtube_import_description">Tempel tautan playlist. Lagunya sudah dari YouTube, jadi masuk apa adanya.</string>
+    <string name="youtube_import_reading">Membaca playlist…</string>
+    <string name="youtube_import_invalid_link">Itu bukan tautan playlist YouTube.</string>
+    <string name="youtube_import_button">Impor</string>
+    <plurals name="youtube_import_progress">
+        <item quantity="other">%1$d lagu sejauh ini</item>
+    </plurals>
+    <string name="beta_updates">Build beta</string>
+    <string name="beta_updates_subtitle">Dapatkan build uji sebelum rilis stabil</string>
+    <string name="update_beta_note">Build uji. Bisa ada yang rusak.</string>
 </resources>

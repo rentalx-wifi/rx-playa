@@ -1551,4 +1551,17 @@
     <string name="download_limit_message">%1$d Titel hier. Wie viele sollen auf dem Gerät bleiben?</string>
     <string name="download_limit_count">%1$d</string>
     <string name="download_limit_all">Alle %1$d</string>
+    <string name="offline_search_empty">Keine Verbindung. Weder in den Downloads noch auf diesem Gerät passt etwas.</string>
+    <string name="youtube_import_title">Aus YouTube Music übernehmen</string>
+    <string name="youtube_import_description">Füge einen Playlist-Link ein. Die Titel sind schon von YouTube und kommen unverändert mit.</string>
+    <string name="youtube_import_reading">Playlist wird gelesen…</string>
+    <string name="youtube_import_invalid_link">Das ist kein YouTube-Playlist-Link.</string>
+    <string name="youtube_import_button">Übernehmen</string>
+    <plurals name="youtube_import_progress">
+        <item quantity="one">%1$d Titel bisher</item>
+        <item quantity="other">%1$d Titel bisher</item>
+    </plurals>
+    <string name="beta_updates">Beta-Builds</string>
+    <string name="beta_updates_subtitle">Testversionen vor der stabilen Veröffentlichung</string>
+    <string name="update_beta_note">Testversion. Es kann kaputtgehen.</string>
 </resources>
