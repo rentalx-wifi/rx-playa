@@ -128,6 +128,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import kotlin.math.PI
 import kotlin.math.exp
+import kotlin.math.pow
 import kotlin.math.sin
 import com.music.bitchord.ui.rememberIsForeground
 
@@ -206,11 +207,17 @@ private fun SpotifyHomeHeader(
 /** How tall the station's plate is. */
 private val WAVE_PLATE_HEIGHT = 92.dp
 
-/** Layers of contour drawn across the plate. Four reads as depth. */
-private const val WAVE_CONTOURS = 4
+/** Layers of contour drawn across the plate. Three reads as depth. */
+private const val WAVE_CONTOURS = 3
 
 /** Segments per contour. More than this is invisible at any phone's width. */
-private const val WAVE_SEGMENTS = 40
+private const val WAVE_SEGMENTS = 44
+
+/** One full turn, for phase that is kept in radians. */
+private val TWO_PI = 2f * PI.toFloat()
+
+/** Radians a second the field drifts at with nothing playing. */
+private const val IDLE_SPEED = 0.6f
 
 /**
  * The station's plate: the one surface on the feed that moves to the music.
@@ -250,7 +257,6 @@ private fun RxWavePill(
     // read only in the draw block below.
     val phase = remember { mutableFloatStateOf(0f) }
     val beat = remember { mutableFloatStateOf(0f) }
-    val hit = remember { mutableFloatStateOf(0f) }
     val scheme = MaterialTheme.colorScheme
     val ink = scheme.onPrimary
     // Strokes are made once: a Stroke is an object, and building eight of them
@@ -282,26 +288,22 @@ private fun RxWavePill(
                 last = now
                 val raw = if (isPlaying) energy().coerceIn(0f, 1f) else 0f
                 val current = beat.floatValue
-                // A 20 ms attack and a quarter-second release: the kick is
-                // immediate, the tail is not a flicker. Both in seconds, so the
-                // feel does not change with the frame rate.
+                // Asymmetric on purpose: the kick is on the plate almost the
+                // frame it happens (~7 ms attack), and lets go in a sixth of a
+                // second. One shared lerp in both directions is exactly what
+                // reads as "late" — the rise crawls while the fall hangs.
                 beat.floatValue = if (raw > current) {
-                    current + (raw - current) * (1f - exp(-dt * 52f))
+                    current + (raw - current) * (1f - exp(-dt * 140f))
                 } else {
-                    current * exp(-dt * 4.2f)
+                    current * exp(-dt * 8f)
                 }
-                // A flash only when the bass actually *arrives*; a sustained
-                // loud passage must not keep the glow pinned.
-                val rise = raw - current
-                hit.floatValue = if (rise > 0.04f) {
-                    (hit.floatValue + rise * 1.7f).coerceAtMost(1f)
-                } else {
-                    hit.floatValue * exp(-dt * 6.5f)
-                }
-                // Idle drifts; a kick sends the field travelling much faster.
+                // Phase is accumulated from dt and only ever added to. It is
+                // never time * speed: a speed that changed with the bass did
+                // exactly that, and every drop in the music made the waves jump
+                // backwards.
                 phase.floatValue = (
-                    phase.floatValue + dt * (0.055f + 0.62f * beat.floatValue + 0.3f * hit.floatValue)
-                    ) % 1f
+                    phase.floatValue + dt * (IDLE_SPEED + 4.2f * beat.floatValue)
+                    ) % TWO_PI
             }
         }
     }
@@ -328,41 +330,51 @@ private fun RxWavePill(
             drawRect(brush = sheen)
 
             val b = beat.floatValue
-            val h = hit.floatValue
             val p = phase.floatValue
             val height = size.height
             val width = size.width
-            // A hit lifts the whole field a little as well as widening it.
-            val surge = 1f + 0.3f * h
             repeat(WAVE_CONTOURS) { layer ->
                 val depth = layer / (WAVE_CONTOURS - 1f)
-                val baseline = height * (0.60f + 0.10f * layer)
-                val amplitude = height * (0.045f + 0.10f * (1f - depth)) *
-                    (0.5f + 1.45f * b) * surge
+                val baseline = height * (0.62f + 0.12f * layer)
+                // The bass drives the amplitude continuously — no threshold, no
+                // per-bin value, so there is nothing to flicker between two
+                // states. Quiet tracks keep about a third of the height.
+                val amplitude = height * (0.085f - 0.018f * depth) * (0.35f + 1.3f * b)
                 // Neighbouring layers travel opposite ways, which is what makes
                 // the field read as layered energy rather than as one sine.
-                val travel = if (layer % 2 == 0) p else -p
+                val direction = if (layer % 2 == 0) 1f else -1f
                 path.reset()
                 var i = 0
                 while (i <= WAVE_SEGMENTS) {
                     val t = i / WAVE_SEGMENTS.toFloat()
                     val x = width * t
-                    // A long swell and a short chop on top of it.
-                    val swell = sin(t * 2f * PI.toFloat() * 1.15f + travel * 2f * PI.toFloat() * 2f + layer * 0.9f)
-                    val chop = sin(t * 2f * PI.toFloat() * 2.7f - travel * 2f * PI.toFloat() * 3.4f + layer * 1.7f) * 0.32f
-                    val y = baseline + (swell + chop) * amplitude
+                    // Both temporal multiples are whole turns: two forward and
+                    // three back. A fractional one (3.4) is a jump of -0.4 of a
+                    // turn every time the wrapped phase comes round, which is
+                    // the other half of why the waves used to twitch.
+                    val swell = sin(
+                        t * TWO_PI * 1.15f + direction * p * 2f + layer * 0.9f,
+                    )
+                    val chop = sin(
+                        t * TWO_PI * 2.7f - direction * p * 3f + layer * 1.7f,
+                    ) * 0.28f
+                    // Tapered to nothing at both edges, so the field grows out
+                    // of the plate instead of being cut off by it.
+                    val edge = sin(PI.toFloat() * t).pow(0.7f)
+                    val y = baseline + (swell + chop) * amplitude * edge
                     if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
                     i++
                 }
-                // Bloom, then the line itself.
+                // Bloom, then the line itself. Both follow the same continuous
+                // level, so a beat brightens the plate without a flash on/off.
                 drawPath(
                     path = path,
-                    color = ink.copy(alpha = 0.05f + 0.11f * h),
+                    color = ink.copy(alpha = 0.05f + 0.16f * b),
                     style = glowStroke,
                 )
                 drawPath(
                     path = path,
-                    color = ink.copy(alpha = 0.26f + 0.30f * h - depth * 0.06f),
+                    color = ink.copy(alpha = 0.26f + 0.34f * b - depth * 0.06f),
                     style = coreStrokes[layer],
                 )
             }
