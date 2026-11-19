@@ -64,6 +64,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.BlendMode
 import com.music.bitchord.ui.components.libraryGrid
+import com.music.bitchord.ui.components.feedItem
 import com.music.bitchord.ui.components.MOTION_FRAME_GAP_MS
 import com.music.bitchord.ui.components.LIBRARY_GRID_SPACING
 import androidx.compose.foundation.lazy.grid.items as gridItems
@@ -197,7 +198,7 @@ internal fun TopPicksShelf(
 /** Stands in for the row while it is being built, at the same size, so the feed doesn't jump. */
 fun LazyListScope.topPicksSkeleton() {
     item(key = "skeleton:top-picks") {
-        Column(Modifier.padding(bottom = 26.dp)) {
+        Column(feedItem().padding(bottom = 26.dp)) {
             SectionHeaderSkeleton()
             BoxWithConstraints {
                 val cardWidth = topPickWidth(maxWidth)

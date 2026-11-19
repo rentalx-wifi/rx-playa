@@ -112,6 +112,7 @@ import com.music.bitchord.ui.theme.LocalMaterial3StyleEnabled
 import com.music.bitchord.ui.components.SignInBanner
 import com.music.bitchord.ui.components.feedMoreSkeleton
 import com.music.bitchord.ui.components.feedSkeleton
+import com.music.bitchord.ui.components.feedItem
 import com.music.bitchord.ui.components.recentlyPlayedSkeleton
 import com.music.bitchord.ui.components.heroCardWidth
 import com.music.bitchord.ui.components.thumbnailBorder
@@ -203,32 +204,33 @@ private fun SpotifyHomeHeader(
 }
 
 /** How tall the station's plate is. */
-private val WAVE_PLATE_HEIGHT = 88.dp
+private val WAVE_PLATE_HEIGHT = 92.dp
 
-/** Layers of contour drawn across the plate. Three is what reads as depth. */
-private const val WAVE_CONTOURS = 3
+/** Layers of contour drawn across the plate. Four reads as depth. */
+private const val WAVE_CONTOURS = 4
 
 /** Segments per contour. More than this is invisible at any phone's width. */
-private const val WAVE_SEGMENTS = 34
+private const val WAVE_SEGMENTS = 40
 
 /**
  * The station's plate: the one surface on the feed that moves to the music.
  *
- * Drawn rather than assembled out of views. Everything that changes per frame
- * lives in two places — the contours in one [Canvas] draw block, the elastic
- * scale in one `graphicsLayer` block — and both read [phase]/[beat] *inside*
- * those blocks, where a state read invalidates the draw or the layer rather
- * than the composable. That is what keeps a 60 fps plate off the recomposition
- * path: nothing recomposes while it breathes, and a frame costs one gradient,
- * three strokes of [WAVE_SEGMENTS] segments and one layer update.
+ * The plate itself is fixed on purpose — an earlier version swelled as a whole
+ * on every kick, and a card that changes size under the thumb reads as a layout
+ * glitch rather than as energy. What moves is the contour field inside it, and
+ * the glow around the strokes.
  *
- * No blur, no shadow, no filter anywhere on it: those are the per-frame costs
- * that put a weak phone on its knees.
+ * Drawn from one [Canvas]: nothing that changes per frame leaves the draw
+ * phase, so a frame costs four short sine contours, eight strokes and no
+ * recomposition. Nothing here is a blur, a shadow or a filter — those are the
+ * per-frame costs that put a weak phone on its knees. The bloom is the old
+ * trick of a wide faint stroke under a thin bright one.
  *
  * [energy] is the bass the listener is hearing, read off the audio thread on
- * this frame — see `AudioEnergy` — so the plate follows the kick of the track
- * rather than a timer pretending to. With nothing playing it falls back to a
- * slow breathing of its own, and with reduced motion it does not move at all.
+ * this frame — see `AudioEnergy`. The envelope is applied here, in seconds
+ * rather than frames, so a phone that drops to 30 fps keeps the same attack
+ * instead of drawing half as much of it. With nothing playing the field drifts
+ * slowly; with reduced motion it does not move at all.
  *
  * The loop stops when the app is not on screen ([rememberIsForeground]) or the
  * plate is not composed at all — scrolled out of the feed, its item is disposed.
@@ -245,11 +247,27 @@ private fun RxWavePill(
     val reduceMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
     val foreground = rememberIsForeground()
     // Float states rather than an Animatable: these are written once a frame and
-    // read only by the draw and layer blocks below.
+    // read only in the draw block below.
     val phase = remember { mutableFloatStateOf(0f) }
     val beat = remember { mutableFloatStateOf(0f) }
+    val hit = remember { mutableFloatStateOf(0f) }
     val scheme = MaterialTheme.colorScheme
     val ink = scheme.onPrimary
+    // Strokes are made once: a Stroke is an object, and building eight of them
+    // every frame is garbage for no reason.
+    val density = LocalDensity.current
+    val glowStroke = remember(density) {
+        Stroke(with(density) { 7.dp.toPx() }, cap = StrokeCap.Round)
+    }
+    val coreStrokes = remember(density) {
+        List(WAVE_CONTOURS) { layer ->
+            Stroke(with(density) { (2.3f - layer * 0.3f).dp.toPx() }, cap = StrokeCap.Round)
+        }
+    }
+    val path = remember { Path() }
+    val sheen = remember(ink) {
+        Brush.verticalGradient(listOf(ink.copy(alpha = 0.14f), Color.Transparent))
+    }
 
     LaunchedEffect(reduceMotion, foreground, isPlaying) {
         if (reduceMotion || !foreground) return@LaunchedEffect
@@ -257,22 +275,33 @@ private fun RxWavePill(
         while (true) {
             withFrameNanos { now ->
                 val dt = if (last == 0L) {
-                    0.016f
+                    1f / 60f
                 } else {
                     ((now - last) / 1_000_000_000f).coerceIn(0f, 0.05f)
                 }
                 last = now
                 val raw = if (isPlaying) energy().coerceIn(0f, 1f) else 0f
                 val current = beat.floatValue
-                // Fast attack, slow release: a beat that arrives is immediate,
-                // one that has gone fades — the envelope a moving coil has.
+                // A 20 ms attack and a quarter-second release: the kick is
+                // immediate, the tail is not a flicker. Both in seconds, so the
+                // feel does not change with the frame rate.
                 beat.floatValue = if (raw > current) {
-                    current + (raw - current) * 0.5f
+                    current + (raw - current) * (1f - exp(-dt * 52f))
                 } else {
-                    current * exp(-dt * 3.4f)
+                    current * exp(-dt * 4.2f)
                 }
-                phase.floatValue =
-                    (phase.floatValue + dt * (0.14f + 1.05f * beat.floatValue)) % 1f
+                // A flash only when the bass actually *arrives*; a sustained
+                // loud passage must not keep the glow pinned.
+                val rise = raw - current
+                hit.floatValue = if (rise > 0.04f) {
+                    (hit.floatValue + rise * 1.7f).coerceAtMost(1f)
+                } else {
+                    hit.floatValue * exp(-dt * 6.5f)
+                }
+                // Idle drifts; a kick sends the field travelling much faster.
+                phase.floatValue = (
+                    phase.floatValue + dt * (0.055f + 0.62f * beat.floatValue + 0.3f * hit.floatValue)
+                    ) % 1f
             }
         }
     }
@@ -281,13 +310,6 @@ private fun RxWavePill(
         Modifier
             .fillMaxWidth()
             .height(WAVE_PLATE_HEIGHT)
-            .graphicsLayer {
-                // The plate gives with the beat — 3% at the peak, felt rather
-                // than seen. Read here, so only this layer invalidates a frame.
-                val swell = 1f + 0.03f * beat.floatValue
-                scaleX = swell
-                scaleY = swell
-            }
             .clip(RoundedCornerShape(28.dp))
             .background(
                 Brush.horizontalGradient(
@@ -301,29 +323,47 @@ private fun RxWavePill(
             .clickable(onClick = onClick),
     ) {
         Canvas(Modifier.matchParentSize()) {
+            // Static light: a sheen down from the top edge, drawn from a brush
+            // made in composition, so it costs one rect a frame.
+            drawRect(brush = sheen)
+
             val b = beat.floatValue
+            val h = hit.floatValue
             val p = phase.floatValue
-            // A calm track breathes through a tenth of the plate's height; a
-            // kick takes the contours to about a third of it.
-            val amplitude = size.height * (0.09f + 0.26f * b)
+            val height = size.height
+            val width = size.width
+            // A hit lifts the whole field a little as well as widening it.
+            val surge = 1f + 0.3f * h
             repeat(WAVE_CONTOURS) { layer ->
-                val baseline = size.height * (0.66f + 0.13f * layer)
-                val path = Path()
+                val depth = layer / (WAVE_CONTOURS - 1f)
+                val baseline = height * (0.60f + 0.10f * layer)
+                val amplitude = height * (0.045f + 0.10f * (1f - depth)) *
+                    (0.5f + 1.45f * b) * surge
+                // Neighbouring layers travel opposite ways, which is what makes
+                // the field read as layered energy rather than as one sine.
+                val travel = if (layer % 2 == 0) p else -p
+                path.reset()
                 var i = 0
                 while (i <= WAVE_SEGMENTS) {
-                    val x = size.width * i / WAVE_SEGMENTS
-                    val wave = sin(p * 2f * PI.toFloat() + i * 0.38f + layer * 1.9f)
-                    val y = baseline + wave * amplitude * (1f - layer * 0.26f)
+                    val t = i / WAVE_SEGMENTS.toFloat()
+                    val x = width * t
+                    // A long swell and a short chop on top of it.
+                    val swell = sin(t * 2f * PI.toFloat() * 1.15f + travel * 2f * PI.toFloat() * 2f + layer * 0.9f)
+                    val chop = sin(t * 2f * PI.toFloat() * 2.7f - travel * 2f * PI.toFloat() * 3.4f + layer * 1.7f) * 0.32f
+                    val y = baseline + (swell + chop) * amplitude
                     if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
                     i++
                 }
+                // Bloom, then the line itself.
                 drawPath(
                     path = path,
-                    color = ink.copy(alpha = 0.34f - layer * 0.09f),
-                    style = Stroke(
-                        width = (2.2f - layer * 0.5f).dp.toPx(),
-                        cap = StrokeCap.Round,
-                    ),
+                    color = ink.copy(alpha = 0.05f + 0.11f * h),
+                    style = glowStroke,
+                )
+                drawPath(
+                    path = path,
+                    color = ink.copy(alpha = 0.26f + 0.30f * h - depth * 0.06f),
+                    style = coreStrokes[layer],
                 )
             }
         }
@@ -664,12 +704,14 @@ fun HomeScreen(
             if (onTopPickClick != null && (!spotifyStyle || selectedHomeFilter != 2)) {
                 when {
                     !topPicks.isNullOrEmpty() -> item(key = "top-picks") {
-                        TopPicksShelf(
-                            picks = topPicks,
-                            listenerName = listenerName,
-                            onClick = onTopPickClick,
-                            onLongPress = onTopPickLongPress,
-                        )
+                        Box(feedItem()) {
+                            TopPicksShelf(
+                                picks = topPicks,
+                                listenerName = listenerName,
+                                onClick = onTopPickClick,
+                                onLongPress = onTopPickLongPress,
+                            )
+                        }
                     }
                     topPicks == null && topPicksLoading -> topPicksSkeleton()
                 }
@@ -686,8 +728,14 @@ fun HomeScreen(
                         feedSkeleton(firstIsHero = leadHero)
                     }
                 }
-                is UiState.Error -> item {
-                    MessageState(displayedState.message, actionLabel = stringResource(Res.string.retry), onAction = onRetry)
+                is UiState.Error -> item(key = "home-error") {
+                    Box(feedItem()) {
+                        MessageState(
+                            displayedState.message,
+                            actionLabel = stringResource(Res.string.retry),
+                            onAction = onRetry,
+                        )
+                    }
                 }
                 is UiState.Success -> {
                     if (recentlyPlayedLoading) {
@@ -752,40 +800,44 @@ private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexedShelves(
     shelves.forEachIndexed { index, shelf ->
         // Find Your Mood follows the lead shelf, as on Apple Music's Home.
         if (index == 1 && onMoodClick != null) {
-            item(key = "find-your-mood") { FindYourMoodShelf(onMoodClick, onMoodsShowAll) }
+            item(key = "find-your-mood") {
+                Box(feedItem()) { FindYourMoodShelf(onMoodClick, onMoodsShowAll) }
+            }
         }
         item(key = shelf.title + index) {
             val openItem: (ShelfItem) -> Unit = { item -> onItemClick(item, shelf.title) }
-            // Placement is animated, so a section resolving above the viewport
-            // slides what is on screen instead of teleporting it.
-            // Listen again and Quick picks are lists on the web player, as
-            // Recents is here: one pager for all three.
-            if (shelf.layout == ShelfLayout.LIST ||
-                (index == 0 && shelf.title.equals(RECENTS_TITLE, ignoreCase = true))
-            ) {
-                RecentShelf(
-                    shelf = shelf,
-                    onItemClick = openItem,
-                    onItemLongPress = onItemLongPress,
-                    currentSong = currentSong,
-                    isPlaying = isPlaying,
-                )
-            } else if (index == 0 && firstIsHero && shelf.layout == ShelfLayout.CARDS) {
-                HeroShelf(
-                    shelf = shelf,
-                    onItemClick = openItem,
-                    onItemLongPress = onItemLongPress,
-                    currentSong = currentSong,
-                    isPlaying = isPlaying,
-                )
-            } else {
-                Shelf(
-                    shelf = shelf,
-                    onItemClick = openItem,
-                    onItemLongPress = onItemLongPress,
-                    currentSong = currentSong,
-                    isPlaying = isPlaying,
-                )
+            // The section arrives, moves and leaves with the rest of the feed
+            // rather than appearing between two frames — see [feedItem].
+            Box(feedItem()) {
+                // Listen again and Quick picks are lists on the web player, as
+                // Recents is here: one pager for all three.
+                if (shelf.layout == ShelfLayout.LIST ||
+                    (index == 0 && shelf.title.equals(RECENTS_TITLE, ignoreCase = true))
+                ) {
+                    RecentShelf(
+                        shelf = shelf,
+                        onItemClick = openItem,
+                        onItemLongPress = onItemLongPress,
+                        currentSong = currentSong,
+                        isPlaying = isPlaying,
+                    )
+                } else if (index == 0 && firstIsHero && shelf.layout == ShelfLayout.CARDS) {
+                    HeroShelf(
+                        shelf = shelf,
+                        onItemClick = openItem,
+                        onItemLongPress = onItemLongPress,
+                        currentSong = currentSong,
+                        isPlaying = isPlaying,
+                    )
+                } else {
+                    Shelf(
+                        shelf = shelf,
+                        onItemClick = openItem,
+                        onItemLongPress = onItemLongPress,
+                        currentSong = currentSong,
+                        isPlaying = isPlaying,
+                    )
+                }
             }
         }
     }

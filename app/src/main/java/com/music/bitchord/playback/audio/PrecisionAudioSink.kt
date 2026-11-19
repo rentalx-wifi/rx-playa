@@ -11,6 +11,7 @@ import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.ForwardingAudioSink
 import com.music.bitchord.BuildConfig
 import com.music.bitchord.playback.AudioOutputStatus
+import com.music.bitchord.playback.AudioEnergy
 import com.music.bitchord.playback.loopmix.LoopMixPort
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -410,6 +411,9 @@ class PrecisionAudioSink(
 
             // Process normalized Float32 samples through custom DSP chain
             dspChain.process(audioBlock)
+            // The meter reads what leaves the chain, and only from the sink
+            // the listener can hear — see [AudioEnergy].
+            if (isAudible()) AudioEnergy.feed(audioBlock)
 
             // Encode processed samples to target PCM output buffer (Float32 or PCM16)
             outputByteBuffer.clear()
@@ -589,6 +593,7 @@ class PrecisionAudioSink(
             arm.renderer.render(loopNextFrame, audioBlock.samples, 0, frames)
             loopNextFrame += frames
             dspChain.process(audioBlock)
+            if (isAudible()) AudioEnergy.feed(audioBlock)
             outputByteBuffer.clear()
             PcmBoundary.encode(sourceBlock = audioBlock, encoding = outEncoding, outputBuffer = outputByteBuffer)
             outputByteBuffer.flip()

@@ -241,7 +241,7 @@ private fun HeroShelfSkeleton() {
 /** Reserved at the top of Play while Recents loads. */
 fun LazyListScope.recentlyPlayedSkeleton() {
     item(key = "skeleton:recently-played") {
-        Column(Modifier.padding(bottom = 26.dp)) {
+        Column(feedItem().padding(bottom = 26.dp)) {
             RecentsHeaderSkeleton()
             BoxWithConstraints {
                 val columnWidth = trackColumnWidth(maxWidth)
@@ -305,20 +305,20 @@ fun ShelfSkeleton(index: Int = 0, cardWidth: Dp = SHELF_CARD_WIDTH, cardCorner: 
 /** Home and Explore while the first page of shelves is still loading. */
 fun LazyListScope.feedSkeleton(shelves: Int = 3, firstIsHero: Boolean = true) {
     if (firstIsHero) {
-        item(key = "skeleton:hero") { HeroShelfSkeleton() }
+        item(key = "skeleton:hero") { Box(feedItem()) { HeroShelfSkeleton() } }
         items(shelves - 1, key = { "skeleton:shelf:$it" }) { index ->
-            ShelfSkeleton(index = index + 1)
+            Box(feedItem()) { ShelfSkeleton(index = index + 1) }
         }
     } else {
         items(shelves, key = { "skeleton:shelf:$it" }) { index ->
-            ShelfSkeleton(index = index)
+            Box(feedItem()) { ShelfSkeleton(index = index) }
         }
     }
 }
 
 /** Appended to the feed while a further page of shelves is on its way. */
 fun LazyListScope.feedMoreSkeleton() {
-    item(key = "skeleton:more") { ShelfSkeleton() }
+    item(key = "skeleton:more") { Box(feedItem()) { ShelfSkeleton() } }
 }
 
 /**
