@@ -4029,6 +4029,9 @@ private fun BitChordApp(
                                 onCancelDownloads = { missing ->
                                     missing.forEach { Downloads.cancel(it.videoId) }
                                 },
+                                // Asks again only for what failed: the rest is
+                                // either on the device or still in the queue.
+                                onRetryFailed = { failed -> startDownload(failed, null) },
                             )
                             TAB_SEARCH -> SearchScreen(
                                 query = query,

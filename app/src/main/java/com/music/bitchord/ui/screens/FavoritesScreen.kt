@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -40,8 +41,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import com.music.bitchord.download.DownloadProgress
+import com.music.bitchord.download.DownloadSession
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.download.DownloadState
@@ -66,6 +71,8 @@ fun FavoritesScreen(
     onDownloadAll: ((List<Song>) -> Unit)? = null,
     /** Stops what the same button started. */
     onCancelDownloads: ((List<Song>) -> Unit)? = null,
+    /** Asks again for the tracks the last attempt could not fetch. */
+    onRetryFailed: ((List<Song>) -> Unit)? = null,
 ) {
     val nothing = LocalNothingStyleEnabled.current
     val matcher = playingRowMatcher(songs, currentSong)
@@ -74,12 +81,24 @@ fun FavoritesScreen(
     // "twelve of thirty" and to know whether there is anything left to ask for.
     val saved by Downloads.saved.collectAsStateWithLifecycle()
     val active by Downloads.active.collectAsStateWithLifecycle()
+    val session by DownloadSession.state.collectAsStateWithLifecycle()
     val metered by AppSettings.meteredConnection.collectAsStateWithLifecycle()
     val offlineMode by AppSettings.offlineMode.collectAsStateWithLifecycle()
     val offline = offlineMode || metered == null
     val missing = remember(songs, saved) { songs.filterNot { it.videoId in saved } }
     val inFlight = missing.count { active[it.videoId] is DownloadState.Queued || active[it.videoId] is DownloadState.Running }
+    val failedSongs = remember(missing, session) {
+        missing.filter { song ->
+            session.items.any { it.videoId == song.videoId && it.progress is DownloadProgress.Failed }
+        }
+    }
     val downloadedCount = songs.size - missing.size
+    val downloadState = favoriteDownloadState(
+        total = songs.size,
+        downloaded = downloadedCount,
+        inFlight = inFlight,
+        failed = failedSongs.size,
+    )
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxSize(),
@@ -132,48 +151,13 @@ fun FavoritesScreen(
                             Text(stringResource(R.string.shuffle))
                         }
                     }
-                    if (onDownloadAll != null && onCancelDownloads != null) {
-                        Row(
-                            modifier = Modifier.padding(top = 6.dp).fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            if (missing.isEmpty()) {
-                                Icon(
-                                    BitChordIcons.StarFilled,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Text(
-                                    text = stringResource(R.string.favorites_all_offline, downloadedCount),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            } else {
-                                Button(onClick = { onDownloadAll(missing) }) {
-                                    Text(stringResource(R.string.favorites_download_all, missing.size))
-                                }
-                                if (inFlight > 0) {
-                                    CircularProgressIndicator(
-                                        strokeWidth = 2.dp,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                    OutlinedButton(onClick = { onCancelDownloads(missing) }) {
-                                        Text(stringResource(R.string.cancel))
-                                    }
-                                }
-                                Text(
-                                    text = stringResource(
-                                        R.string.favorites_offline_progress,
-                                        downloadedCount,
-                                        songs.size,
-                                    ),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
+                    if (onDownloadAll != null) {
+                        FavoriteDownloadBlock(
+                            state = downloadState,
+                            onDownload = { onDownloadAll(missing) },
+                            onCancel = onCancelDownloads?.let { cancel -> { cancel(missing) } },
+                            onRetry = onRetryFailed?.let { retry -> { retry(failedSongs) } },
+                        )
                     }
                 }
             }
@@ -229,6 +213,197 @@ fun FavoritesScreen(
                     },
                 )
             }
+        }
+    }
+}
+
+/**
+ * What the header's download block is allowed to say.
+ *
+ * One of four, never a mixture: the block used to draw the start button, the
+ * cancel button, the spinner and the counter side by side, so a phone at 360dp
+ * wrapped "Отмена" one letter per line and grew the card over the list. The
+ * state is decided here rather than by four independent booleans in the layout,
+ * which is also what makes it testable — see `FavoriteDownloadStateTest`.
+ */
+internal sealed interface FavoriteDownloadState {
+
+    /** Nothing running, nothing failed: something is still to fetch. */
+    data class Idle(val downloaded: Int, val total: Int) : FavoriteDownloadState
+
+    /** Anything queued or running. Cancel belongs here and nowhere else. */
+    data class Downloading(val downloaded: Int, val total: Int) : FavoriteDownloadState
+
+    /** The queue has stopped and some tracks did not arrive. */
+    data class Failed(val downloaded: Int, val total: Int, val failed: Int) : FavoriteDownloadState
+
+    /** Every track is on this device. */
+    data class Complete(val total: Int) : FavoriteDownloadState
+}
+
+/**
+ * Which of the four it is.
+ *
+ * Downloading outranks failed: as long as anything is still moving, the queue is
+ * working and a retry would only add a second copy of a track already in it.
+ * Failed outranks complete for the same reason in reverse — a queue that ended
+ * with casualties is not a finished job, however many tracks did land.
+ */
+internal fun favoriteDownloadState(
+    total: Int,
+    downloaded: Int,
+    inFlight: Int,
+    failed: Int,
+): FavoriteDownloadState {
+    val songs = total.coerceAtLeast(0)
+    val here = downloaded.coerceIn(0, songs)
+    return when {
+        inFlight > 0 -> FavoriteDownloadState.Downloading(here, songs)
+        failed > 0 -> FavoriteDownloadState.Failed(here, songs, failed)
+        songs > 0 && here >= songs -> FavoriteDownloadState.Complete(songs)
+        else -> FavoriteDownloadState.Idle(here, songs)
+    }
+}
+
+/**
+ * The download block of the Favourites header: two short lines at most, and one
+ * decision at a time.
+ *
+ * Every text that shares a line with a button is `weight(1f)` with a single line
+ * and no wrapping, because the alternative on a narrow phone is a word folding
+ * one letter per row and a card that grows over the list under it. Nothing here
+ * is wider than the card, so the header keeps its height whatever the counts.
+ */
+@Composable
+private fun FavoriteDownloadBlock(
+    state: FavoriteDownloadState,
+    onDownload: () -> Unit,
+    onCancel: (() -> Unit)?,
+    onRetry: (() -> Unit)?,
+) {
+    val caption = MaterialTheme.typography.bodyMedium
+    val quiet = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+        when (state) {
+            is FavoriteDownloadState.Downloading -> {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = stringResource(R.string.favorites_downloading, state.downloaded, state.total),
+                        style = caption,
+                        color = quiet,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (onCancel != null) {
+                        TextButton(
+                            onClick = onCancel,
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.cancel),
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        }
+                    }
+                }
+                LinearProgressIndicator(
+                    progress = { state.downloaded.toFloat() / state.total.coerceAtLeast(1) },
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp).height(3.dp),
+                    strokeCap = StrokeCap.Round,
+                )
+            }
+            is FavoriteDownloadState.Failed -> Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.favorites_failed_count, state.failed),
+                    style = caption,
+                    color = quiet,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    onClick = { onRetry?.invoke() },
+                    enabled = onRetry != null,
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.favorites_retry, state.failed),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
+            }
+            is FavoriteDownloadState.Complete -> Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    BitChordIcons.StarFilled,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    text = stringResource(R.string.favorites_all_offline, state.total),
+                    style = caption,
+                    color = quiet,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            is FavoriteDownloadState.Idle -> {
+                Text(
+                    text = stringResource(
+                        R.string.favorites_offline_progress,
+                        state.downloaded,
+                        state.total,
+                    ),
+                    style = caption,
+                    color = quiet,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Button(
+                    onClick = onDownload,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                ) {
+                    Text(
+                        text = stringResource(
+                            R.string.favorites_download_all,
+                            (state.total - state.downloaded).coerceAtLeast(0),
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The four states at the width the layout broke at, so a regression is visible. */
+@Preview(name = "Favourites download block · 360dp", widthDp = 360, showBackground = true)
+@Composable
+private fun FavoriteDownloadBlockPreview() {
+    MaterialTheme {
+        Column(
+            Modifier.width(328.dp).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            FavoriteDownloadBlock(FavoriteDownloadState.Idle(12, 231), {}, null, null)
+            FavoriteDownloadBlock(FavoriteDownloadState.Downloading(12, 231), {}, {}, null)
+            FavoriteDownloadBlock(FavoriteDownloadState.Failed(12, 231, 5), {}, null) {}
+            FavoriteDownloadBlock(FavoriteDownloadState.Complete(231), {}, null, null)
         }
     }
 }

@@ -9,10 +9,16 @@ import com.music.bitchord.data.DebugLog as Log
 import androidx.core.content.ContextCompat
 import com.music.bitchord.data.innertube.StreamResolver
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.model.durationMillis
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.DownloadQuality
 import com.music.bitchord.data.sources.SourceRegistry
 import com.music.bitchord.data.sources.SourceResolver
+import com.music.bitchord.data.importing.BasicExternalPlaylistTrack
+import com.music.bitchord.data.importing.ExternalPlaylistImporter
+import com.music.bitchord.data.soundcloud.SOUNDCLOUD_TRACK_PREFIX
+import com.music.bitchord.data.soundcloud.SoundCloudPlayback
+import com.music.bitchord.playback.isExternalProviderTrackId
 import com.music.bitchord.data.sources.SourceStream
 import com.music.bitchord.data.sources.StreamFormat
 import com.music.bitchord.data.sources.TrackMatcher
@@ -23,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -955,20 +962,87 @@ object Downloads {
         DownloadSession.running(id, 0f)
 
         try {
-            val plan = prepare(context, song)
-            // The manager is showing the row that was tapped, which for a music
-            // video is the wrong title and the wrong cover for the file actually
-            // being written. Corrected here rather than left to disagree with
-            // the notification and with the Downloads page afterwards.
-            DownloadSession.retitle(id, plan.track)
-            transfer(context, song, plan)
+            transferWithRetries(context, song)
         } catch (e: CancellationException) {
             clear(id)
             throw e
         } catch (e: Exception) {
-            Log.w(TAG, "download failed for $id: ${e.message}", e)
+            // The source, the id and the reason on one line: a queue that loses
+            // a track has to say which track and why, or the only report is
+            // "some didn't download".
+            Log.w(
+                TAG,
+                "download failed for $id (${song.playbackSource ?: "YouTube"}, ${song.title}): ${e.message}",
+                e,
+            )
             fail(id, e.friendly())
         }
+    }
+
+    /**
+     * [prepare] and [transfer], with a second and a third go at a track that
+     * failed for a reason that may not last.
+     *
+     * A queue of two hundred tracks meets every transient fault there is — a
+     * dropped socket, a 429 from an addon that noticed the parallelism, a signed
+     * URL that expired between the probe and the first range. None of those say
+     * anything about the track, and before this each of them ended that track
+     * for the whole run.
+     *
+     * Every attempt starts from [prepare] rather than resuming the old URL: a
+     * refusal is much more often an expired signature than a broken file, and
+     * asking again is the only way to get a fresh one. The destination is
+     * atomic — see [DownloadStore.begin] — so an abandoned attempt leaves
+     * nothing behind.
+     */
+    private suspend fun transferWithRetries(context: Context, song: Song) {
+        var attempt = 0
+        while (true) {
+            try {
+                val plan = prepare(context, song)
+                // The manager is showing the row that was tapped, which for a music
+                // video is the wrong title and the wrong cover for the file actually
+                // being written. Corrected here rather than left to disagree with
+                // the notification and with the Downloads page afterwards.
+                DownloadSession.retitle(song.videoId, plan.track)
+                transfer(context, song, plan)
+                return
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (attempt >= MAX_DOWNLOAD_ATTEMPTS - 1 || !e.isWorthRetrying()) throw e
+                attempt++
+                val wait = RETRY_BASE_DELAY_MS * attempt
+                Log.w(
+                    TAG,
+                    "attempt $attempt for ${song.videoId} hit ${e.message}; retrying in ${wait}ms",
+                )
+                delay(wait)
+            }
+        }
+    }
+
+    /** Codes that mean "ask again", not "this track is gone". */
+    private val HTTP_STATUS = Regex("""HTTP\s+(\d{3})""")
+
+    /**
+     * Whether a failure is about the connection or the signature rather than
+     * about the track. 401/403/410 are here because a retry re-resolves the
+     * route: those are the codes a signed URL returns when it has expired, and
+     * the fresh URL is a different answer.
+     */
+    private fun Throwable.isWorthRetrying(): Boolean {
+        val text = message.orEmpty()
+        val status = HTTP_STATUS.find(text)?.groupValues?.get(1)?.toIntOrNull()
+        if (status != null) {
+            return status in EXPIRED_CODES || status == 408 || status == 429 || status in 500..599
+        }
+        if (this is java.io.IOException) return true
+        return text.contains("timeout", ignoreCase = true) ||
+            text.contains("stalled", ignoreCase = true) ||
+            text.contains("try again", ignoreCase = true) ||
+            text.contains("connection", ignoreCase = true) ||
+            text.contains("closed", ignoreCase = true)
     }
 
     /**
@@ -1257,20 +1331,103 @@ object Downloads {
             val name = SourceRegistry.config(row.first)?.displayName ?: "its source"
             error("Couldn't download this song from $name — check that it's still connected")
         }
+        // A row from a catalogue whose id is not playable here used to fall
+        // straight through to the YouTube resolver, which can only fail on an id
+        // that isn't a video id. Those rows play because the player matches them
+        // a playable copy; the download now asks the same question.
+        soundCloudRoute(track)?.let { return it }
+        val playableId = playableVideoId(track)
         // MediaStore.Audio refuses audio/webm on affected Android versions.
         // Keep Opus for app-private downloads, but pin exported downloads to
         // AAC-in-MP4 for both the initial resolve and any mid-transfer retry.
         val requireM4a = AppSettings.exportDownloads.value
-        val stream = StreamResolver.resolveForDownload(track.videoId, quality.maxKbps, requireM4a)
+        val stream = StreamResolver.resolveForDownload(playableId, quality.maxKbps, requireM4a)
         return Route(
             extension = stream.downloadExtension,
             mimeType = stream.downloadMimeType,
             describe = "${stream.kbps}kbps ${stream.mimeType}",
             downloadFormat = youtubeDownloadBadge(stream.downloadExtension, stream.kbps),
             write = { sink, onProgress ->
-                Downloader.fetch(track.videoId, stream, quality.maxKbps, requireM4a, sink, onProgress)
+                Downloader.fetch(playableId, stream, quality.maxKbps, requireM4a, sink, onProgress)
             },
         )
+    }
+
+    /**
+     * A SoundCloud row downloaded from SoundCloud itself, by the same extraction
+     * the player uses — [SoundCloudPlayback.resolve] — rather than by matching a
+     * YouTube copy.
+     *
+     * Null for every other row, and for a SoundCloud row whose own stream could
+     * not be extracted: the caller then falls back to a match, which is worse
+     * audio but is still the song.
+     *
+     * The stream it returns is either a file or an HLS index; the index is saved
+     * as a package by [OfflineHls] like any other manifest.
+     */
+    private suspend fun soundCloudRoute(track: Song): Route? {
+        if (!track.videoId.startsWith(SOUNDCLOUD_TRACK_PREFIX)) return null
+        val sourceUrl = track.playbackSourceId.orEmpty()
+        if (!SoundCloudPlayback.isTrustedSoundCloudUrl(sourceUrl)) return null
+        return try {
+            val stream = SoundCloudPlayback.resolve(sourceUrl)
+            val mime = stream.mimeType.orEmpty().lowercase()
+            if ("mpegurl" in mime || "m3u8" in mime) {
+                Route(
+                    extension = "m3u8",
+                    mimeType = "application/vnd.apple.mpegurl",
+                    describe = "SoundCloud ${stream.bitrateKbps}kbps HLS",
+                    offlineHls = Manifest(stream.url, stream.headers),
+                    write = { sink, onProgress ->
+                        Downloader.fetchDirect(stream.url, stream.headers, sink, onProgress)
+                    },
+                )
+            } else {
+                val probe = Downloader.probe(stream.url, stream.headers)
+                val file = probe as? Downloader.Probe.File
+                if (file == null) {
+                    Log.w(TAG, "SoundCloud served ${track.videoId} as something unkeepable; matching instead")
+                    null
+                } else {
+                    Route(
+                        extension = file.container.extension,
+                        mimeType = file.container.mimeType,
+                        describe = "SoundCloud ${stream.bitrateKbps}kbps",
+                        write = { sink, onProgress ->
+                            Downloader.fetchDirect(stream.url, stream.headers, sink, onProgress)
+                        },
+                    )
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "SoundCloud download for ${track.videoId} fell back to a match: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * The video id to fetch for a row that carries somebody else's id.
+     *
+     * VK Music and Spotify rows are metadata: their ids name a track in a
+     * catalogue this app cannot stream from, and playback resolves them through
+     * [ExternalPlaylistImporter] — see `MainViewModel.resolveVkSourceSong`. The
+     * download asks the same matcher, so a track that plays can be kept.
+     */
+    private suspend fun playableVideoId(track: Song): String {
+        if (!isExternalProviderTrackId(track.videoId)) return track.videoId
+        val match = ExternalPlaylistImporter.match(
+            BasicExternalPlaylistTrack(
+                title = track.title,
+                artist = track.artist,
+                album = track.albumName,
+                durationMs = track.durationMillis(),
+                coverUrl = track.thumbnailUrl,
+            ),
+        ) ?: error("This track isn't available to download — no matching copy was found")
+        Log.d(TAG, "${track.videoId} downloads as ${match.videoId}")
+        return match.videoId
     }
 
     /**
@@ -1531,10 +1688,16 @@ object Downloads {
      * `Unsupported MIME type audio/webm` at least sends someone looking in the
      * right direction.
      */
-    private fun Exception.friendly(): String = when {
-        (this is IllegalStateException || this is IllegalArgumentException) &&
-            !message.isNullOrBlank() -> message!!
-        else -> "Download failed — check your connection"
+    private fun Exception.friendly(): String {
+        val text = message.orEmpty()
+        val status = HTTP_STATUS.find(text)?.groupValues?.get(1)?.toIntOrNull()
+        return when {
+            status in EXPIRED_CODES -> "The link expired — try again"
+            status == 429 -> "The source asked to wait — try again in a minute"
+            status != null && status >= 500 -> "The source is having trouble (HTTP $status)"
+            text.isNotBlank() -> text
+            else -> "Download failed — check your connection"
+        }
     }
 
     /**
@@ -1605,7 +1768,16 @@ object Downloads {
     internal const val WIFI_ONLY_REFUSAL = "Downloads are set to Wi-Fi only"
 
     /** As `DownloadService.WORKERS`, whose reasoning is the same here. */
-    private const val BATCH_WORKERS = 3
+    private const val BATCH_WORKERS = 2
+
+    /** A track is taken three times before the queue writes it off. */
+    private const val MAX_DOWNLOAD_ATTEMPTS = 3
+
+    /** Times the attempt number, so the second wait is longer than the first. */
+    private const val RETRY_BASE_DELAY_MS = 1_500L
+
+    /** A signature that has expired, rather than a track that is gone. */
+    private val EXPIRED_CODES = setOf(401, 403, 410)
 
     /** Dropped when the sheet is reopened; a failure is worth showing once. */
     fun dismissFailure(videoId: String) {
