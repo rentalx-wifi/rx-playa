@@ -66,6 +66,13 @@ val vkAudioScopeApproved: Boolean = (
         ?: System.getenv("VK_AUDIO_SCOPE_APPROVED")
         ?: "false"
     ).trim().toBooleanStrictOrNull() ?: false
+
+/** Same client id the phone's web sign-in uses — see the app module. */
+val vkAudioClientId: String = (
+    localProps.getProperty("VK_AUDIO_CLIENT_ID")
+        ?: System.getenv("VK_AUDIO_CLIENT_ID")
+        ?: "2685278"
+    ).trim()
 val vkRedirectScheme = vkIdClientId.takeIf(String::isNotBlank)?.let { "vk$it" } ?: "vk0000000"
 
 /*
@@ -117,6 +124,7 @@ android {
             "\"${integrationServer.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
         )
         buildConfigField("String", "VK_ID_CLIENT_ID", "\"${vkIdClientId.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
+        buildConfigField("String", "VK_AUDIO_CLIENT_ID", "\"${vkAudioClientId.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         buildConfigField("boolean", "VK_AUDIO_SCOPE_APPROVED", vkAudioScopeApproved.toString())
         buildConfigField("String", "VK_ID_REDIRECT_SCHEME", "\"$vkRedirectScheme\"")
         // The TV APKs share a GitHub release with the phone ones and are told
