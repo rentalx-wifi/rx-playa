@@ -1597,4 +1597,6 @@
     <string name="beta_updates">Тестовые сборки</string>
     <string name="beta_updates_subtitle">Получать тестовые сборки до стабильного релиза</string>
     <string name="update_beta_note">Тестовая сборка. Что-то может сломаться.</string>
+    <string name="soundcloud_token_title">Токен SoundCloud</string>
+    <string name="soundcloud_token_hint">Вставь OAuth access token из клиента SoundCloud. Он проверяется перед сохранением.</string>
 </resources>

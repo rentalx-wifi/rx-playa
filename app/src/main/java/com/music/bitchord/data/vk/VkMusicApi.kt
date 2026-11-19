@@ -48,7 +48,7 @@ object VkMusicApi {
     private val client = Http.client.newBuilder().callTimeout(15, TimeUnit.SECONDS).build()
 
     val available: Boolean
-        get() = BuildConfig.VK_AUDIO_SCOPE_APPROVED && AppSettings.vkAccessToken.value.isNotBlank()
+        get() = AppSettings.vkAccessToken.value.isNotBlank()
 
     suspend fun search(query: String, limit: Int = 50): List<Song> {
         if (!available || query.isBlank()) return emptyList()

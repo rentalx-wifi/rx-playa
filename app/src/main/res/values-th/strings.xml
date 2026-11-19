@@ -1546,4 +1546,6 @@
     <string name="beta_updates">รุ่นเบต้า</string>
     <string name="beta_updates_subtitle">รับรุ่นทดสอบก่อนรุ่นเสถียร</string>
     <string name="update_beta_note">รุ่นทดสอบ บางอย่างอาจพังได้</string>
+    <string name="soundcloud_token_title">โทเคน SoundCloud</string>
+    <string name="soundcloud_token_hint">วางโทเคนการเข้าถึง OAuth จากไคลเอนต์ SoundCloud ระบบจะตรวจสอบก่อนบันทึก</string>
 </resources>

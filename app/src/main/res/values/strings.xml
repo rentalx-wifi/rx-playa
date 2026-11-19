@@ -1434,4 +1434,6 @@
     <string name="beta_updates">Beta builds</string>
     <string name="beta_updates_subtitle">Get test builds before the stable release</string>
     <string name="update_beta_note">Test build. Things may break.</string>
+    <string name="soundcloud_token_title">SoundCloud token</string>
+    <string name="soundcloud_token_hint">Paste an OAuth access token from a SoundCloud client. It is checked before it is saved.</string>
 </resources>

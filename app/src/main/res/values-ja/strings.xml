@@ -1541,4 +1541,6 @@
     <string name="beta_updates">ベータ版</string>
     <string name="beta_updates_subtitle">安定版より先にテスト版を受け取る</string>
     <string name="update_beta_note">テスト版です。不具合が出る可能性があります。</string>
+    <string name="soundcloud_token_title">SoundCloud トークン</string>
+    <string name="soundcloud_token_hint">SoundCloud クライアントの OAuth アクセストークンを貼ってください。保存前に確認します。</string>
 </resources>

@@ -1520,4 +1520,6 @@
     <string name="beta_updates">Beta sürümler</string>
     <string name="beta_updates_subtitle">Kararlı sürümden önce test sürümlerini al</string>
     <string name="update_beta_note">Test sürümü. Bir şeyler bozulabilir.</string>
+    <string name="soundcloud_token_title">SoundCloud belirteci</string>
+    <string name="soundcloud_token_hint">Bir SoundCloud istemcisinden OAuth erişim belirtecini yapıştır. Kaydedilmeden önce denetlenir.</string>
 </resources>

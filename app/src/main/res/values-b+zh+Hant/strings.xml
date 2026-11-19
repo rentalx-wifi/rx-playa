@@ -1533,4 +1533,6 @@
     <string name="beta_updates">測試版</string>
     <string name="beta_updates_subtitle">在穩定版之前取得測試版本</string>
     <string name="update_beta_note">測試版本，可能會有問題。</string>
+    <string name="soundcloud_token_title">SoundCloud 權杖</string>
+    <string name="soundcloud_token_hint">貼上 SoundCloud 用戶端的 OAuth 存取權杖。儲存前會先驗證。</string>
 </resources>

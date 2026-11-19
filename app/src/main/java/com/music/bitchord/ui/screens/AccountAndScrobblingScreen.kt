@@ -232,11 +232,13 @@ fun AccountAndScrobblingScreen(
                 subtitle = stringResource(R.string.soundcloud_import_description),
                 onClick = onImportSoundCloudPlaylist,
             )
-            if (soundCloudToken.isBlank() && soundCloudLoginAvailable) {
+            if (soundCloudToken.isBlank()) {
                 FullWidthDivider()
                 SettingsRow(
                     icon = SfIcons.SwitchAccount,
                     title = stringResource(R.string.sign_in),
+                    subtitle = if (soundCloudLoginAvailable) null
+                    else stringResource(R.string.soundcloud_token_title),
                     onClick = onOpenSoundCloudLogin,
                 )
             }
@@ -251,24 +253,17 @@ fun AccountAndScrobblingScreen(
 
         SettingsGroup(
             header = "VK Music",
-            footer = if (BuildConfig.VK_AUDIO_SCOPE_APPROVED) null
-            else stringResource(R.string.vk_public_import_subtitle),
+            footer = stringResource(R.string.vk_import_subtitle),
         ) {
             SettingsRow(
                 icon = Icons.Rounded.MusicNote,
                 title = "VK Music",
                 subtitle = when {
-                    vkToken.isBlank() && BuildConfig.VK_ID_CLIENT_ID.isBlank() ->
-                        stringResource(R.string.vk_public_import_subtitle)
                     vkToken.isBlank() -> stringResource(R.string.tap_to_connect)
-                    vkAccount.isNotBlank() && !BuildConfig.VK_AUDIO_SCOPE_APPROVED ->
-                        "$vkAccount · ${stringResource(R.string.source_setup_required)}"
                     vkAccount.isNotBlank() -> vkAccount
                     else -> stringResource(R.string.connected)
                 },
-                onClick = if (vkToken.isBlank() && BuildConfig.VK_ID_CLIENT_ID.isNotBlank()) {
-                    onOpenVkLogin
-                } else onOpenVkMusic,
+                onClick = if (vkToken.isBlank()) onOpenVkLogin else onOpenVkMusic,
             )
             FullWidthDivider()
             SettingsRow(

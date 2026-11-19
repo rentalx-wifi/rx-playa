@@ -161,40 +161,19 @@ private fun SpotifyHomeHeader(
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 itemsIndexed(labels) { index, label ->
                     val active = index == selected
-                    if (LocalMaterial3StyleEnabled.current) {
-                        // The Pixel skin's own chip: 8-point corners, a check on
-                        // the selected one, and the tonal container M3 gives it.
-                        FilterChip(
-                            selected = active,
-                            onClick = { onSelected(index) },
-                            label = { Text(label, style = MaterialTheme.typography.labelLarge) },
-                            leadingIcon = if (active) {
-                                {
-                                    Icon(
-                                        Icons.Rounded.Check,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(FilterChipDefaults.IconSize),
-                                    )
-                                }
-                            } else {
-                                null
-                            },
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (active) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = if (active) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.clickable { onSelected(index) },
+                    ) {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier.padding(horizontal = 15.dp, vertical = 9.dp),
                         )
-                    } else {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = if (active) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = if (active) MaterialTheme.colorScheme.onPrimary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.clickable { onSelected(index) },
-                        ) {
-                            Text(
-                                label,
-                                style = MaterialTheme.typography.labelLarge,
-                                modifier = Modifier.padding(horizontal = 15.dp, vertical = 9.dp),
-                            )
-                        }
                     }
                 }
             }

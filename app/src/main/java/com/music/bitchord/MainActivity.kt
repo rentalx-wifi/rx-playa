@@ -137,6 +137,7 @@ import com.music.bitchord.auth.YandexMusicLoginScreen
 import com.music.bitchord.auth.OAuthRedirect
 import com.music.bitchord.auth.WebSessionMode
 import com.music.bitchord.auth.YtMusicLoginScreen
+import com.music.bitchord.auth.VkWebLoginScreen
 import com.music.bitchord.data.LocalMediaRepository
 import com.music.bitchord.data.listentogether.JamInviteLink
 import com.music.bitchord.data.listentogether.ListenTogether
@@ -167,6 +168,7 @@ import com.music.bitchord.data.soundcloud.SoundCloudPlayback
 import com.music.bitchord.data.soundcloud.SoundCloudOAuth
 import com.music.bitchord.data.soundcloud.SoundCloudNotConfiguredException
 import com.music.bitchord.data.vk.VkIdAuth
+import com.music.bitchord.data.vk.VkWebAuth
 import com.music.bitchord.data.vk.VkNotConfiguredException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -201,7 +203,7 @@ import com.music.bitchord.ui.components.ImportDialogsHost
 import com.music.bitchord.ui.components.importPlaylist
 import com.music.bitchord.ui.components.importSoundCloudPlaylist
 import com.music.bitchord.ui.components.YouTubeMusicImportAlert
-import com.music.bitchord.ui.components.SoundCloudImportAlert
+import com.music.bitchord.ui.components.SoundCloudTokenDialog
 import com.music.bitchord.ui.components.GoogleCookieImportAlert
 import com.music.bitchord.ui.components.VkPlaylistImportAlert
 import com.music.bitchord.ui.components.GuestProfileAlert
@@ -894,9 +896,11 @@ private fun BitChordApp(
     var showSpotifyImportDialog by remember { mutableStateOf(false) }
     var showYandexImportDialog by remember { mutableStateOf(false) }
     var showYoutubeImportDialog by remember { mutableStateOf(false) }
+    var showSoundCloudTokenDialog by remember { mutableStateOf(false) }
     var showSoundCloudImportDialog by remember { mutableStateOf(false) }
     var showVkImportDialog by remember { mutableStateOf(false) }
     var showGoogleCookieImport by remember { mutableStateOf(false) }
+    var showVkWebLogin by remember { mutableStateOf(false) }
     var googleBlockedNotice by remember { mutableStateOf(false) }
     var importedGoogleCookie by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(webSession) {
@@ -1516,6 +1520,14 @@ private fun BitChordApp(
     LifecycleResumeEffect(Unit) {
         scope.launch { runCatching { AppUpdateChecker.check(updateContext) } }
         onPauseOrDispose { }
+    }
+
+    // A stored session is checked once per launch: a token the service has
+    // revoked is otherwise discovered only at the first track, as a request
+    // that fails with no explanation.
+    LaunchedEffect(Unit) {
+        runCatching { VkWebAuth.validate() }
+        runCatching { SoundCloudOAuth.validate() }
     }
     val oauthRedirect by OAuthRedirect.pending.collectAsStateWithLifecycle()
     LaunchedEffect(oauthRedirect) {
@@ -3445,7 +3457,7 @@ private fun BitChordApp(
                                         } catch (e: CancellationException) {
                                             throw e
                                         } catch (e: SoundCloudNotConfiguredException) {
-                                            showSoundCloudImportDialog = true
+                                            showSoundCloudTokenDialog = true
                                         } catch (e: Exception) {
                                             Toast.makeText(context, R.string.failed, Toast.LENGTH_LONG).show()
                                         }
@@ -3455,26 +3467,14 @@ private fun BitChordApp(
                                     scope.launch { SoundCloudOAuth.disconnect() }
                                 },
                                 onImportSoundCloudPlaylist = { showSoundCloudImportDialog = true },
-                                onOpenVkLogin = {
-                                    scope.launch {
-                                        try {
-                                            VkIdAuth.begin(context)
-                                        } catch (e: CancellationException) {
-                                            throw e
-                                        } catch (e: VkNotConfiguredException) {
-                                            showVkImportDialog = true
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, R.string.failed, Toast.LENGTH_LONG).show()
-                                        }
-                                    }
-                                },
+                                onOpenVkLogin = { showVkWebLogin = true },
                                 onOpenVkMusic = {
                                     context.startActivity(
                                         Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://vk.com/audio")),
                                     )
                                 },
                                 onImportVkPlaylist = { showVkImportDialog = true },
-                                onDisconnectVk = { scope.launch { VkIdAuth.logout() } },
+                                onDisconnectVk = { scope.launch { VkWebAuth.logout() } },
                                 onOpenYandexMusicLogin = {
                                     yandexLoginVerifying = false
                                     showYandexMusicLogin = true
@@ -6541,10 +6541,38 @@ private fun BitChordApp(
                 )
             }
 
+            // VK's own sign-in page, full screen: 2FA and captcha are VK's to
+            // show, and the token arrives as a redirect out of it.
+            if (showVkWebLogin) {
+                VkWebLoginScreen(
+                    onRedirect = { uri ->
+                        showVkWebLogin = false
+                        scope.launch {
+                            val redirect = VkWebAuth.parseRedirect(uri) ?: return@launch
+                            val account = runCatching { VkWebAuth.complete(redirect) }.getOrNull()
+                            Toast.makeText(
+                                context,
+                                if (account != null) R.string.connected else R.string.failed,
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    },
+                    onClose = { showVkWebLogin = false },
+                )
+            }
+
             UpdatePromptHost(hazeState = hazeState)
 
             downloadLimitRequest?.let { request ->
                 DownloadLimitDialog(request = request, onDismiss = { downloadLimitRequest = null })
+            }
+
+            if (showSoundCloudTokenDialog) {
+                SoundCloudTokenDialog(
+                    hazeState = hazeState,
+                    onConnected = { showQueueNotice(context.getString(R.string.connected)) },
+                    onDismiss = { showSoundCloudTokenDialog = false },
+                )
             }
 
             soundCloudUnavailableAction?.let { song ->

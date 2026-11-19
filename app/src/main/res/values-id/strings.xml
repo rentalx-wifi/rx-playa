@@ -1540,4 +1540,6 @@
     <string name="beta_updates">Build beta</string>
     <string name="beta_updates_subtitle">Dapatkan build uji sebelum rilis stabil</string>
     <string name="update_beta_note">Build uji. Bisa ada yang rusak.</string>
+    <string name="soundcloud_token_title">Token SoundCloud</string>
+    <string name="soundcloud_token_hint">Tempel token akses OAuth dari klien SoundCloud. Token diperiksa sebelum disimpan.</string>
 </resources>

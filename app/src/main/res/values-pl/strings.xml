@@ -1605,4 +1605,6 @@
     <string name="beta_updates">Wersje beta</string>
     <string name="beta_updates_subtitle">Otrzymuj wersje testowe przed stabilnym wydaniem</string>
     <string name="update_beta_note">Wersja testowa. Coś może się zepsuć.</string>
+    <string name="soundcloud_token_title">Token SoundCloud</string>
+    <string name="soundcloud_token_hint">Wklej token dostępu OAuth z klienta SoundCloud. Jest sprawdzany przed zapisaniem.</string>
 </resources>

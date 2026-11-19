@@ -1564,4 +1564,6 @@
     <string name="beta_updates">बीटा बिल्ड</string>
     <string name="beta_updates_subtitle">स्थिर रिलीज़ से पहले टेस्ट बिल्ड पाएँ</string>
     <string name="update_beta_note">टेस्ट बिल्ड। कुछ टूट सकता है।</string>
+    <string name="soundcloud_token_title">SoundCloud टोकन</string>
+    <string name="soundcloud_token_hint">SoundCloud क्लाइंट से OAuth एक्सेस टोकन चिपकाएँ। सहेजने से पहले इसे जाँचा जाता है।</string>
 </resources>

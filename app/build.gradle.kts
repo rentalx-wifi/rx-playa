@@ -70,6 +70,20 @@ val vkAudioScopeApproved: Boolean = (
         ?: System.getenv("VK_AUDIO_SCOPE_APPROVED")
         ?: "false"
     ).trim().toBooleanStrictOrNull() ?: false
+
+/**
+ * The VK client id the web sign-in uses.
+ *
+ * VK ID will not hand a third-party app the `audio` permission, so the token
+ * that actually opens `audio.search` has to come from a client that holds it.
+ * Overridable for anyone who registers their own; the default is the client
+ * the open-source VK players use for exactly this reason.
+ */
+val vkAudioClientId: String = (
+    localProps.getProperty("VK_AUDIO_CLIENT_ID")
+        ?: System.getenv("VK_AUDIO_CLIENT_ID")
+        ?: "2685278"
+    ).trim()
 val vkRedirectScheme = vkIdClientId.takeIf(String::isNotBlank)?.let { "vk$it" } ?: "vk0000000"
 
 // See the root build.gradle.kts: one version for the phone and its watch app.
@@ -111,6 +125,7 @@ android {
             "\"${integrationServer.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
         )
         buildConfigField("String", "VK_ID_CLIENT_ID", "\"${vkIdClientId.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
+        buildConfigField("String", "VK_AUDIO_CLIENT_ID", "\"${vkAudioClientId.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         buildConfigField("boolean", "VK_AUDIO_SCOPE_APPROVED", vkAudioScopeApproved.toString())
         buildConfigField("String", "VK_ID_REDIRECT_SCHEME", "\"$vkRedirectScheme\"")
         manifestPlaceholders["vkIdRedirectScheme"] = vkRedirectScheme

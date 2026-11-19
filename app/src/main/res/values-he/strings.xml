@@ -1571,4 +1571,6 @@
     <string name="beta_updates">גרסאות בטא</string>
     <string name="beta_updates_subtitle">קבל גרסאות ניסיון לפני השחרור היציב</string>
     <string name="update_beta_note">גרסת ניסיון. משהו עלול להישבר.</string>
+    <string name="soundcloud_token_title">אסימון SoundCloud</string>
+    <string name="soundcloud_token_hint">הדבק אסימון גישה של OAuth מלקוח SoundCloud. הוא נבדק לפני השמירה.</string>
 </resources>

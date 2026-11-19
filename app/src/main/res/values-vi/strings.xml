@@ -1480,4 +1480,6 @@
     <string name="beta_updates">Bản beta</string>
     <string name="beta_updates_subtitle">Nhận bản thử trước bản ổn định</string>
     <string name="update_beta_note">Bản thử. Có thể có thứ bị lỗi.</string>
+    <string name="soundcloud_token_title">Token SoundCloud</string>
+    <string name="soundcloud_token_hint">Dán token truy cập OAuth từ ứng dụng SoundCloud. Token được kiểm tra trước khi lưu.</string>
 </resources>

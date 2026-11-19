@@ -143,6 +143,53 @@ object SoundCloudOAuth {
         }
     }
 
+    /**
+     * Sign-in with a token copied from another SoundCloud client.
+     *
+     * The official flow above needs a client secret, and a secret cannot live
+     * in an APK: it belongs to the broker, so that path works only where the
+     * backend is deployed. This one works everywhere and is what the account
+     * screen falls back to — the token is checked against `/me` before
+     * anything is stored, so a wrong or expired one is refused here rather
+     * than at the first play.
+     */
+    suspend fun signInWithToken(raw: String): SoundCloudAccount {
+        val token = raw.trim()
+            .removePrefix("OAuth ")
+            .removePrefix("oauth ")
+            .trim()
+        require(token.isNotBlank()) { "SoundCloud token is empty" }
+        AppSettings.setSoundCloudSession(token, "", System.currentTimeMillis() + DIRECT_TOKEN_MS)
+        return try {
+            SoundCloudAccountApi.me().also { account ->
+                AppSettings.setSoundCloudAccount(account.id, account.name, account.avatarUrl)
+            }
+        } catch (error: Exception) {
+            AppSettings.clearSoundCloudAccount()
+            throw error
+        }
+    }
+
+    /**
+     * Whether the stored session is still accepted, checked once per launch.
+     *
+     * Only an explicit rejection ends the session: a dead network says nothing
+     * about the token, and logging out on it would make the account look lost
+     * every time the phone starts offline.
+     */
+    suspend fun validate(): Boolean {
+        if (accessToken() == null) return false
+        return runCatching {
+            SoundCloudAccountApi.me()
+            true
+        }.getOrElse { error ->
+            if (error is IOException && error.message.orEmpty().contains("401")) {
+                AppSettings.clearSoundCloudAccount()
+            }
+            false
+        }
+    }
+
     suspend fun disconnect() {
         val token = accessToken()
         if (token != null) {
@@ -210,5 +257,8 @@ object SoundCloudOAuth {
 
     private const val REDIRECT_URI = "rxmusic://oauth/soundcloud"
     private const val TOKEN_SKEW_MS = 60_000L
+
+    /** How long a pasted token is trusted; SoundCloud's own tokens do not expire. */
+    private const val DIRECT_TOKEN_MS = 365L * 24L * 60L * 60L * 1_000L
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 }
