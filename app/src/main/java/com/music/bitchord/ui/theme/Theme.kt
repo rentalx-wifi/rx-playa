@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -386,8 +387,20 @@ fun BitChordTheme(
                 else -> LegacyTypography
             },
             shapes = if (material3) PixelShapes else DefaultShapes,
-            content = content,
-        )
+        ) {
+            // MaterialTheme provides no content colour of its own, and the app's
+            // root is a Box that paints a background rather than a Surface, so
+            // every Text that named no colour — the alert cards, the menu rows,
+            // most popups — fell back to Compose's default Color.Black. In the
+            // dark theme that is black on black: the unreadable text in some
+            // popups. onBackground is the right default because it is the colour
+            // of the page a popup floats over, and any Surface inside a popup
+            // still overrides it for its own content.
+            CompositionLocalProvider(
+                LocalContentColor provides palette.onBackground,
+                content = content,
+            )
+        }
     }
 }
 

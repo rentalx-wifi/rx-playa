@@ -215,17 +215,23 @@ fun AccountAndScrobblingScreen(
             header = stringResource(R.string.soundcloud),
             footer = stringResource(R.string.soundcloud_import_footer),
         ) {
-            SettingsRow(
-                icon = SfIcons.Cloud,
-                title = stringResource(R.string.soundcloud),
-                subtitle = when {
-                    soundCloudToken.isBlank() -> stringResource(R.string.soundcloud_public_import_subtitle)
-                    soundCloudAccount.isNotBlank() -> soundCloudAccount
-                    else -> stringResource(R.string.connected)
-                },
-                onClick = null,
-            )
-            FullWidthDivider()
+            // The account line exists only when there is an account: with no
+            // token it said "public playlists and liked tracks, without signing
+            // in" under the SoundCloud heading, which described the import row
+            // below it rather than anything the row itself did.
+            if (soundCloudToken.isNotBlank()) {
+                SettingsRow(
+                    icon = SfIcons.Cloud,
+                    title = stringResource(R.string.soundcloud),
+                    subtitle = if (soundCloudAccount.isNotBlank()) {
+                        soundCloudAccount
+                    } else {
+                        stringResource(R.string.connected)
+                    },
+                    onClick = null,
+                )
+                FullWidthDivider()
+            }
             SettingsRow(
                 icon = SfIcons.Cloud,
                 title = stringResource(R.string.soundcloud_import_title),

@@ -585,11 +585,16 @@ object AudioCache {
     }.getOrDefault(false)
 
     /**
-     * Whether the device has no usable connection right now. Asked by the
-     * places that must behave differently offline — choosing a cache entry,
-     * and deciding whether a failed read means the bytes on disk are bad.
+     * Whether the device has no usable connection right now — or the listener
+     * has asked the app to act as though it had none.
+     *
+     * Asked by the places that must behave differently offline — choosing a
+     * cache entry, deciding whether a failed read means the bytes on disk are
+     * bad, and building the page search shows. The switch is read first because
+     * it costs nothing while the capability lookup is a binder call.
      */
     fun isOffline(): Boolean {
+        if (AppSettings.offlineMode.value) return true
         if (!::appContext.isInitialized) return false
         val connectivity = appContext.getSystemService(ConnectivityManager::class.java) ?: return false
         val capabilities = runCatching { connectivity.getNetworkCapabilities(connectivity.activeNetwork) }

@@ -1605,7 +1605,7 @@ object Downloads {
     internal const val WIFI_ONLY_REFUSAL = "Downloads are set to Wi-Fi only"
 
     /** As `DownloadService.WORKERS`, whose reasoning is the same here. */
-    private const val BATCH_WORKERS = 4
+    private const val BATCH_WORKERS = 3
 
     /** Dropped when the sheet is reopened; a failure is worth showing once. */
     fun dismissFailure(videoId: String) {

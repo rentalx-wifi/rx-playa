@@ -12,7 +12,6 @@
     <string name="vk_import_invalid">Не удалось прочитать или сопоставить список. Используйте «Исполнитель — Название», CSV/TSV с колонками artist/title или массив треков JSON VK.</string>
     <string name="vk_public_import_subtitle">Без ключей API VK можно перенести свой список треков, но не получить доступ к приватной медиатеке VK.</string>
     <string name="soundcloud_public_choose">Выберите публичные лайки или плейлист</string>
-    <string name="soundcloud_public_import_subtitle">Публичные плейлисты и лайки без входа в аккаунт</string>
     <string name="app_name">RX Playa</string>
     <string name="playback_channel_name">Сейчас играет</string>
     <string name="download_channel_name">Загрузки</string>
@@ -43,6 +42,12 @@
     <string name="explore">Обзор</string>
     <string name="listen_now">Слушать сейчас</string>
     <string name="downloads">Загрузки</string>
+    <string name="wave_offline">Офлайн-волна · с этого устройства</string>
+    <string name="offline_mode">Офлайн-режим</string>
+    <string name="favorites_download_all">Скачать %1$d для офлайна</string>
+    <string name="favorites_offline_progress">%1$d из %2$d на устройстве</string>
+    <string name="favorites_all_offline">Все %1$d сохранены офлайн</string>
+    <string name="offline_mode_subtitle">Играть и собирать волну только из того, что на устройстве</string>
     <string name="downloaded_songs">Загруженные песни</string>
     <string name="local_music">Локальная музыка</string>
     <string name="audio_files_on_device">Аудиофайлы на устройстве</string>

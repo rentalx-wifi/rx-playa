@@ -287,6 +287,7 @@ fun SettingsScreen(
     val showCacheFolder by AppSettings.showCacheFolder.collectAsStateWithLifecycle()
     val downloadQuality by AppSettings.downloadQuality.collectAsStateWithLifecycle()
     val wifiOnlyDownloads by AppSettings.wifiOnlyDownloads.collectAsStateWithLifecycle()
+    val offlineMode by AppSettings.offlineMode.collectAsStateWithLifecycle()
     val exportDownloads by AppSettings.exportDownloads.collectAsStateWithLifecycle()
     val syncDownloadedPlaylists by AppSettings.syncDownloadedPlaylists.collectAsStateWithLifecycle()
     val stopOnTaskRemoved by AppSettings.stopOnTaskRemoved.collectAsStateWithLifecycle()
@@ -597,6 +598,16 @@ fun SettingsScreen(
         // it be fetched" — and those two questions only make sense read
         // together, which is what puts them side by side here.
         if (shows(SettingsCategory.DOWNLOADS)) SearchableSettingsGroup(search, header = stringResource(R.string.downloads)) {
+            // First in the group: it decides what every other row here can do.
+            val offlineModeTitle = stringResource(R.string.offline_mode)
+            row(offlineModeTitle, "offline", "network", "no connection") {
+                SettingsSubRow(
+                    title = offlineModeTitle,
+                    checked = offlineMode,
+                    onCheckedChange = AppSettings::setOfflineMode,
+                    subtitle = stringResource(R.string.offline_mode_subtitle),
+                )
+            }
             val downloadQualityTitle = stringResource(R.string.download_quality)
             row(downloadQualityTitle, "offline", "lossless") {
                 SettingsRow(

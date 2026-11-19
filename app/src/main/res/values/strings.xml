@@ -14,7 +14,6 @@
     <string name="vk_import_invalid">Could not read or match that list. Use Artist — Title, CSV/TSV with artist/title columns, or a VK JSON track array.</string>
     <string name="vk_public_import_subtitle">Without VK API keys you can import your track list, but not access a private VK library.</string>
     <string name="soundcloud_public_choose">Choose public liked tracks or a playlist</string>
-    <string name="soundcloud_public_import_subtitle">Public playlists and liked tracks, without signing in</string>
     <string name="app_name">RX Playa</string>
     <string name="playback_channel_name">Now playing</string>
     <string name="download_channel_name">Downloads</string>
@@ -43,6 +42,11 @@
     <string name="explore">Explore</string>
     <string name="listen_now">Listen Now</string>
     <string name="downloads">Downloads</string>
+    <string name="offline_mode">Offline mode</string>
+    <string name="favorites_download_all">Download %1$d for offline</string>
+    <string name="favorites_offline_progress">%1$d of %2$d on this device</string>
+    <string name="favorites_all_offline">All %1$d saved offline</string>
+    <string name="offline_mode_subtitle">Play and build the wave from what is on this device</string>
     <string name="downloaded_songs">Downloaded songs</string>
     <string name="local_music">Local Music</string>
     <string name="search_source_youtube" translatable="false">YouTube</string>
@@ -599,6 +603,7 @@
     <string name="starting">Starting</string>
     <string name="start_radio">Start radio</string>
     <string name="bitwave" translatable="false">RX Wave</string>
+    <string name="wave_offline">Offline wave · from this device</string>
     <string name="shared_link">Shared link</string>
     <string name="opened_file">Opened file</string>
     <string name="radio_started">%1$s radio started</string>

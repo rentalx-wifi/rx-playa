@@ -262,6 +262,18 @@ object AppSettings {
     val meteredConnection = MutableStateFlow<Boolean?>(null)
 
     /**
+     * A switch the listener throws, not a reading of the radio.
+     *
+     * Off by default, and independent of the real connection: someone on hotel
+     * wifi or a metered hotspot wants the app to behave as though there is no
+     * network without turning the phone's own radio off. Everything that
+     * already asked [com.music.bitchord.playback.AudioCache.isOffline] — the
+     * home page, search, the cache's own choices, RX Wave's queue — reads this
+     * too, so one switch moves the whole app.
+     */
+    val offlineMode = MutableStateFlow(false)
+
+    /**
      * Follow the beta channel: test builds are published before the stable one
      * and this is the switch that offers them.
      *
@@ -1022,6 +1034,7 @@ object AppSettings {
         wifiOnlyDownloads.value = prefs.getBoolean(KEY_WIFI_ONLY_DOWNLOADS, true)
         exportDownloads.value = prefs.getBoolean(KEY_EXPORT_DOWNLOADS, false)
         syncDownloadedPlaylists.value = prefs.getBoolean(KEY_SYNC_DOWNLOADED_PLAYLISTS, false)
+        offlineMode.value = prefs.getBoolean(KEY_OFFLINE_MODE, false)
         betaUpdates.value = prefs.getBoolean(KEY_BETA_UPDATES, false)
         crossfadeSeconds.value = prefs.getInt(KEY_CROSSFADE, 0)
         smartFadeEnabled.value = prefs.getBoolean(KEY_SMART_FADE, false)
@@ -1347,6 +1360,11 @@ object AppSettings {
     fun setWifiOnlyDownloads(value: Boolean) {
         wifiOnlyDownloads.value = value
         prefs.edit().putBoolean(KEY_WIFI_ONLY_DOWNLOADS, value).apply()
+    }
+
+    fun setOfflineMode(value: Boolean) {
+        offlineMode.value = value
+        prefs.edit().putBoolean(KEY_OFFLINE_MODE, value).apply()
     }
 
     fun setBetaUpdates(value: Boolean) {
@@ -2434,6 +2452,7 @@ object AppSettings {
     private const val KEY_UPGRADE_LENGTH_SLACK_SECONDS = "upgrade_length_slack_seconds"
     private const val KEY_QUALITY_DOWNLOAD = "audio_quality_download"
     private const val KEY_WIFI_ONLY_DOWNLOADS = "wifi_only_downloads"
+    private const val KEY_OFFLINE_MODE = "offline_mode"
     private const val KEY_BETA_UPDATES = "beta_updates"
     private const val KEY_EXPORT_DOWNLOADS = "export_downloads"
     private const val KEY_SYNC_DOWNLOADED_PLAYLISTS = "sync_downloaded_playlists"

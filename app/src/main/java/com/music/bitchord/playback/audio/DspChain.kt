@@ -43,6 +43,7 @@ class DspChain(
 
     override fun configure(sampleRate: Int, channelCount: Int) {
         this.currentSampleRate = sampleRate
+        com.music.bitchord.playback.AudioEnergy.configure(sampleRate)
         spatial.configure(sampleRate, channelCount)
         equalizer.configure(sampleRate, channelCount)
         transition.configure(sampleRate, channelCount)
@@ -84,6 +85,9 @@ class DspChain(
         // see; the loudness stage's limiter is what catches whatever survives.
         loudness.holdLimiter = equalizer.isShaping
         loudness.process(block)
+        // Last, so what the meter reports is what leaves the chain: the pill
+        // moves to the bass the listener actually hears, not to the decoder's.
+        com.music.bitchord.playback.AudioEnergy.feed(block)
     }
 
     @Suppress("DEPRECATION")

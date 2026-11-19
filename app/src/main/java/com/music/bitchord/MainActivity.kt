@@ -235,6 +235,7 @@ import com.music.bitchord.data.spotify.SPOTIFY_PAGE_PREFIX
 import com.music.bitchord.data.spotify.isSpotifySourceTrack
 import com.music.bitchord.data.vk.isVkSourceTrack
 import com.music.bitchord.playback.AudioCache
+import com.music.bitchord.playback.AudioEnergy
 import com.music.bitchord.playback.LinkRequest
 import com.music.bitchord.playback.MusicLink
 import com.music.bitchord.playback.OriginalVersion
@@ -256,6 +257,7 @@ import com.music.bitchord.playback.fromAutoplay
 import com.music.bitchord.playback.hasYouTubeOriginal
 import com.music.bitchord.playback.loadAutoplayTracks
 import com.music.bitchord.playback.loadPersonalWave
+import com.music.bitchord.playback.OfflineWave
 import com.music.bitchord.playback.playSongs
 import com.music.bitchord.playback.BoundedQueuePlanner
 import com.music.bitchord.playback.playBoundedContext
@@ -2083,10 +2085,27 @@ private fun BitChordApp(
         scope.launch {
             if (refusedByHost()) return@launch
             val profile = personalizedHome.profile
-            val wave = if (profile.isEmpty) {
-                emptyList()
+            // Offline the station is the device's own files: the online one
+            // asks a catalogue for each seed artist, and a press that waited
+            // for a timeout to fail is worse than a shorter station.
+            val offline = AudioCache.isOffline()
+            val owned = if (offline) {
+                runCatching { Downloads.getDownloadedSongs(context) }.getOrDefault(emptyList())
             } else {
-                freshPersonalWave(profile, player.queue)
+                emptyList()
+            }
+            if (offline && owned.isEmpty()) {
+                showQueueNotice(context.getString(R.string.offline_nothing_downloaded))
+                return@launch
+            }
+            val wave = when {
+                offline -> OfflineWave.plan(
+                    downloaded = owned,
+                    likedIds = profile.tracks.filter { it.liked }.mapTo(HashSet()) { it.song.videoId },
+                    excludeIds = player.queue.mapTo(HashSet()) { it.videoId },
+                )
+                profile.isEmpty -> emptyList()
+                else -> freshPersonalWave(profile, player.queue)
             }
             if (request != playRequestGeneration) return@launch
             val activeController = controller
@@ -3907,6 +3926,15 @@ private fun BitChordApp(
                                 recentlyPlayedLoading = homeRecentlyPlayedLoading,
                                 personalizationHint = personalizationHint,
                                 waveLabel = bitWaveLabel,
+                                waveStatus = when {
+                                    AudioCache.isOffline() -> stringResource(R.string.wave_offline)
+                                    else -> null
+                                },
+                                // Read off the audio thread by the plate's own
+                                // frame loop, not collected: a flow here would
+                                // wake this composable sixty times a second.
+                                waveEnergy = { AudioEnergy.currentBass() },
+                                onWaveToggle = togglePlayPause,
                                 onWaveClick = startPersonalWave,
                                 listenerName = account?.name,
                                 leadHero = false,
@@ -3991,6 +4019,16 @@ private fun BitChordApp(
                                 onSongLongPress = openSongMenu,
                                 onSongSwipe = onSongSwipe,
                                 onToggleLike = toggleLikeOf,
+                                // The same entry point every release's "Download
+                                // all" uses: it already drops what is saved,
+                                // asks for the two permissions, honours the
+                                // Wi-Fi-only rule and queues the rest three at a
+                                // time through [Downloads]. The screen above only
+                                // adds the progress it can read back.
+                                onDownloadAll = { missing -> startDownload(missing, null) },
+                                onCancelDownloads = { missing ->
+                                    missing.forEach { Downloads.cancel(it.videoId) }
+                                },
                             )
                             TAB_SEARCH -> SearchScreen(
                                 query = query,

@@ -13,7 +13,6 @@
     <string name="vk_import_invalid">Could not read or match that list. Use Artist — Title, CSV/TSV with artist/title columns, or a VK JSON track array.</string>
     <string name="vk_public_import_subtitle">Without VK API keys you can import your track list, but not access a private VK library.</string>
     <string name="soundcloud_public_choose">Choose public liked tracks or a playlist</string>
-    <string name="soundcloud_public_import_subtitle">Public playlists and liked tracks, without signing in</string>
     <string name="app_name">RX Playa</string>
     <string name="playback_channel_name">Đang phát</string>
     <string name="download_channel_name">Tải xuống</string>
@@ -41,6 +40,12 @@
     <string name="explore">Khám phá</string>
     <string name="listen_now">Nghe ngay</string>
     <string name="downloads">Tải xuống</string>
+    <string name="offline_mode">Offline mode</string>
+    <string name="offline_mode_subtitle">Play and build the wave from what is on this device</string>
+    <string name="favorites_download_all">Download %1$d for offline</string>
+    <string name="favorites_offline_progress">%1$d of %2$d on this device</string>
+    <string name="favorites_all_offline">All %1$d saved offline</string>
+    <string name="wave_offline">Offline wave · from this device</string>
     <string name="downloaded_songs">Bài hát đã tải</string>
     <string name="local_music">Nhạc trên thiết bị</string>
     <string name="audio_files_on_device">Tệp âm thanh trên thiết bị</string>

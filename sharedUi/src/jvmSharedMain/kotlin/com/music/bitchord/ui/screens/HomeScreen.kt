@@ -58,6 +58,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -67,6 +69,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,6 +84,8 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Storage
 import com.music.bitchord.ui.icons.BitChordIcons
 import coil3.compose.AsyncImage
@@ -118,7 +126,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import kotlin.math.PI
+import kotlin.math.exp
 import kotlin.math.sin
+import com.music.bitchord.ui.rememberIsForeground
 
 /** How far the Listen now heading and feed sit above the shared top inset. */
 private val HOME_TITLE_LIFT = 28.dp
@@ -135,6 +145,10 @@ private fun SpotifyHomeHeader(
     onSelected: (Int) -> Unit,
     personalizationHint: String? = null,
     waveLabel: String? = null,
+    waveStatus: String? = null,
+    waveEnergy: () -> Float = { 0f },
+    isPlaying: Boolean = false,
+    onWaveToggle: (() -> Unit)? = null,
     onWaveClick: (() -> Unit)? = null,
 ) {
     Column(
@@ -154,7 +168,14 @@ private fun SpotifyHomeHeader(
         }
         if (!waveLabel.isNullOrBlank() && onWaveClick != null) {
             Spacer(Modifier.height(12.dp))
-            RxWavePill(waveLabel, onWaveClick)
+            RxWavePill(
+                label = waveLabel,
+                status = waveStatus,
+                onClick = onWaveClick,
+                isPlaying = isPlaying,
+                onToggle = onWaveToggle,
+                energy = waveEnergy,
+            )
         }
         if (labels.isNotEmpty()) {
             Spacer(Modifier.height(14.dp))
@@ -181,78 +202,174 @@ private fun SpotifyHomeHeader(
     }
 }
 
-/** A tiny living station indicator; only this pill redraws while it breathes. */
+/** How tall the station's plate is. */
+private val WAVE_PLATE_HEIGHT = 88.dp
+
+/** Layers of contour drawn across the plate. Three is what reads as depth. */
+private const val WAVE_CONTOURS = 3
+
+/** Segments per contour. More than this is invisible at any phone's width. */
+private const val WAVE_SEGMENTS = 34
+
+/**
+ * The station's plate: the one surface on the feed that moves to the music.
+ *
+ * Drawn rather than assembled out of views. Everything that changes per frame
+ * lives in two places — the contours in one [Canvas] draw block, the elastic
+ * scale in one `graphicsLayer` block — and both read [phase]/[beat] *inside*
+ * those blocks, where a state read invalidates the draw or the layer rather
+ * than the composable. That is what keeps a 60 fps plate off the recomposition
+ * path: nothing recomposes while it breathes, and a frame costs one gradient,
+ * three strokes of [WAVE_SEGMENTS] segments and one layer update.
+ *
+ * No blur, no shadow, no filter anywhere on it: those are the per-frame costs
+ * that put a weak phone on its knees.
+ *
+ * [energy] is the bass the listener is hearing, read off the audio thread on
+ * this frame — see `AudioEnergy` — so the plate follows the kick of the track
+ * rather than a timer pretending to. With nothing playing it falls back to a
+ * slow breathing of its own, and with reduced motion it does not move at all.
+ *
+ * The loop stops when the app is not on screen ([rememberIsForeground]) or the
+ * plate is not composed at all — scrolled out of the feed, its item is disposed.
+ */
 @Composable
-private fun RxWavePill(label: String, onClick: () -> Unit) {
+private fun RxWavePill(
+    label: String,
+    status: String?,
+    onClick: () -> Unit,
+    isPlaying: Boolean,
+    onToggle: (() -> Unit)?,
+    energy: () -> Float,
+) {
     val reduceMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
-    val transition = rememberInfiniteTransition(label = "rxWaveBreath")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = (PI * 2).toFloat(),
-        animationSpec = infiniteRepeatable(tween(2_400, easing = LinearEasing), RepeatMode.Restart),
-        label = "rxWavePhase",
-    )
-    val breath by transition.animateFloat(
-        initialValue = 0.985f,
-        targetValue = 1.025f,
-        animationSpec = infiniteRepeatable(tween(1_650), RepeatMode.Reverse),
-        label = "rxWaveScale",
-    )
-    val animatedPhase = if (reduceMotion) 0f else phase
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
-        tonalElevation = 2.dp,
-        modifier = Modifier
-            .graphicsLayer {
-                val scale = if (reduceMotion) 1f else breath
-                scaleX = scale
-                scaleY = scale
-                shadowElevation = if (reduceMotion) 0f else 3.dp.toPx()
+    val foreground = rememberIsForeground()
+    // Float states rather than an Animatable: these are written once a frame and
+    // read only by the draw and layer blocks below.
+    val phase = remember { mutableFloatStateOf(0f) }
+    val beat = remember { mutableFloatStateOf(0f) }
+    val scheme = MaterialTheme.colorScheme
+    val ink = scheme.onPrimary
+
+    LaunchedEffect(reduceMotion, foreground, isPlaying) {
+        if (reduceMotion || !foreground) return@LaunchedEffect
+        var last = 0L
+        while (true) {
+            withFrameNanos { now ->
+                val dt = if (last == 0L) {
+                    0.016f
+                } else {
+                    ((now - last) / 1_000_000_000f).coerceIn(0f, 0.05f)
+                }
+                last = now
+                val raw = if (isPlaying) energy().coerceIn(0f, 1f) else 0f
+                val current = beat.floatValue
+                // Fast attack, slow release: a beat that arrives is immediate,
+                // one that has gone fades — the envelope a moving coil has.
+                beat.floatValue = if (raw > current) {
+                    current + (raw - current) * 0.5f
+                } else {
+                    current * exp(-dt * 3.4f)
+                }
+                phase.floatValue =
+                    (phase.floatValue + dt * (0.14f + 1.05f * beat.floatValue)) % 1f
             }
+        }
+    }
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(WAVE_PLATE_HEIGHT)
+            .graphicsLayer {
+                // The plate gives with the beat — 3% at the peak, felt rather
+                // than seen. Read here, so only this layer invalidates a frame.
+                val swell = 1f + 0.03f * beat.floatValue
+                scaleX = swell
+                scaleY = swell
+            }
+            .clip(RoundedCornerShape(28.dp))
+            .background(
+                Brush.horizontalGradient(
+                    listOf(
+                        scheme.primary,
+                        lerp(scheme.primary, scheme.secondary, 0.55f),
+                        lerp(scheme.primary, scheme.tertiary, 0.40f),
+                    ),
+                ),
+            )
             .clickable(onClick = onClick),
     ) {
-        val waveInk = MaterialTheme.colorScheme.onPrimary
+        Canvas(Modifier.matchParentSize()) {
+            val b = beat.floatValue
+            val p = phase.floatValue
+            // A calm track breathes through a tenth of the plate's height; a
+            // kick takes the contours to about a third of it.
+            val amplitude = size.height * (0.09f + 0.26f * b)
+            repeat(WAVE_CONTOURS) { layer ->
+                val baseline = size.height * (0.66f + 0.13f * layer)
+                val path = Path()
+                var i = 0
+                while (i <= WAVE_SEGMENTS) {
+                    val x = size.width * i / WAVE_SEGMENTS
+                    val wave = sin(p * 2f * PI.toFloat() + i * 0.38f + layer * 1.9f)
+                    val y = baseline + wave * amplitude * (1f - layer * 0.26f)
+                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                    i++
+                }
+                drawPath(
+                    path = path,
+                    color = ink.copy(alpha = 0.34f - layer * 0.09f),
+                    style = Stroke(
+                        width = (2.2f - layer * 0.5f).dp.toPx(),
+                        cap = StrokeCap.Round,
+                    ),
+                )
+            }
+        }
+
         Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 18.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Canvas(Modifier.size(22.dp)) {
-                drawCircle(
-                    color = waveInk.copy(alpha = 0.22f),
-                    radius = size.minDimension / 2f,
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.W800),
+                    color = ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                val barWidth = size.width * 0.09f
-                val gap = size.width * 0.13f
-                repeat(4) { index ->
-                    val wave = sin(animatedPhase + index * 1.25f) * 0.5f + 0.5f
-                    val height = size.height * (0.22f + wave * 0.48f)
-                    val x = size.width / 2f + (index - 1.5f) * gap
-                    drawRoundRect(
-                        color = waveInk,
-                        topLeft = androidx.compose.ui.geometry.Offset(x - barWidth / 2f, (size.height - height) / 2f),
-                        size = androidx.compose.ui.geometry.Size(barWidth, height),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth),
+                if (!status.isNullOrBlank()) {
+                    Text(
+                        text = status,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = ink.copy(alpha = 0.74f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.W800),
-            )
+            Spacer(Modifier.width(12.dp))
             Box(
                 Modifier
-                    .size(5.dp)
+                    .size(42.dp)
                     .clip(CircleShape)
-                    .background(
-                        MaterialTheme.colorScheme.onPrimary.copy(
-                            alpha = if (reduceMotion) 0.75f
-                            else 0.45f + 0.35f * (sin(animatedPhase) * 0.5f + 0.5f),
-                        ),
+                    .background(ink.copy(alpha = 0.18f))
+                    .clickable { onToggle?.invoke() ?: onClick() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    contentDescription = stringResource(
+                        if (isPlaying) Res.string.pause else Res.string.play,
                     ),
-            )
+                    tint = ink,
+                    modifier = Modifier.size(23.dp),
+                )
+            }
         }
     }
 }
@@ -430,6 +547,9 @@ fun HomeScreen(
     homeFilterLabels: List<String> = emptyList(),
     personalizationHint: String? = null,
     waveLabel: String? = null,
+    waveStatus: String? = null,
+    waveEnergy: () -> Float = { 0f },
+    onWaveToggle: (() -> Unit)? = null,
     onWaveClick: (() -> Unit)? = null,
 ) {
     var selectedHomeFilter by rememberSaveable { mutableIntStateOf(0) }
@@ -502,6 +622,10 @@ fun HomeScreen(
                             onSelected = { selectedHomeFilter = it },
                             personalizationHint = personalizationHint,
                             waveLabel = waveLabel,
+                            waveStatus = waveStatus,
+                            waveEnergy = waveEnergy,
+                            isPlaying = isPlaying,
+                            onWaveToggle = onWaveToggle,
                             onWaveClick = onWaveClick,
                         )
                     } else {
