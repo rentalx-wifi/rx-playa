@@ -842,7 +842,7 @@ private fun ChoiceRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = ACTION_HEIGHT)
+            .heightIn(min = alertActionHeight())
             // iOS washes the whole row instead of drawing a ripple inside it.
             .background(
                 if (pressed) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f) else Color.Transparent,
@@ -896,7 +896,7 @@ internal fun AlertScaffold(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    val shape = RoundedCornerShape(ALERT_CORNER)
+    val shape = RoundedCornerShape(alertCorner())
 
     Box(
         modifier = Modifier
@@ -911,7 +911,7 @@ internal fun AlertScaffold(
     ) {
         Column(
             modifier = Modifier
-                .width(ALERT_WIDTH)
+                .width(alertWidth())
                 .clip(shape)
                 .then(
                     if (reduceDynamicBlur || !frosted) {

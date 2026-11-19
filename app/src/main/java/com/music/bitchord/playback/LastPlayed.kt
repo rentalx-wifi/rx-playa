@@ -20,6 +20,19 @@ object LastPlayed {
     private lateinit var prefs: SharedPreferences
     private val json = Json { ignoreUnknownKeys = true }
 
+    /**
+     * Encodes and writes the restart snapshot away from the caller's thread.
+     *
+     * Every caller of the "immediate" path is the app's main thread at a queue
+     * boundary, and a queue plus a disk sync is not work to do there: it was
+     * the two seconds of frozen screen between tapping a track and hearing it.
+     * Ordering is kept by the single thread; only a process death inside the
+     * few milliseconds before the write lands can restore the previous queue.
+     */
+    private val writer = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "last-played-save").apply { isDaemon = true }
+    }
+
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
@@ -63,17 +76,38 @@ object LastPlayed {
         }
         val safeIndex = index.coerceIn(songs.indices)
         val bounds = window(songs.size, safeIndex)
-        val stored = StoredQueue(
-            tracks = songs.subList(bounds.first, bounds.last + 1).map { StoredTrack.from(it) },
+        saveWindowImmediately(
+            songs = songs.subList(bounds.first, bounds.last + 1),
+            index = safeIndex - bounds.first,
+            positionMs = positionMs,
         )
-        val encoded = runCatching {
-            json.encodeToString(StoredQueue.serializer(), stored)
-        }.getOrNull() ?: return
-        prefs.edit()
-            .putString(KEY_QUEUE, encoded)
-            .putInt(KEY_INDEX, safeIndex - bounds.first)
-            .putLong(KEY_POSITION, positionMs.coerceAtLeast(0L))
-            .commit()
+    }
+
+    /**
+     * Writes an already-windowed snapshot without re-windowing it.
+     *
+     * The service has the live player in hand and can slice the window itself;
+     * handing it the whole queue to slice again meant converting every item — a
+     * binder read each — only to throw all but seventy of them away.
+     */
+    fun saveWindowImmediately(songs: List<Song>, index: Int, positionMs: Long) {
+        if (songs.isEmpty()) {
+            clearImmediately()
+            return
+        }
+        val stored = StoredQueue(tracks = songs.map(StoredTrack::from))
+        val relativeIndex = index.coerceIn(songs.indices)
+        val position = positionMs.coerceAtLeast(0L)
+        writer.execute {
+            val encoded = runCatching {
+                json.encodeToString(StoredQueue.serializer(), stored)
+            }.getOrNull() ?: return@execute
+            prefs.edit()
+                .putString(KEY_QUEUE, encoded)
+                .putInt(KEY_INDEX, relativeIndex)
+                .putLong(KEY_POSITION, position)
+                .commit()
+        }
     }
 
     /** Update only cheap scalar state; this performs no queue conversion or JSON work. */

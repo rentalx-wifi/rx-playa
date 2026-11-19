@@ -195,6 +195,8 @@ suspend fun loadPersonalWave(
     limit: Int = PERSONAL_WAVE_TRACKS,
     random: Random = Random.Default,
     nowMs: Long = System.currentTimeMillis(),
+    /** Build the station even if every row in it played recently — the last resort before a one-seed radio. */
+    ignoreRecent: Boolean = false,
 ): Result<List<Song>> {
     val liked = profile.tracks.filter { it.liked && it.song.videoId.isNotBlank() }
     if (liked.isEmpty()) return Result.success(emptyList())
@@ -236,12 +238,12 @@ suspend fun loadPersonalWave(
         val at = track.lastPlayedAtMs ?: 0L
         at > 0L && at >= nowMs - PLAYED_COOLDOWN_MS
     }
-    val recentVideoIds = buildSet {
+    val recentVideoIds = if (ignoreRecent) emptySet() else buildSet {
         addAll(served.videoIds)
         playedRecently.forEach { add(it.song.videoId) }
         exclude.forEach { add(it.videoId) }
     }
-    val recentRecordings = buildSet {
+    val recentRecordings = if (ignoreRecent) emptySet() else buildSet {
         addAll(served.recordings)
         playedRecently.forEach { add(PersonalWavePlanner.recordingKey(it.song)) }
         exclude.forEach { add(PersonalWavePlanner.recordingKey(it)) }

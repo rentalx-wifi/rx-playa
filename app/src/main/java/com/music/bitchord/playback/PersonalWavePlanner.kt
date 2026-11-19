@@ -37,7 +37,9 @@ import kotlin.random.Random
  * 9. An artist the likes do not know joins only when several seed radios name
  *    them — a neighbour of the taste, not a chart pick — and never more than
  *    one such artist in [DISCOVERY_EVERY] rows.
- * 10. An artist takes at most [MAX_PER_ARTIST] rows, and never two in a row.
+ * 10. An artist takes at most [MAX_PER_ARTIST] rows, and never two in a row —
+ *     and with at least [ARTIST_GAP] rows in between, so a station cannot read
+ *     as one artist's page even when the pool is mostly them.
  * 11. A track that was served by an earlier wave or played since goes to the
  *     back of the station. Press the pill twice and the second one opens with
  *     tracks the first one did not use; a repeat only appears once the fresh
@@ -110,6 +112,9 @@ internal object PersonalWavePlanner {
     )
 
     private const val MAX_PER_ARTIST = 2
+
+    /** How many rows must sit between two rows by the same artist. */
+    private const val ARTIST_GAP = 4
     private const val SCORE_JITTER = 1.0
     private const val MIN_SEED_WEIGHT = 0.25
     private const val DISCOVERY_EVERY = 5
@@ -222,25 +227,57 @@ internal object PersonalWavePlanner {
         )
         val picks = ArrayList<Pick>(input.limit)
         val perArtist = HashMap<String, Int>()
+        val lastAt = HashMap<String, Int>()
+        val taken = HashSet<String>()
         var lastArtist = ""
         var sinceDiscovery = DISCOVERY_EVERY
-        for (pick in ordered) {
-            if (picks.size >= input.limit) break
+
+        fun fits(pick: Pick, gap: Int): String? {
             val artist = normalizedArtistName(pick.song.artist)
-            if ((perArtist[artist] ?: 0) >= MAX_PER_ARTIST) continue
-            if (artist == lastArtist) continue
+            if (pick.song.videoId in taken) return null
+            if ((perArtist[artist] ?: 0) >= MAX_PER_ARTIST) return null
+            if (artist == lastArtist) return null
+            // Rule 10, spread out: two rows by one artist belong in a station,
+            // but not within a handful of rows of each other.
+            lastAt[artist]?.let { at -> if (picks.size - at <= gap) return null }
             val liked = artist in input.likedArtists
             val confirmed = artist in historyConfirmed
             if (!liked && !confirmed) {
                 // Rule 9: a newcomer only every DISCOVERY_EVERY rows.
-                if (sinceDiscovery < DISCOVERY_EVERY) continue
-                sinceDiscovery = 0
-            } else {
-                sinceDiscovery++
+                if (sinceDiscovery < DISCOVERY_EVERY) return null
             }
+            return artist
+        }
+
+        fun add(pick: Pick, artist: String) {
+            val liked = artist in input.likedArtists
+            val confirmed = artist in historyConfirmed
+            if (!liked && !confirmed) sinceDiscovery = 0 else sinceDiscovery++
             picks += pick
+            taken += pick.song.videoId
             perArtist[artist] = (perArtist[artist] ?: 0) + 1
+            lastAt[artist] = picks.size
             lastArtist = artist
+        }
+
+        // Three passes, and the order of them is rule 11: the whole fresh pool
+        // is placed first, first honouring the artist gap and then not, and only
+        // then does a repeated row fill what is left. A pool too small for the
+        // gap still yields a station; a station never opens with repeats.
+        for (pick in ordered) {
+            if (picks.size >= input.limit) break
+            if (!pick.fresh) break
+            fits(pick, ARTIST_GAP)?.let { add(pick, it) }
+        }
+        for (pick in ordered) {
+            if (picks.size >= input.limit) break
+            if (!pick.fresh) break
+            fits(pick, 0)?.let { add(pick, it) }
+        }
+        for (pick in ordered) {
+            if (picks.size >= input.limit) break
+            if (pick.fresh) continue
+            fits(pick, 0)?.let { add(pick, it) }
         }
 
         return Result(picks, rejects, asked, artistHits)

@@ -908,7 +908,7 @@ internal fun PipelineDoneAction(label: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(ACTION_HEIGHT)
+            .height(alertActionHeight())
             .background(
                 if (pressed) Color.White.copy(alpha = 0.09f) else Color.Transparent,
             )

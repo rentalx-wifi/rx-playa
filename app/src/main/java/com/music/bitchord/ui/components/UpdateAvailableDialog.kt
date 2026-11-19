@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,6 +39,7 @@ import com.halilibo.richtext.ui.material3.RichText
 import com.music.bitchord.R
 import com.music.bitchord.data.AppUpdateChecker
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.ui.theme.LocalMaterial3StyleEnabled
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
@@ -46,6 +48,24 @@ import dev.chrisbanes.haze.materials.HazeMaterials
 internal val ALERT_WIDTH = 270.dp
 internal val ALERT_CORNER = 14.dp
 internal val ACTION_HEIGHT = 44.dp
+
+/**
+ * The same metrics, as Material 3 draws them.
+ *
+ * The card above is UIAlertController's, down to the 270-point width and the
+ * 44-point rows, which is right for the skin that copies that language and
+ * wrong for the Pixel one: a dialog there is wider, has 28-point corners and
+ * taller rows. Every dialog in the app measures itself through these, so the
+ * Pixel skin changes all of them at once instead of one at a time.
+ */
+@Composable
+internal fun alertWidth(): Dp = if (LocalMaterial3StyleEnabled.current) 360.dp else ALERT_WIDTH
+
+@Composable
+internal fun alertCorner(): Dp = if (LocalMaterial3StyleEnabled.current) 28.dp else ALERT_CORNER
+
+@Composable
+internal fun alertActionHeight(): Dp = if (LocalMaterial3StyleEnabled.current) 52.dp else ACTION_HEIGHT
 
 /**
  * The dim behind the alert. Flat on purpose — the glass is the card, and
@@ -95,7 +115,7 @@ fun UpdateAvailableDialog(
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val state by AppUpdateChecker.download.collectAsStateWithLifecycle()
-    val shape = RoundedCornerShape(ALERT_CORNER)
+    val shape = RoundedCornerShape(alertCorner())
 
     Box(
         modifier = modifier
@@ -114,7 +134,7 @@ fun UpdateAvailableDialog(
     ) {
         Column(
             modifier = Modifier
-                .width(ALERT_WIDTH)
+                .width(alertWidth())
                 .clip(shape)
                 .then(
                     if (reduceDynamicBlur) {
@@ -298,7 +318,7 @@ internal fun AlertAction(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(ACTION_HEIGHT)
+            .height(alertActionHeight())
             // iOS washes the whole row instead of drawing a ripple inside it.
             .background(
                 if (pressed) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f) else Color.Transparent,

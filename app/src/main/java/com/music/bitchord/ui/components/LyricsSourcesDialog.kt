@@ -93,7 +93,7 @@ fun LyricsSourcesDialog(
     val prioritizeSyllableSync by AppSettings.prioritizeSyllableSync.collectAsStateWithLifecycle()
     val paxSenixApiKey by AppSettings.paxSenixApiKey.collectAsStateWithLifecycle()
     var showPaxSenixKeyDialog by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(ALERT_CORNER)
+    val shape = RoundedCornerShape(alertCorner())
 
     Box(
         modifier = modifier
@@ -108,7 +108,7 @@ fun LyricsSourcesDialog(
     ) {
         Column(
             modifier = Modifier
-                .width(ALERT_WIDTH)
+                .width(alertWidth())
                 .clip(shape)
                 .then(
                     if (reduceDynamicBlur) {
@@ -253,7 +253,7 @@ private fun SyllableSyncToggle(checked: Boolean, onToggle: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = ACTION_HEIGHT)
+            .heightIn(min = alertActionHeight())
             .background(
                 if (pressed) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f) else Color.Transparent,
             )
@@ -485,7 +485,7 @@ private fun ReorderableSourceList(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = ACTION_HEIGHT)
+                            .heightIn(min = alertActionHeight())
                             .clickable(
                                 enabled = toggleable,
                                 indication = null,

@@ -96,12 +96,23 @@ object BoundedContextPersistence {
     }
 
     fun saveImmediately(state: State) {
-        synchronized(this) {
+        val startedAt = synchronized(this) {
             generation += 1
             pending = null
+            generation
         }
-        val encoded = encode(state) ?: return
-        synchronized(this) { write(state, encoded).commit() }
+        // Encoded and written on [writer]: the caller is the main thread at a
+        // queue boundary, and a whole context is not something to serialise and
+        // fsync there — that is the freeze between a tap and the music. The
+        // generation check still drops this write if a newer one or a clear has
+        // happened in the meantime.
+        writer.execute {
+            val encoded = encode(state) ?: return@execute
+            synchronized(this) {
+                if (startedAt != generation) return@execute
+                write(state, encoded).commit()
+            }
+        }
     }
 
     private fun write(state: State, encoded: String): SharedPreferences.Editor =

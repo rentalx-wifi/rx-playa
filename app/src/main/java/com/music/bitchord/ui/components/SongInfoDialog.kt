@@ -51,8 +51,8 @@ internal fun SongInfoDialog(song: Song, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(
             Modifier
-                .width(ALERT_WIDTH)
-                .clip(RoundedCornerShape(ALERT_CORNER))
+                .width(alertWidth())
+                .clip(RoundedCornerShape(alertCorner()))
                 .background(MaterialTheme.colorScheme.surface),
         ) {
             Column(
@@ -136,7 +136,7 @@ private fun SongInfoRow(label: String, value: String?) {
     Row(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = ACTION_HEIGHT)
+            .heightIn(min = alertActionHeight())
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

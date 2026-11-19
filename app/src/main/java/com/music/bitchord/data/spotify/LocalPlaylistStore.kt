@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.HomeSource
 import com.music.bitchord.data.model.PlaybackSourceType
+import com.music.bitchord.playback.contextEntryKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
@@ -120,6 +121,36 @@ object LocalPlaylistStore {
         imported.forEach { byId[it.id] = it }
         _playlists.value = byId.values.sortedBy { it.title.lowercase() }
         persist(_playlists.value)
+    }
+
+    /**
+     * Takes a track out of a playlist kept on this device.
+     *
+     * Its own operation rather than a rewrite of the whole playlist, because
+     * this is what the "remove from this playlist" row calls: a playlist made
+     * without an account had no way to lose a track at all, which is what the
+     * complaints were about.
+     *
+     * The match is by [Song.contextEntryKey], so a row that is in the list
+     * twice under two ids loses only the one that was tapped.
+     */
+    fun removeSong(id: String, song: Song): Boolean {
+        val clean = id.removePrefix("local:playlist:").removePrefix("VL")
+        val index = _playlists.value.indexOfFirst {
+            it.id == clean || it.browseId == id || it.id == id
+        }
+        if (index < 0) return false
+        val playlist = _playlists.value[index]
+        val key = song.contextEntryKey()
+        val remaining = playlist.songs.filterNot {
+            it.videoId == song.videoId || it.contextEntryKey() == key
+        }
+        if (remaining.size == playlist.songs.size) return false
+        val updated = _playlists.value.toMutableList()
+        updated[index] = playlist.copy(songs = remaining)
+        _playlists.value = updated
+        persist(updated)
+        return true
     }
 
     fun deletePlaylist(id: String) {

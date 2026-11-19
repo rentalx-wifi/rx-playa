@@ -6265,9 +6265,12 @@ class PlaybackService : MediaLibraryService() {
         }
         val range = LastPlayed.window(player.mediaItemCount, player.currentMediaItemIndex)
         persistedQueueStart = range.first
-        LastPlayed.saveQueueImmediately(
-            songs = (0 until player.mediaItemCount).map { player.getMediaItemAt(it).toSong() },
-            index = player.currentMediaItemIndex,
+        // The window is sliced here, from the live player, rather than handing
+        // the whole queue over to be sliced again: every slice meant a binder
+        // read per item and a copy of a Song to discard most of them.
+        LastPlayed.saveWindowImmediately(
+            songs = range.map { player.getMediaItemAt(it).toSong() },
+            index = player.currentMediaItemIndex - range.first,
             positionMs = player.currentPosition,
         )
         saveBoundedContextSnapshot(player, immediately = true)

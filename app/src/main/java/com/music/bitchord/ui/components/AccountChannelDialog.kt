@@ -70,7 +70,7 @@ fun AccountChannelDialog(
     modifier: Modifier = Modifier,
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
-    val shape = RoundedCornerShape(ALERT_CORNER)
+    val shape = RoundedCornerShape(alertCorner())
 
     Box(
         modifier = modifier
@@ -85,7 +85,7 @@ fun AccountChannelDialog(
     ) {
         Column(
             modifier = Modifier
-                .width(ALERT_WIDTH)
+                .width(alertWidth())
                 .clip(shape)
                 .then(
                     if (reduceDynamicBlur) {
@@ -183,7 +183,7 @@ private fun ChannelRow(channel: AccountChannel, selected: Boolean, onClick: () -
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = ACTION_HEIGHT)
+            .heightIn(min = alertActionHeight())
             .background(
                 if (pressed) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f) else Color.Transparent,
             )

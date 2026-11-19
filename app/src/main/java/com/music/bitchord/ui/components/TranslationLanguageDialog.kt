@@ -79,7 +79,7 @@ fun TranslationLanguageDialog(
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
     val selected by AppSettings.translationLanguage.collectAsStateWithLifecycle()
-    val shape = RoundedCornerShape(ALERT_CORNER)
+    val shape = RoundedCornerShape(alertCorner())
     val appLocale = AppCompatDelegate.getApplicationLocales().get(0) ?: Locale.getDefault()
     var query by remember { mutableStateOf("") }
 
@@ -116,7 +116,7 @@ fun TranslationLanguageDialog(
     ) {
         Column(
             modifier = Modifier
-                .width(ALERT_WIDTH)
+                .width(alertWidth())
                 .clip(shape)
                 .then(
                     if (reduceDynamicBlur) {
@@ -231,7 +231,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = ACTION_HEIGHT)
+            .heightIn(min = alertActionHeight())
             .padding(horizontal = 16.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -279,7 +279,7 @@ private fun LanguageChoiceRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = ACTION_HEIGHT)
+            .heightIn(min = alertActionHeight())
             .background(
                 if (pressed) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f) else Color.Transparent,
             )
