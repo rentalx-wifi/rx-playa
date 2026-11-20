@@ -179,6 +179,9 @@ import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.GuestProfileStore
 import com.music.bitchord.data.settings.BitPerfectMode
 import com.music.bitchord.ui.AddonBlockedAlert
+import com.music.bitchord.ui.isDeviceFile
+import com.music.bitchord.ui.likeBelongsToOfflinePlaylist
+import com.music.bitchord.ui.likeStatusFor
 import com.music.bitchord.data.settings.LibrarySort
 import com.music.bitchord.data.settings.ThemeMode
 import com.music.bitchord.data.yandex.YandexMusicIntegration
@@ -1141,16 +1144,19 @@ private fun BitChordApp(
     val offlinePlaylists by OfflinePlaylists.playlists.collectAsStateWithLifecycle()
     val offlinePlaylistGroups = remember(offlinePlaylists) { offlinePlaylists.map { it.toGroup() } }
     val likeStatusOf: (Song) -> LikeStatus = { song ->
-        val durable = likeStatuses[song.videoId]
-        val uri = song.localUri
-        when {
-            durable == LikeStatus.DISLIKE -> LikeStatus.DISLIKE
-            uri != null -> if (uri in offlineLiked) LikeStatus.LIKE else LikeStatus.INDIFFERENT
-            else -> durable ?: LikeStatus.INDIFFERENT
-        }
+        likeStatusFor(
+            isDeviceFile = song.isDeviceFile,
+            localUri = song.localUri,
+            durable = likeStatuses[song.videoId],
+            offlineLiked = offlineLiked,
+        )
     }
     val toggleLikeOf: (Song) -> Unit = { song ->
-        if (song.localUri != null) {
+        // Only a file on the device belongs to the device's own Liked list. A
+        // downloaded track has a catalogue identity, and its heart is the
+        // account's rating wherever it is tapped — search, the player, or
+        // Favourites.
+        if (likeBelongsToOfflinePlaylist(song)) {
             val liked = OfflinePlaylists.toggleLike(song)
             TrackRatingStore.set(song, if (liked) LikeStatus.LIKE else LikeStatus.INDIFFERENT)
         } else {
