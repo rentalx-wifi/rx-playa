@@ -925,9 +925,18 @@ private fun BitChordApp(
     var browseRenameInSheet by remember { mutableStateOf(false) }
     /** The playlist being rearranged, or null when the reorder page is shut. */
     var reorderTarget by remember { mutableStateOf<UserPlaylist?>(null) }
+    /**
+     * The page [reorderTarget] belongs to. Held apart because a device playlist
+     * has no id [UserPlaylist] can spell back: its own `browseId` builds
+     * `VL…` out of an account's playlist id, while the store's card carries
+     * `local:playlist:…`.
+     */
+    var reorderPageId by remember { mutableStateOf<String?>(null) }
     /** Its entries as YouTube has them now — fetched fresh when the sheet opens. */
     var reorderEntries by remember { mutableStateOf<UiState<List<Song>>>(UiState.Loading) }
     var reorderSaving by remember { mutableStateOf(false) }
+    /** True while that page is arranging a playlist kept on this device, not one on the account. */
+    var reorderLocal by remember { mutableStateOf(false) }
     /** An album or playlist: lifted when it was a hold, else hung off the ⋯ that was tapped. */
     val openBrowseMenu: (BrowseTarget) -> Unit = { target ->
         browseMenuOrigin = LongPressOrigin.consume()
@@ -3728,7 +3737,7 @@ private fun BitChordApp(
                                 )
                             }
                             // This page's songs being rearranged, drawn in place of its list.
-                            val reordering = reorderTarget?.takeIf { it.browseId == page.browseId }
+                            val reordering = reorderTarget?.takeIf { reorderPageId == page.browseId }
                             DetailScreen(
                                 page = page,
                                 currentSong = player.song,
@@ -3836,18 +3845,36 @@ private fun BitChordApp(
                                             contentPadding = PaddingValues(
                                                 bottom = listPadding.calculateBottomPadding(),
                                             ),
-                                            onClose = { reorderTarget = null },
+                                            onClose = {
+                                                reorderTarget = null
+                                                reorderPageId = null
+                                            },
                                             onSave = { reordered ->
-                                                val original = (reorderEntries as? UiState.Success)?.data.orEmpty()
-                                                reorderSaving = true
-                                                viewModel.reorderPlaylist(reordering, original, reordered) { saved ->
-                                                    reorderSaving = false
-                                                    showQueueNotice(
-                                                        context.getString(
-                                                            if (saved) R.string.playlist_reordered else R.string.reorder_failed,
-                                                        ),
+                                                if (reorderLocal) {
+                                                    // Nothing to send: the store is the playlist.
+                                                    viewModel.reorderLocalPlaylist(
+                                                        playlist = reordering,
+                                                        pageId = reorderPageId.orEmpty(),
+                                                        reordered = reordered,
                                                     )
-                                                    if (saved && reorderTarget == reordering) reorderTarget = null
+                                                    showQueueNotice(context.getString(R.string.playlist_reordered))
+                                                    reorderTarget = null
+                                                    reorderPageId = null
+                                                } else {
+                                                    val original = (reorderEntries as? UiState.Success)?.data.orEmpty()
+                                                    reorderSaving = true
+                                                    viewModel.reorderPlaylist(reordering, original, reordered) { saved ->
+                                                        reorderSaving = false
+                                                        showQueueNotice(
+                                                            context.getString(
+                                                                if (saved) R.string.playlist_reordered else R.string.reorder_failed,
+                                                            ),
+                                                        )
+                                                        if (saved && reorderTarget == reordering) {
+                                                            reorderTarget = null
+                                                            reorderPageId = null
+                                                        }
+                                                    }
                                                 }
                                             },
                                         )
@@ -5899,6 +5926,8 @@ private fun BitChordApp(
                             reorderTarget = p
                             reorderEntries = UiState.Loading
                             reorderSaving = false
+                            reorderLocal = false
+                            reorderPageId = p.browseId
                             viewModel.loadPlaylistEntries(p) { result ->
                                 if (reorderTarget != p) return@loadPlaylistEntries
                                 reorderEntries = result.fold(
@@ -5906,6 +5935,39 @@ private fun BitChordApp(
                                     onFailure = { UiState.Error(context.getString(R.string.failed)) },
                                 )
                             }
+                        }
+                    } ?: localPlaylist?.let { p ->
+                        // A playlist kept on this device is arranged the same way, off
+                        // the list its own store holds instead of off YouTube: there is
+                        // no account move to make, and both rows the branch above sends
+                        // for would have been refused on it.
+                        {
+                            browseActions = null
+                            val entry = UserPlaylist(
+                                playlistId = p.id,
+                                title = p.title,
+                                subtitle = context.resources.getQuantityString(
+                                    R.plurals.song_count_plural,
+                                    p.songs.size,
+                                    p.songs.size,
+                                ),
+                                thumbnailUrl = p.songs.firstNotNullOfOrNull { it.thumbnailUrl },
+                            )
+                            if (detail?.browseId != p.browseId) {
+                                viewModel.openDetail(
+                                    browseId = p.browseId,
+                                    title = entry.title,
+                                    subtitle = entry.subtitle,
+                                    thumbnailUrl = entry.thumbnailUrl,
+                                    type = BrowseType.PLAYLIST,
+                                )
+                            }
+                            detailSearching = false
+                            reorderTarget = entry
+                            reorderPageId = p.browseId
+                            reorderLocal = true
+                            reorderEntries = UiState.Success(p.songs)
+                            reorderSaving = false
                         }
                     },
                     onDelete = playlist?.let { p ->

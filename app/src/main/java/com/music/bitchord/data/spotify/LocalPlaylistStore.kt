@@ -153,6 +153,29 @@ object LocalPlaylistStore {
         return true
     }
 
+    /** Rewrites the running order of a playlist kept on this device.
+     *
+     * [songs] is the whole list as the reorder page left it, not a pair of
+     * moves: the store holds the list, so the order it is written in is the
+     * order the playlist plays in, and there is no account to send moves to.
+     *
+     * [id] is taken in every shape [addSongs] takes one in, so a card, a page
+     * and the store's own id all name the same playlist. Returns whether there
+     * was a playlist to reorder.
+     */
+    fun reorderSongs(id: String, songs: List<Song>): Boolean {
+        val clean = id.removePrefix("local:playlist:").removePrefix("VL")
+        val index = _playlists.value.indexOfFirst {
+            it.id == clean || it.browseId == id || it.id == id
+        }
+        if (index < 0) return false
+        val updated = _playlists.value.toMutableList()
+        updated[index] = updated[index].copy(songs = songs)
+        _playlists.value = updated
+        persist(updated)
+        return true
+    }
+
     fun deletePlaylist(id: String) {
         val updated = _playlists.value.filterNot { it.id == id || it.browseId == id || it.id == id.removePrefix("local:playlist:") }
         _playlists.value = updated

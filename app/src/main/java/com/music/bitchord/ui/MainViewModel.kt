@@ -1504,6 +1504,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Saves a new running order for a playlist kept on this device — the
+     * counterpart to [reorderPlaylist] for one with no YouTube Music page and
+     * so no account to be signed in to.
+     *
+     * The open page is reloaded from the store rather than patched here: the
+     * store is the one thing that knows what the playlist holds now.
+     *
+     * [pageId] is the page to bring into the new order — the store's own
+     * `local:playlist:` id, which [UserPlaylist.browseId] cannot spell back from
+     * an account playlist id.
+     */
+    fun reorderLocalPlaylist(playlist: UserPlaylist, pageId: String, reordered: List<Song>) {
+        com.music.bitchord.data.spotify.LocalPlaylistStore
+            .reorderSongs(playlist.playlistId, reordered)
+        reloadLocalDetail(pageId)
+    }
+
     fun deletePlaylist(playlist: UserPlaylist) {
         // A local playlist is deleted here and now: sending it to YouTube would
         // fail for a row that never existed there, and would leave the card on
