@@ -10,6 +10,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebStorage
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -71,7 +72,15 @@ internal fun parseYandexOAuthRedirect(rawUrl: String?): YandexOAuthResult? {
 private fun decode(value: String): String =
     runCatching { URLDecoder.decode(value, StandardCharsets.UTF_8.name()) }.getOrDefault(value)
 
-/** Removes only Yandex's browser session; Google/Discord/Spotify cookies remain intact. */
+/**
+ * Removes Yandex's browser session: its cookies, and the page storage the web
+ * player keeps beside them.
+ *
+ * Cookies are cleared one by one, so Google's, VK's and Discord's survive. Page
+ * storage cannot be cleared that finely — [WebStorage] deletes all of it — but
+ * it holds no login: every session this app keeps is a cookie, and the WebViews
+ * that write local storage are the login ones, which are gone by this point.
+ */
 fun clearYandexMusicWebSession() {
     val manager = CookieManager.getInstance()
     val urls = listOf(
@@ -94,6 +103,10 @@ fun clearYandexMusicWebSession() {
             }
     }
     manager.flush()
+    // The web player keeps its own session in localStorage/IndexedDB, which is
+    // what would otherwise sign the next visit straight back in — the cookies
+    // above are not the whole of it.
+    WebStorage.getInstance().deleteAllData()
 }
 
 /** Embedded Yandex OAuth login which captures the access token from the final URL fragment. */
