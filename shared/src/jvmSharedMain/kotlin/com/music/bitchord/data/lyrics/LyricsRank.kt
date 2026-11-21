@@ -1,6 +1,4 @@
-package com.music.bitchord.ui
-
-import com.music.bitchord.data.lyrics.LyricLine
+package com.music.bitchord.data.lyrics
 
 /**
  * How good a set of lines is, for the panel that shows them.

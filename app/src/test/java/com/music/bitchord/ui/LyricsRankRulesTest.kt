@@ -2,6 +2,10 @@ package com.music.bitchord.ui
 
 import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.lyrics.LyricWord
+import com.music.bitchord.data.lyrics.PLAIN_LYRICS
+import com.music.bitchord.data.lyrics.TIMED_LYRICS
+import com.music.bitchord.data.lyrics.WORD_LYRICS
+import com.music.bitchord.data.lyrics.lyricsRank
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

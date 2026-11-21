@@ -53,6 +53,7 @@ import com.music.bitchord.data.lyrics.EmbeddedLyrics
 import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.lyrics.LyricsRepository
 import com.music.bitchord.data.lyrics.LyricsSource
+import com.music.bitchord.data.lyrics.lyricsRank
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.navigation.AppNavigator
 import com.music.bitchord.data.innertube.Innertube

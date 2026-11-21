@@ -107,6 +107,7 @@ import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.lyrics.EmbeddedLyrics
 import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.lyrics.LyricsRepository
+import com.music.bitchord.data.lyrics.lyricsRank
 import com.music.bitchord.data.model.NOTIFICATION_ART_PX
 import com.music.bitchord.data.model.PlaybackSourceType
 import com.music.bitchord.data.model.SearchFilter
@@ -119,6 +120,7 @@ import com.music.bitchord.data.sources.SourceRegistry
 import com.music.bitchord.download.Downloads
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArraySet
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import com.music.bitchord.data.Http
 import com.music.bitchord.auth.SignedIn
@@ -7800,8 +7802,13 @@ class PlaybackService : MediaLibraryService() {
         serviceLyricsJob = scope.launch(Dispatchers.IO) {
             val localUri = currentSong.localUri
             var lines: List<LyricLine>? = null
+            // What the notification is already showing. Raised as answers land,
+            // so the strip on the lock screen appears with the first one instead
+            // of waiting for the whole race.
+            val shownRank = AtomicInteger(-1)
             if (localUri != null) {
                 lines = EmbeddedLyrics.forUri(this@PlaybackService, localUri)
+                lines?.let { shownRank.set(lyricsRank(it)) }
             }
             if (lines == null) {
                 val found = LyricsRepository.lyrics(
@@ -7813,11 +7820,28 @@ class PlaybackService : MediaLibraryService() {
                     sources = AppSettings.lyricsSources.value,
                     order = AppSettings.lyricsSourceOrder.value,
                     prioritizeSyllableSync = AppSettings.prioritizeSyllableSync.value,
+                    onSourceResult = onResult@ { _, result ->
+                        if (result == null) return@onResult
+                        val rank = lyricsRank(result.lines)
+                        while (true) {
+                            val current = shownRank.get()
+                            if (rank <= current) return@onResult
+                            if (shownRank.compareAndSet(current, rank)) break
+                        }
+                        scope.launch(Dispatchers.Main) {
+                            serviceLyrics = result.lines
+                            if (player?.isPlaying == true) updateLyricSubtitle()
+                        }
+                    },
                 )
                 lines = found?.lines
             }
             withContext(Dispatchers.Main) {
-                serviceLyrics = lines
+                // Never backwards: the ticker may already be following better
+                // lines than the race settled on.
+                if (lines != null && lyricsRank(lines) >= shownRank.get()) {
+                    serviceLyrics = lines
+                }
                 if (player?.isPlaying == true) {
                     updateLyricSubtitle()
                 }
