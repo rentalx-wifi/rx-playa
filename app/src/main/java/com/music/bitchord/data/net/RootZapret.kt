@@ -2,6 +2,7 @@ package com.music.bitchord.data.net
 
 import android.content.Context
 import android.net.Uri
+import com.music.bitchord.R
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -67,7 +68,7 @@ object RootZapret {
         val binary: String? = null,
         val running: Boolean = false,
         val hasFirewall: Boolean = false,
-        val message: String = "Not checked",
+        val message: String = "",
     )
 
     data class Diagnosis(val status: Status, val environment: String, val log: String)
@@ -134,17 +135,17 @@ object RootZapret {
     fun logFile(context: Context) = File(context.filesDir, "zapret/nfqws.log")
     fun importedBinary(context: Context) = File(context.filesDir, "zapret/nfqws")
 
-    suspend fun probe(userPath: String?): Status = withContext(Dispatchers.IO) {
+    suspend fun probe(context: Context, userPath: String?): Status = withContext(Dispatchers.IO) {
         val report = rootReport(userPath)
         if (!report.rootGranted) {
-            return@withContext Status(message = "No root: an ordinary app cannot launch nfqws")
+            return@withContext Status(message = context.getString(R.string.zapret_status_no_root))
         }
         val binary = report.binary
             ?: return@withContext Status(
                 rootGranted = true,
                 rootMethod = report.rootMethod,
                 hasFirewall = report.hasFirewall,
-                message = "Root granted, but nfqws was not found. Install zapret or import the binary.",
+                message = context.getString(R.string.zapret_status_binary_missing),
             )
         Status(
             rootGranted = true,
@@ -153,9 +154,9 @@ object RootZapret {
             running = report.running,
             hasFirewall = report.hasFirewall,
             message = when {
-                report.running -> "Running: $binary"
-                report.help != null -> "Ready: $binary · ${report.help}"
-                else -> "Ready: $binary"
+                report.running -> context.getString(R.string.zapret_status_running, binary)
+                report.help != null -> context.getString(R.string.zapret_status_ready_help, binary, report.help)
+                else -> context.getString(R.string.zapret_status_ready, binary)
             },
         )
     }
@@ -176,7 +177,7 @@ object RootZapret {
         }
         val report = runRootScript(script, STAGE_TIMEOUT_SECONDS)
         val fields = fieldsOf(report.output)
-        val status = statusOf(fields)
+        val status = statusOf(context, fields)
         val environment = buildList {
             add("root: " + (fields["ROOTMETHOD"] ?: if (fields["ROOT"] == "0") "yes" else "no"))
             add("nfqws: " + (fields["BIN"] ?: "none"))
@@ -187,7 +188,7 @@ object RootZapret {
             add("rule: " + (fields["RULE"] ?: "no") + " · quic drop: " + (fields["DROP"] ?: "no"))
             fields["COUNTERS"]?.takeIf(String::isNotBlank)?.let { add(it.trim()) }
         }.joinToString(" · ")
-        Diagnosis(status, environment, report.output.substringAfter("LOGTAIL_START", readLog(logFile(context))))
+        Diagnosis(status, environment, report.output.substringAfter("LOGTAIL_START", readLog(context, logFile(context))))
     }
 
     /**
@@ -206,8 +207,8 @@ object RootZapret {
             }
         } catch (failure: Throwable) {
             null
-        } ?: return@withContext "Could not read that file"
-        if (bytes.isEmpty()) return@withContext "That file is empty"
+        } ?: return@withContext context.getString(R.string.zapret_status_import_unreadable)
+        if (bytes.isEmpty()) return@withContext context.getString(R.string.zapret_status_import_empty)
 
         val written = runRootScript(
             buildString {
@@ -219,7 +220,10 @@ object RootZapret {
             stdinBytes = bytes,
         )
         if (fieldsOf(written.output)["DONE"] != "0") {
-            return@withContext "Could not write the binary as root: ${written.output.take(160)}"
+            return@withContext context.getString(
+                R.string.zapret_status_import_write_failed,
+                written.output.take(160),
+            )
         }
         val check = runRootScript(
             buildString {
@@ -229,8 +233,14 @@ object RootZapret {
             STAGE_TIMEOUT_SECONDS,
         )
         val fields = fieldsOf(check.output)
-        if (fields["X"] != "yes") return@withContext "Copied, but $staged is not executable as root"
-        "Imported: $staged · ${check.output.lines().firstOrNull { it.isNotBlank() } ?: "runs"}"
+        if (fields["X"] != "yes") {
+            return@withContext context.getString(R.string.zapret_status_import_not_executable, staged)
+        }
+        context.getString(
+            R.string.zapret_status_imported,
+            staged,
+            check.output.lines().firstOrNull { it.isNotBlank() } ?: context.getString(R.string.zapret_status_runs),
+        )
     }
 
     /**
@@ -238,6 +248,7 @@ object RootZapret {
      * actually happened rather than what was attempted.
      */
     suspend fun start(
+        context: Context,
         userPath: String?,
         strategy: Strategy,
         customArgs: String,
@@ -245,7 +256,7 @@ object RootZapret {
         logFile: File,
     ): String = withContext(Dispatchers.IO) {
         val args = if (strategy == Strategy.CUSTOM) customArgs.trim() else strategy.args
-        if (args.isEmpty()) return@withContext "No arguments: fill in the custom strategy first"
+        if (args.isEmpty()) return@withContext context.getString(R.string.zapret_status_no_arguments)
 
         hostFile.parentFile?.mkdirs()
         hostFile.writeText(HOSTS.joinToString("\n"))
@@ -289,23 +300,27 @@ object RootZapret {
         val logTail = report.output.substringAfter("LOGTAIL_START", "").trim()
         when {
             fields["ERROR"] == "no_binary" ->
-                "nfqws was not found. Install zapret or import the binary."
+                context.getString(R.string.zapret_status_binary_absent)
             fields["ALIVE"] == "yes" && fields["RULE"] == "yes" ->
-                "Started (${strategy.display}); NFQUEUE $QUEUE_NUM armed" +
-                    if (fields["DROP"] == "yes") ", QUIC dropped" else ""
+                (if (fields["DROP"] == "yes") {
+                    context.getString(R.string.zapret_status_started_quic, strategy.display, QUEUE_NUM)
+                } else {
+                    context.getString(R.string.zapret_status_started, strategy.display, QUEUE_NUM)
+                })
             fields["ALIVE"] == "yes" ->
-                "nfqws is up (${strategy.display}), but the firewall rule failed. " +
-                    "iptables as root may be blocked on this ROM." +
+                context.getString(R.string.zapret_status_rule_failed, strategy.display) +
                     logTail.takeIf(String::isNotBlank)?.let { "\n$it" }.orEmpty()
             else -> buildString {
-                append("nfqws did not stay up. ")
-                fields["HELP"]?.takeIf(String::isNotBlank)?.let { append("Binary: $it. ") }
-                append(logTail.ifBlank { "Journal is empty" })
+                append(context.getString(R.string.zapret_status_not_up)).append(' ')
+                fields["HELP"]?.takeIf(String::isNotBlank)?.let {
+                    append(context.getString(R.string.zapret_status_binary_line, it)).append(' ')
+                }
+                append(logTail.ifBlank { context.getString(R.string.zapret_status_journal_empty) })
             }
         }
     }
 
-    suspend fun stop(logFile: File? = null): String = withContext(Dispatchers.IO) {
+    suspend fun stop(context: Context, logFile: File? = null): String = withContext(Dispatchers.IO) {
         val script = buildString {
             appendLine(shebang())
             appendLine("killall nfqws 2>/dev/null")
@@ -316,22 +331,22 @@ object RootZapret {
         }
         val fields = fieldsOf(runRootScript(script, STAGE_TIMEOUT_SECONDS).output)
         when {
-            fields["ALIVE"] == "yes" -> "Still running: stop it from a root shell"
-            fields["RULE"] == "yes" -> "Process stopped, but the iptables rule is still there"
-            else -> "Stopped"
+            fields["ALIVE"] == "yes" -> context.getString(R.string.zapret_status_still_running)
+            fields["RULE"] == "yes" -> context.getString(R.string.zapret_status_rule_left)
+            else -> context.getString(R.string.zapret_status_stopped)
         }
     }
 
-    fun readLog(context: Context): String = readLog(logFile(context))
+    fun readLog(context: Context): String = readLog(context, logFile(context))
 
-    private fun readLog(file: File): String = runCatching {
+    private fun readLog(context: Context, file: File): String = runCatching {
         if (!file.exists()) {
-            "Journal is empty"
+            context.getString(R.string.zapret_status_journal_empty)
         } else {
             val text = file.readText()
-            if (text.isBlank()) "Journal is empty" else text.takeLast(1200)
+            if (text.isBlank()) context.getString(R.string.zapret_status_journal_empty) else text.takeLast(1200)
         }
-    }.getOrDefault("Journal unreadable")
+    }.getOrDefault(context.getString(R.string.zapret_status_journal_unreadable))
 
     // ── Script pieces ───────────────────────────────────────────────────────
 
@@ -409,13 +424,13 @@ object RootZapret {
         )
     }
 
-    private fun statusOf(fields: Map<String, String>): Status = Status(
+    private fun statusOf(context: Context, fields: Map<String, String>): Status = Status(
         rootGranted = fields["ROOT"] == "0",
         rootMethod = fields["ROOTMETHOD"]?.takeIf(String::isNotBlank),
         binary = fields["BIN"]?.takeIf(String::isNotBlank),
         running = !fields["PID"].isNullOrBlank(),
         hasFirewall = !fields["IPTABLES"].isNullOrBlank() || !fields["NFT"].isNullOrBlank(),
-        message = "Checked",
+        message = context.getString(R.string.zapret_status_checked),
     )
 
     private data class ShellResult(val output: String, val code: Int)

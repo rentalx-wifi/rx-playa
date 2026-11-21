@@ -41,6 +41,7 @@ class ZapretBootReceiver : BroadcastReceiver() {
             try {
                 withTimeoutOrNull(BOOT_BUDGET_MS) {
                     RootZapret.start(
+                        context = context,
                         userPath = AppSettings.zapretPath.value,
                         strategy = RootZapret.Strategy.of(AppSettings.zapretStrategy.value),
                         customArgs = AppSettings.zapretArgs.value,

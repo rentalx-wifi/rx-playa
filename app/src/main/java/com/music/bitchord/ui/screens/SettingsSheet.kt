@@ -1853,7 +1853,7 @@ fun SettingsScreen(
                         onClick = {
                             zapretScope.launch {
                                 zapretBusy = true
-                                val status = RootZapret.probe(zapretPath)
+                                val status = RootZapret.probe(context, zapretPath)
                                 zapretStatus = status.message
                                 zapretRunning = status.running
                                 zapretBusy = false
@@ -1866,17 +1866,18 @@ fun SettingsScreen(
                             zapretScope.launch {
                                 zapretBusy = true
                                 if (zapretRunning) {
-                                    zapretStatus = RootZapret.stop()
+                                    zapretStatus = RootZapret.stop(context)
                                     zapretRunning = false
                                 } else {
                                     zapretStatus = RootZapret.start(
+                                        context = context,
                                         userPath = zapretPath,
                                         strategy = strategy,
                                         customArgs = savedArgs,
                                         hostFile = hostFile,
                                         logFile = logFile,
                                     )
-                                    zapretRunning = RootZapret.probe(zapretPath).running
+                                    zapretRunning = RootZapret.probe(context, zapretPath).running
                                 }
                                 zapretBusy = false
                             }
