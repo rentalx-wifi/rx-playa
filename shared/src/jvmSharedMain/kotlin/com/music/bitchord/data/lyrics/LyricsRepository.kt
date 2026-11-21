@@ -4,6 +4,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
@@ -85,6 +86,89 @@ object LyricsRepository {
      * word-synced one, taking the top-priority source that has one.
      */
     suspend fun lyrics(
+        videoId: String,
+        title: String,
+        artist: String,
+        durationMs: Long,
+        album: String? = null,
+        sources: Set<LyricsSource> = LyricsSource.entries.toSet(),
+        order: List<LyricsSource> = LyricsSource.entries,
+        prioritizeSyllableSync: Boolean = false,
+        isrc: String? = null,
+        onSourceStarted: ((LyricsSource) -> Unit)? = null,
+        onSourceResult: ((LyricsSource, Result?) -> Unit)? = null,
+        onSourceCancelled: ((LyricsSource) -> Unit)? = null,
+    ): Result? {
+        val key = cacheKey(videoId, durationMs, isrc, sources, order, prioritizeSyllableSync)
+        answers[key]?.let { cached ->
+            // A cached answer is still reported as this source's own: the picker
+            // beside the words names whoever produced them, and "not fetched"
+            // next to a full panel would be a lie about where they came from.
+            cached?.let { onSourceResult?.invoke(it.source, it) }
+            return cached
+        }
+        val running = inFlight[key]
+        val work = running ?: lookupScope.async {
+            try {
+                race(
+                    videoId, title, artist, durationMs, album, sources, order,
+                    prioritizeSyllableSync, isrc,
+                    onSourceStarted, onSourceResult, onSourceCancelled,
+                ).also { fresh -> answers[key] = fresh }
+            } finally {
+                inFlight.remove(key)
+            }
+        }
+        if (running == null) inFlight[key] = work
+        val result = work.await()
+        // A caller that joined somebody else's lookup did not see its callbacks,
+        // so it is told the answer here; its own view of which sources answered
+        // can only be the one that mattered.
+        if (running != null) result?.let { onSourceResult?.invoke(it.source, it) }
+        return result
+    }
+
+    /**
+     * What makes two lookups the same one.
+     *
+     * The track identifies the words; the source set, their order and the
+     * syllable preference decide which answer wins. Title and artist are left
+     * out on purpose: the same recording is asked about with the names the
+     * caller happens to hold, and a downloaded file and its stream are one
+     * recording.
+     */
+    internal fun cacheKey(
+        videoId: String,
+        durationMs: Long,
+        isrc: String?,
+        sources: Set<LyricsSource>,
+        order: List<LyricsSource>,
+        prioritizeSyllableSync: Boolean,
+    ): String = buildString {
+        append(videoId).append('|').append(durationMs).append('|')
+        append(isrc.orEmpty()).append('|')
+        append(if (prioritizeSyllableSync) '1' else '0').append('|')
+        append(sources.sorted().joinToString(",") { it.name }).append('|')
+        append(order.joinToString(",") { it.name })
+    }
+
+    /** Learnt answers, most recently used last; see [lyrics]. */
+    private val answers: MutableMap<String, Result?> = Collections.synchronizedMap(
+        object : LinkedHashMap<String, Result?>(CACHED_ANSWERS, 0.75f, true) {
+            override fun removeEldestEntry(eldest: Map.Entry<String, Result?>) = size > CACHED_ANSWERS
+        },
+    )
+
+    /** Lookups in flight, so a second screen asking for the same track joins one. */
+    private val inFlight = ConcurrentHashMap<String, Deferred<Result?>>()
+
+    /** Owns no view: a lookup outlives the screen that asked for it, briefly. */
+    private val lookupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** How many answers to keep. Each is a few kilobytes. */
+    private const val CACHED_ANSWERS = 120
+
+    private suspend fun race(
         videoId: String,
         title: String,
         artist: String,
