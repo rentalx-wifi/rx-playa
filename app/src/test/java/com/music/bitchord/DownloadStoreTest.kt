@@ -216,6 +216,30 @@ class DownloadStoreTest {
     }
 
     /**
+     * Offline mode refuses a download outright, on Wi-Fi too: it means there is
+     * no network to spend, not that the network in hand is the wrong kind.
+     */
+    @Test
+    fun `offline mode refuses every download`() {
+        val offline = AppSettings.offlineMode.value
+        val wifiOnly = AppSettings.wifiOnlyDownloads.value
+        val metered = AppSettings.meteredConnection.value
+        try {
+            AppSettings.wifiOnlyDownloads.value = false
+            AppSettings.meteredConnection.value = false
+            AppSettings.offlineMode.value = true
+            assertFalse(AppSettings.downloadsAllowedNow)
+
+            AppSettings.offlineMode.value = false
+            assertTrue(AppSettings.downloadsAllowedNow)
+        } finally {
+            AppSettings.offlineMode.value = offline
+            AppSettings.wifiOnlyDownloads.value = wifiOnly
+            AppSettings.meteredConnection.value = metered
+        }
+    }
+
+    /**
      * The two settings are independent on purpose, and this is the pairing that
      * proves it: a capped mobile-data *stream* must not quietly downgrade a
      * *file*. It used to — the ceiling was what decided whether a download could

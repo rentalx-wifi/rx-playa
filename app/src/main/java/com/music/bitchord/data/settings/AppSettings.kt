@@ -978,13 +978,19 @@ object AppSettings {
     /**
      * Whether a download may start on the connection in hand.
      *
+     * Offline mode counts as no connection at all: it says the app should behave
+     * as if there were no network, and fetching megabytes under it is the one
+     * thing that behaviour rules out. A copy already in the cache is not a fetch
+     * and does not come through here — see [com.music.bitchord.download.Downloads.servableFromCache].
+     *
      * A null [meteredConnection] means there is no active network, and that is
      * deliberately allowed through: a download with nothing to download over
      * fails on the network and says so, which is true, where refusing it here
      * would blame a Wi-Fi setting for an outage.
      */
     val downloadsAllowedNow: Boolean
-        get() = !wifiOnlyDownloads.value || meteredConnection.value != true
+        get() = !offlineMode.value &&
+            (!wifiOnlyDownloads.value || meteredConnection.value != true)
 
     /**
      * [authStore] is the application's own, passed in rather than opened again:
