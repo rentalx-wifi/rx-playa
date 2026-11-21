@@ -12,6 +12,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicInteger
 
 /** Metadata every playlist source can provide without copying audio. */
@@ -82,17 +83,26 @@ object ExternalPlaylistImporter {
         candidatesFor: suspend (title: String, artist: String) -> List<Song>,
         onProgress: (completed: Int, total: Int) -> Unit,
         fallbackCandidatesFor: (suspend (title: String, artist: String) -> List<Song>)? = null,
+        /** How long one row may take to match; see the guard below. */
+        matchTimeoutMs: Long = MATCH_TIMEOUT_MS,
     ): Pair<List<Song>, List<T>> = coroutineScope {
         val completed = AtomicInteger(0)
         val gate = Semaphore(MATCH_PARALLELISM)
         val matches = tracks.mapIndexed { index, track ->
             async(Dispatchers.IO) {
                 gate.withPermit {
-                    val match = findMatch(
-                        track = track,
-                        candidatesFor = candidatesFor,
-                        fallbackCandidatesFor = fallbackCandidatesFor,
-                    )
+                    // Every row is awaited before anything is returned, so one
+                    // search that never answers used to hold the whole import
+                    // at a progress counter that had stopped moving. A row that
+                    // cannot be settled in [matchTimeoutMs] counts as a row that
+                    // was not found — which is a result the listener can act on.
+                    val match = withTimeoutOrNull(matchTimeoutMs) {
+                        findMatch(
+                            track = track,
+                            candidatesFor = candidatesFor,
+                            fallbackCandidatesFor = fallbackCandidatesFor,
+                        )
+                    }
                     val done = completed.incrementAndGet()
                     withContext(Dispatchers.Main) { onProgress(done, tracks.size) }
                     Triple(index, match?.copy(thumbnailUrl = match.thumbnailUrl ?: track.coverUrl), track)
@@ -121,4 +131,13 @@ object ExternalPlaylistImporter {
     }
 
     private const val MATCH_PARALLELISM = 4
+
+    /**
+     * How long one row may spend in the catalogue before it counts as missing.
+     *
+     * Generous: two searches and a fallback, each of which has its own request
+     * timeout. What it stops is the case the issue was filed about — a search
+     * that never comes back, holding an import that showed no way to finish.
+     */
+    private const val MATCH_TIMEOUT_MS = 20_000L
 }
