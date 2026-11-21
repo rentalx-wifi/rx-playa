@@ -82,6 +82,7 @@ import com.music.bitchord.data.listentogether.ServerConnectionState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -126,6 +127,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -249,6 +251,7 @@ import com.music.bitchord.playback.QueueCoordinator.asQueueEntry
 import com.music.bitchord.playback.QueueShuffle
 import com.music.bitchord.playback.withQueueSource
 import com.music.bitchord.playback.removeDisliked
+import com.music.bitchord.playback.dropPlaylistTracks
 import com.music.bitchord.playback.QueueSource
 import com.music.bitchord.playback.cast.CastController
 import com.music.bitchord.data.model.QueueTier
@@ -1823,6 +1826,20 @@ private fun BitChordApp(
                 }
             }
             // Start playback in the mini-player; the user opens the full view by tapping it.
+        }
+    }
+    /**
+     * Keeps the queue in step with a playlist edit.
+     *
+     * The rows the queue took from this playlist go with it; the one playing is
+     * left to finish, and the service takes it out at the next transition — see
+     * [QueueCoordinator.playlistQueueDrops]. No [videoId] means the playlist
+     * itself is gone, and its whole context goes.
+     */
+    fun dropFromQueue(playlistId: String, videoId: String? = null) {
+        if (playlistId.isBlank()) return
+        scope.launch {
+            controller?.dropPlaylistTracks(playlistId, listOfNotNull(videoId))
         }
     }
     // Kept for entry points whose rows already carry their origin (notably a
@@ -5161,11 +5178,16 @@ private fun BitChordApp(
                         {
                             songActions = null
                             viewModel.removeFromPlaylist(it.browseId, song)
+                            dropFromQueue(it.browseId, song.videoId)
                         }
                     } ?: detail?.browseId?.takeIf { !fromPlayer }?.let { id ->
                         when {
                             OfflinePlaylists.isOfflinePlaylist(id) && song.localUri != null -> {
-                                { songActions = null; OfflinePlaylists.remove(id, song) }
+                                {
+                                    songActions = null
+                                    OfflinePlaylists.remove(id, song)
+                                    dropFromQueue(id, song.videoId)
+                                }
                             }
                             // A playlist kept on this device: the same row, and the
                             // one that used to do nothing at all.
@@ -5173,6 +5195,7 @@ private fun BitChordApp(
                                 {
                                     songActions = null
                                     LocalPlaylistStore.removeSong(id, song)
+                                    dropFromQueue(id, song.videoId)
                                 }
                             }
                             else -> null
@@ -5974,6 +5997,7 @@ private fun BitChordApp(
                         {
                             browseActions = null
                             viewModel.deletePlaylist(p)
+                            dropFromQueue(p.browseId)
                         }
                     } ?: offlineEditable?.let { p ->
                         {
@@ -5981,12 +6005,14 @@ private fun BitChordApp(
                             // Its page has nothing left to show; take it away too.
                             if (detail?.browseId == p.browseId) viewModel.closeDetail()
                             OfflinePlaylists.delete(p.browseId)
+                            dropFromQueue(p.browseId)
                         }
                     } ?: localPlaylist?.let { p ->
                         {
                             browseActions = null
                             if (detail?.browseId == p.browseId) viewModel.closeDetail()
                             LocalPlaylistStore.deletePlaylist(p.browseId)
+                            dropFromQueue(p.browseId)
                         }
                     },
                     onDeleteDownload = target.downloadId?.let { id ->
@@ -6089,6 +6115,19 @@ private fun BitChordApp(
                 val initialCookie = if (mode == WebSessionMode.SWITCH_CHANNEL) {
                     googleAccounts.firstOrNull { it.accountId == activeAccountId }?.cookie
                 } else importedGoogleCookie
+                // An imported cookie is already the listener saying "this account":
+                // waiting for a second tap only leaves them staring at a page that
+                // either works or does not, with no verdict either way. Take it as
+                // soon as the page says it is signed in; a failure still surfaces
+                // through onCaptureUnavailable.
+                LaunchedEffect(pageReady, initialCookie, mode) {
+                    if (mode == WebSessionMode.SIGN_IN && pageReady &&
+                        initialCookie != null && !confirmingProfile && !captureFailed
+                    ) {
+                        confirmingProfile = true
+                        captureRequest++
+                    }
+                }
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Column(Modifier.fillMaxSize()) {
                         Row(
@@ -6113,6 +6152,8 @@ private fun BitChordApp(
                                     },
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onBackground,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                                 if (pageReady) {
                                     Text(
@@ -6124,6 +6165,7 @@ private fun BitChordApp(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
                                 }
                             }
@@ -6133,18 +6175,6 @@ private fun BitChordApp(
                                     enabled = !confirmingProfile,
                                 ) {
                                     Text(stringResource(R.string.google_cookie_import_short))
-                                }
-                            }
-                            if (pageReady) {
-                                TextButton(onClick = {
-                                    captureFailed = false
-                                    confirmingProfile = true
-                                    captureRequest++
-                                }, enabled = !confirmingProfile) {
-                                    Text(
-                                        if (confirmingProfile) stringResource(R.string.checking)
-                                        else stringResource(R.string.use_this_profile),
-                                    )
                                 }
                             }
                         }
@@ -6176,7 +6206,36 @@ private fun BitChordApp(
                                         }
                                     }
                                 },
+                                modifier = Modifier.weight(1f),
                             )
+                        }
+                        // The one action worth reaching for sits at the bottom, where a
+                        // thumb is: as a text button in the header it squeezed the title
+                        // down to one letter per line on a phone.
+                        if (pageReady) {
+                            Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .navigationBarsPadding()
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            captureFailed = false
+                                            confirmingProfile = true
+                                            captureRequest++
+                                        },
+                                        enabled = !confirmingProfile,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Text(
+                                            if (confirmingProfile) stringResource(R.string.checking)
+                                            else stringResource(R.string.use_this_profile),
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

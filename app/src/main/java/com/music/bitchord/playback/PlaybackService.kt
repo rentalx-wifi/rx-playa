@@ -269,6 +269,18 @@ internal class ManualUpgradeThrottle(private val cooldownMs: Long) {
  * hears about the reorder once, when the row is dropped, not mid-drag.
  */
 const val ACTION_QUEUE_DRAG = "com.music.bitchord.action.QUEUE_DRAG"
+
+/**
+ * A playlist lost tracks: the queue it built loses the same rows.
+ *
+ * Sent after the server accepted the edit, so the queue follows the playlist
+ * instead of waiting for the next tap on play. Carries the playlist's browse id
+ * and, in [EXTRA_PLAYLIST_IDS], the video ids that left — empty when the whole
+ * playlist is gone.
+ */
+const val ACTION_PLAYLIST_EDITED = "com.music.bitchord.action.PLAYLIST_EDITED"
+const val EXTRA_PLAYLIST_ID = "bitchord.playlistId"
+const val EXTRA_PLAYLIST_IDS = "bitchord.playlistIds"
 const val EXTRA_QUEUE_DRAG_ACTIVE = "bitchord.queueDrag.active"
 
 /** A full first page for an explicitly requested station. */
@@ -808,6 +820,15 @@ class PlaybackService : MediaLibraryService() {
     private val swapVersionCommand = SessionCommand(ACTION_SWAP_VERSION, Bundle.EMPTY)
     private val queueDragCommand = SessionCommand(ACTION_QUEUE_DRAG, Bundle.EMPTY)
     private val removeDislikedCommand = SessionCommand(ACTION_REMOVE_DISLIKED, Bundle.EMPTY)
+    private val playlistEditedCommand = SessionCommand(ACTION_PLAYLIST_EDITED, Bundle.EMPTY)
+
+    /**
+     * Rows that lost their playlist while being the one playing: playlist browse
+     * id to the video ids still to remove. Filled by [dropPlaylistTracksFromQueue]
+     * and emptied a track later by [sweepPendingPlaylistDrops], which is what lets
+     * a deleted row finish playing instead of being cut off mid-song.
+     */
+    private val pendingPlaylistDrops = mutableMapOf<String, MutableSet<String>>()
 
     private var favoriteActionJob: Job? = null
     private var stationActionJob: Job? = null
@@ -1004,6 +1025,9 @@ class PlaybackService : MediaLibraryService() {
             // The player this fired on, which is by definition the one the
             // session is currently pointed at.
             val exoPlayer = player ?: return
+            // Rows that lost their playlist while being the one playing come out
+            // here, one track later than the edit that removed them.
+            sweepPendingPlaylistDrops(exoPlayer)
             // A quality swap replaces the playing item, which Media3
             // reports here as a playlist change — indistinguishable, from
             // this callback's point of view, from the queue moving on. It
@@ -3475,6 +3499,90 @@ class PlaybackService : MediaLibraryService() {
             exoPlayer.removeMediaItem(index)
         }
         return dropped.reversed()
+    }
+
+    /**
+     * Takes a playlist's lost rows out of the queue.
+     *
+     * [videoIds] empty means the playlist itself is gone, so every row it put in
+     * the queue goes. The current row is not interrupted: it is parked in
+     * [pendingPlaylistDrops] and removed at the next transition.
+     */
+    private fun dropPlaylistTracksFromQueue(playlistId: String, videoIds: Set<String>) {
+        val exoPlayer = player ?: return
+        if (playlistId.isBlank()) return
+        val songs = (0 until exoPlayer.mediaItemCount).map { exoPlayer.getMediaItemAt(it).toSong() }
+        val plan = QueueCoordinator.playlistQueueDrops(
+            songs = songs,
+            currentIndex = exoPlayer.currentMediaItemIndex,
+            playlistId = playlistId,
+            videoIds = videoIds,
+        )
+        plan.playing?.let {
+            pendingPlaylistDrops.getOrPut(playlistId) { mutableSetOf() } += it
+        }
+        if (plan.indices.isEmpty()) return
+        val removed = plan.indices.map(songs::get)
+        // Bottom-up: every index ahead of a removal still holds.
+        plan.indices.asReversed().forEach(exoPlayer::removeMediaItem)
+        tellParty(plan.videoIds)
+        settleQueueAfterRowRemoval(exoPlayer, removed)
+    }
+
+    /** Removes parked rows once playback has moved on; see [dropPlaylistTracksFromQueue]. */
+    private fun sweepPendingPlaylistDrops(exoPlayer: ExoPlayer) {
+        if (pendingPlaylistDrops.isEmpty()) return
+        val songs = (0 until exoPlayer.mediaItemCount).map { exoPlayer.getMediaItemAt(it).toSong() }
+        val currentIndex = exoPlayer.currentMediaItemIndex
+        val removable = mutableListOf<Int>()
+        val removedIds = mutableListOf<String>()
+        pendingPlaylistDrops.entries.removeAll { (playlistId, videoIds) ->
+            val plan = QueueCoordinator.playlistQueueDrops(songs, currentIndex, playlistId, videoIds)
+            removable += plan.indices
+            removedIds += plan.videoIds
+            // Still the one playing: keep watching it, and take it out later.
+            val stillPlaying = plan.playing
+            if (stillPlaying == null) true else {
+                videoIds.retainAll(setOf(stillPlaying))
+                false
+            }
+        }
+        if (removable.isEmpty()) return
+        val removed = removable.map(songs::get)
+        removable.sortedDescending().forEach(exoPlayer::removeMediaItem)
+        tellParty(removedIds)
+        settleQueueAfterRowRemoval(exoPlayer, removed)
+    }
+
+    /**
+     * Bookkeeping after queue rows were taken away from underneath playback.
+     *
+     * Shuffle keeps its own canonical copy of the context, and a bounded window
+     * keeps its own cursor into it — both describe the queue as it was, so both
+     * are told about the rows that are no longer in it.
+     */
+    private fun settleQueueAfterRowRemoval(exoPlayer: ExoPlayer, removed: List<Song>) {
+        if (boundedContextWindow == null) {
+            removed.forEach(QueueShuffle::removeMatchingRecording)
+        } else {
+            boundedEditState = BoundedQueueEdits.requestRefresh(boundedEditState)
+            exoPlayer.currentMediaItem?.let { syncBoundedContextCursor(exoPlayer, it) }
+            if (crossfade?.isTransitioning() != true) applyDeferredBoundedQueueEdit()
+        }
+        saveQueueSnapshotImmediately(exoPlayer)
+        refreshCustomLayouts()
+        publishWidgetState()
+    }
+
+    /** Drops the same rows from a party's queue, so listeners see the edit too. */
+    private fun tellParty(videoIds: List<String>) {
+        if (videoIds.isEmpty() || !ListenTogether.state.value.inParty) return
+        val gone = videoIds.toSet()
+        ListenTogether.state.value.queue.items
+            .filter { it.videoId in gone }
+            .map { it.videoId }
+            .distinct()
+            .forEach(ListenTogether::queueRemove)
     }
 
     /** Clears the queue's AutoPlay tail for the duration of repeat-all, keeping it to put back. */
@@ -8526,6 +8634,7 @@ class PlaybackService : MediaLibraryService() {
                 .add(swapVersionCommand)
                 .add(queueDragCommand)
                 .add(removeDislikedCommand)
+                .add(playlistEditedCommand)
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailablePlayerCommands(MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS)
@@ -8578,6 +8687,10 @@ class PlaybackService : MediaLibraryService() {
                         partySync?.endQueueDrag()
                     }
                 }
+                ACTION_PLAYLIST_EDITED -> dropPlaylistTracksFromQueue(
+                    playlistId = args.getString(EXTRA_PLAYLIST_ID).orEmpty(),
+                    videoIds = args.getStringArrayList(EXTRA_PLAYLIST_IDS).orEmpty().toSet(),
+                )
                 // A widget or watch drawn before the track changed can still
                 // send this for one the player offers no Like on.
                 ACTION_TOGGLE_FAVORITE -> session.player.currentMediaItem

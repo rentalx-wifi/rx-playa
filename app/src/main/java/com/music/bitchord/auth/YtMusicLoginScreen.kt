@@ -223,11 +223,15 @@ private fun captureFrom(
     onUnavailable: () -> Unit,
 ) {
     if (!isYouTubeMusicWebPage(view.url)) {
+        Log.w(TAG, "capture ignored: page is not music.youtube.com (url=${view.url?.take(120)})")
         onUnavailable()
         return
     }
     val cookies = CookieManager.getInstance().getCookie(MUSIC_ORIGIN)
     if (cookies == null || !AuthStore.hasApiSid(cookies)) {
+        // Names, not values: which cookies arrived is the whole question here,
+        // and a jar with SID missing is a cookie that was never pasted right.
+        Log.w(TAG, "capture refused: cookie jar has ${cookieNames(cookies)}, no signing SID")
         onUnavailable()
         return
     }
@@ -246,7 +250,7 @@ private fun captureFrom(
             it is JsonPrimitive && it.content == "true"
         }
         if (config == null || !loggedIn) {
-            Log.w(TAG, "confirmation requested before the page exposed a signed-in identity")
+            Log.w(TAG, "capture refused: page is not signed in, ytcfg=${raw.orEmpty().take(400)}")
             onUnavailable()
             return@evaluateJavascript
         }
@@ -298,6 +302,17 @@ private const val YTCFG_PROBE = """
 """
 
 private val json = Json { ignoreUnknownKeys = true }
+
+/** Cookie names from the browser jar, for a log line that stays short and value-free. */
+internal fun cookieNames(header: String?): String {
+    val names = header.orEmpty().split(';')
+        .mapNotNull { it.substringBefore('=', "").trim().takeIf(String::isNotEmpty) }
+    return when {
+        names.isEmpty() -> "nothing"
+        names.size <= 12 -> names.joinToString(" ") { it }
+        else -> names.take(12).joinToString(" ") { it } + " +${names.size - 12}"
+    }
+}
 
 /** The probe's result, or null for anything that isn't the object it promises. */
 private fun String?.parseConfig(): JsonObject? =

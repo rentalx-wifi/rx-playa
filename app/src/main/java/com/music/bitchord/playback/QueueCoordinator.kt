@@ -5,6 +5,14 @@ import com.music.bitchord.data.listentogether.PartyTrack
 import com.music.bitchord.data.model.QueueTier
 import com.music.bitchord.data.model.Song
 
+/** The queue rows one playlist edit takes away, and the one it has to leave playing. */
+data class PlaylistQueueDrop(
+    val indices: List<Int>,
+    val videoIds: List<String>,
+    /** The video id under the playhead, still matching the edit; null if there is none. */
+    val playing: String?,
+)
+
 /**
  * The tier of the queue row at [index]. The functions below take this as a
  * parameter so unit tests can supply tiers directly — on the JVM the metadata
@@ -71,6 +79,44 @@ object QueueCoordinator {
 
     fun removeMatchingRecordings(player: Player, target: Song): Int =
         removeMatchingRecordings(player, listOf(target))
+
+    /**
+     * The rows a playlist edit takes out of the queue that playlist built.
+     *
+     * Only CONTEXT rows carrying [playlistId] as their source are candidates:
+     * the same recording played from search, an album or the listener's own
+     * queue is another context, and clearing a playlist has no business taking
+     * it away from any of them. An empty [videoIds] means the whole playlist is
+     * gone, so every row of its context goes.
+     *
+     * The row under the playhead is never cut off mid-track. It is handed back
+     * as [PlaylistQueueDrop.playing] instead, for the caller to take out once a
+     * later transition makes it past tense.
+     */
+    fun playlistQueueDrops(
+        songs: List<Song>,
+        currentIndex: Int,
+        playlistId: String,
+        videoIds: Set<String>,
+    ): PlaylistQueueDrop {
+        val wanted = playlistId.removePrefix("VL")
+        if (wanted.isBlank()) return PlaylistQueueDrop(emptyList(), emptyList(), null)
+        val indices = mutableListOf<Int>()
+        val removedIds = mutableListOf<String>()
+        var playing: String? = null
+        songs.forEachIndexed { index, song ->
+            if (song.queueTier != QueueTier.CONTEXT) return@forEachIndexed
+            if (song.playbackSourceId?.removePrefix("VL") != wanted) return@forEachIndexed
+            if (videoIds.isNotEmpty() && song.videoId !in videoIds) return@forEachIndexed
+            if (index == currentIndex) {
+                playing = song.videoId
+            } else {
+                indices += index
+                removedIds += song.videoId
+            }
+        }
+        return PlaylistQueueDrop(indices, removedIds, playing)
+    }
 
     /** @see QueueTimeline.findUserQueueInsertionIndex */
     fun findUserQueueInsertionIndex(

@@ -313,6 +313,27 @@ fun MediaController.setQueueDragActive(active: Boolean) {
     )
 }
 
+/**
+ * Takes the rows of [playlistId] out of the queue, now that the playlist no
+ * longer has [videoIds] — or all of them, when the list is empty.
+ *
+ * The track under the playhead is left alone: the service finishes it and drops
+ * it at the next transition; see [QueueCoordinator.playlistQueueDrops].
+ */
+suspend fun MediaController.dropPlaylistTracks(
+    playlistId: String,
+    videoIds: Collection<String> = emptyList(),
+) {
+    if (playlistId.isBlank()) return
+    sendCustomCommand(
+        SessionCommand(ACTION_PLAYLIST_EDITED, Bundle.EMPTY),
+        bundleOf(
+            EXTRA_PLAYLIST_ID to playlistId,
+            EXTRA_PLAYLIST_IDS to ArrayList(videoIds),
+        ),
+    ).await()
+}
+
 /** Mirrors the controller into Compose state, polling position while playing. */
 @Composable
 fun rememberPlayerState(controller: MediaController?): PlayerState {
