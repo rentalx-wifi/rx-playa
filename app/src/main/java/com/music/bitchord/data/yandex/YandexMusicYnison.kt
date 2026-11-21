@@ -2,11 +2,13 @@ package com.music.bitchord.data.yandex
 
 import com.music.bitchord.BuildConfig
 import com.music.bitchord.data.Http
+import com.music.bitchord.data.settings.AppSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
@@ -104,6 +106,10 @@ internal class YandexMusicYnison(
         var attempt = 0
         var serverBackoff = DEFAULT_BACKOFF_MS
         while (currentCoroutineContext().isActive) {
+            // A socket that died because the device has no network is not
+            // something to retry: under Doze that was a wake-up every thirty
+            // seconds until morning, for a connection nothing could carry.
+            if (attempt > 0) awaitNetwork()
             var receivedState = false
             try {
                 runConnection {
@@ -130,9 +136,30 @@ internal class YandexMusicYnison(
             }
 
             attempt++
-            val base = serverBackoff[(attempt - 1).coerceAtMost(serverBackoff.lastIndex)]
-            delay(base + Random.nextLong(0L, 251L))
+            // Grows past the server's own hint instead of sitting on its last
+            // value. That hint used to become the ceiling for the rest of the
+            // session: four failures and every retry after them was thirty
+            // seconds apart, however long the outage lasted.
+            val hint = serverBackoff[(attempt - 1).coerceAtMost(serverBackoff.lastIndex)]
+            val grown = 1_000L shl (attempt - 1).coerceIn(0, MAX_BACKOFF_SHIFT)
+            delay(minOf(maxOf(hint, grown), MAX_BACKOFF_MS) + Random.nextLong(0L, 251L))
         }
+    }
+
+    /**
+     * Suspends until the device has a network again, when it has none.
+     *
+     * The reading is the one the Wi-Fi-only download gate uses: null exactly
+     * when there is no active network. Waiting on it rather than polling means
+     * a night without a signal costs one wake-up, on the callback that says the
+     * network is back, instead of a reconnect per backoff step.
+     */
+    private suspend fun awaitNetwork() {
+        if (AppSettings.meteredConnection.value != null) return
+        // Bounded: a device whose connectivity was never observed leaves this
+        // null with a network up, and waiting on it forever would be a sync that
+        // never comes back. Fifteen minutes is the longest a retry waits anyway.
+        withTimeoutOrNull(MAX_BACKOFF_MS) { AppSettings.meteredConnection.first { it != null } }
     }
 
     private suspend fun runConnection(onState: suspend (YnisonPlaybackState) -> Unit) {
@@ -283,6 +310,12 @@ internal class YandexMusicYnison(
         val REDIRECT_URL =
             "https://ynison.music.yandex.ru/redirector.YnisonRedirectService/GetRedirectToYnison".toHttpUrl()
         val DEFAULT_BACKOFF_MS = listOf(0L, 1_000L, 5_000L, 30_000L)
+
+        /** The longest a reconnect waits, so a dead night is a few tries, not thousands. */
+        const val MAX_BACKOFF_MS = 900_000L
+
+        /** 1 s doubling: 1, 2, 4, … 1024 s, which [MAX_BACKOFF_MS] then caps. */
+        const val MAX_BACKOFF_SHIFT = 10
     }
 }
 
