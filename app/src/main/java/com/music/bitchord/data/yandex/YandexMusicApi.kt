@@ -199,12 +199,22 @@ class YandexMusicApi internal constructor(
 
     /** The complete liked-id list; metadata is fetched in bounded batches, never audio. */
     suspend fun likedTracks(token: String, userId: String): List<YandexLikedTrack> {
+        val cached = likedLibraries[userId]
         val url = baseUrl.newBuilder().apply {
             listOf("users", userId, "likes", "tracks").forEach(::addPathSegment)
-            addQueryParameter("if-modified-since-revision", "0")
+            // The revision already in hand, so an unchanged library is one round
+            // trip instead of a full listing and dozens of metadata batches —
+            // which is what every Home opening used to cost.
+            addQueryParameter("if-modified-since-revision", (cached?.revision ?: 0L).toString())
         }.build()
-        val library = execute(requestBuilder(listOf("users", userId, "likes", "tracks"), token)
-            .url(url).get().build()).resultObject().objectAt("library")
+        val response = try {
+            execute(requestBuilder(listOf("users", userId, "likes", "tracks"), token).url(url).get().build())
+        } catch (unchanged: YandexMusicApiException.EmptyResult) {
+            // 202 with no body: the revision in the request is the current one.
+            // Nothing changed, so the list from last time is the answer.
+            return cached?.tracks ?: throw unchanged
+        }
+        val library = response.resultObject().objectAt("library")
             ?: throw YandexMusicApiException.InvalidResponse()
         val entries = library.arrayAt("tracks") ?: throw YandexMusicApiException.InvalidResponse()
         val likes = entries.mapNotNull { element ->
@@ -213,11 +223,22 @@ class YandexMusicApi internal constructor(
             val composite = entry.stringAt("albumId", "album_id")?.takeIf(String::isNotBlank)?.let { "$id:$it" } ?: id
             Triple(id, composite, entry.stringAt("timestamp").toYandexTimestamp())
         }
-        if (likes.isEmpty()) return emptyList()
+        val revision = library.longAt("revision")
+        if (likes.isEmpty()) {
+            if (revision != null) likedLibraries[userId] = CachedLikes(revision, emptyList())
+            return emptyList()
+        }
         val metadata = tracksMetadata(token, likes.map { it.second }).associateBy { it.id }
         if (metadata.isEmpty()) throw YandexMusicApiException.EmptyResult()
-        return likes.mapNotNull { (id, _, at) -> metadata[id]?.let { YandexLikedTrack(it, at) } }
+        val tracks = likes.mapNotNull { (id, _, at) -> metadata[id]?.let { YandexLikedTrack(it, at) } }
+        // Kept even when the revision was not stated: the cache then re-asks from
+        // zero, which is what every call did before this existed.
+        likedLibraries[userId] = CachedLikes(revision, tracks)
+        return tracks
     }
+
+    /** A liked library as it stood at [revision], for as long as this process lives. */
+    private data class CachedLikes(val revision: Long?, val tracks: List<YandexLikedTrack>)
 
     suspend fun likedArtists(token: String, userId: String): List<YandexLikedArtist> {
         val url = baseUrl.newBuilder().apply {
@@ -509,6 +530,15 @@ class YandexMusicApi internal constructor(
         const val BASE_URL = "https://api.music.yandex.net/"
         const val CLIENT_HEADER = "YandexMusicAndroid/24023621"
         val JSON = Json { ignoreUnknownKeys = true }
+
+        /**
+         * Liked libraries already read, by account.
+         *
+         * In memory, and deliberately not on disk: this is a shortcut for repeat
+         * openings in one session, not a store. Losing it costs one full listing,
+         * which is what every lookup cost before it.
+         */
+        val likedLibraries = java.util.concurrent.ConcurrentHashMap<String, CachedLikes>()
     }
 }
 
