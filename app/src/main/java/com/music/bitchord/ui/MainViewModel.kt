@@ -421,6 +421,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private var lyricsFor: List<Any>? = null
 
     /**
+     * How good the lines currently on screen are — see [lyricsRank].
+     *
+     * A source that answers in two hundred milliseconds used to sit behind one
+     * that had not answered at all, and the panel stayed empty until the race
+     * finished. Now the first answer is shown as it lands, and this is what
+     * keeps a late, worse one from replacing it: the panel only ever improves.
+     */
+    private var lyricsShownRank = -1
+
+    /**
      * Called as the playing track changes; cheap no-op when already loaded.
      *
      * [localUri] is the file this track plays from when it is on the device,
@@ -466,6 +476,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _lyricsProviderStates.value =
             LyricsSource.entries.associateWith { LyricsProviderState.NOT_FETCHED }
         _lyrics.value = null
+        lyricsShownRank = -1
         _lyricsSource.value = null
         lyricsJob?.cancel()
         if (sources.isEmpty()) {
@@ -506,8 +517,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 onSourceCancelled = { source -> providerCancelled(generation, source) },
             )
             val selected = selectedLyricsSource?.let(lyricsProviderResults::get) ?: found
-            _lyrics.value = selected?.lines
-            _lyricsSource.value = selected?.source
+            if (selected != null) {
+                // Never replaces better lines with worse ones: a word-timed
+                // answer that arrived first stays, whatever the priority race
+                // settled on afterwards.
+                val rank = lyricsRank(selected.lines)
+                if (rank >= lyricsShownRank) {
+                    lyricsShownRank = rank
+                    showLyricsResult(selected)
+                }
+            }
             _lyricsChecked.value = true
         }
     }
@@ -577,7 +596,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         lyricsProviderResults[source] = result
         _lyricsProviderStates.update { it + (source to LyricsProviderState.FOUND) }
-        if (selectedLyricsSource == source) showLyricsResult(result)
+        when {
+            // A tap on a source is the last word: it wins over any automatic
+            // replacement, and nothing upgrades away from it.
+            selectedLyricsSource == source -> showLyricsResult(result)
+            selectedLyricsSource == null -> showLyricsIfBetter(result)
+        }
+    }
+
+    /** Puts a source's answer on screen when it beats what is already there. */
+    private fun showLyricsIfBetter(result: LyricsRepository.Result) {
+        val rank = lyricsRank(result.lines)
+        if (rank <= lyricsShownRank) return
+        lyricsShownRank = rank
+        showLyricsResult(result)
     }
 
     private fun providerCancelled(generation: Long, source: LyricsSource) {
