@@ -616,6 +616,10 @@ fun SettingsScreen(
                     title = downloadQualityTitle,
                     subtitle = stringResource(R.string.download_quality_subtitle, downloadQuality.perTrack),
                     value = downloadQuality.localizedLabel(),
+                    // The title and a two-word value do not both fit on one line
+                    // at phone width: the value wins its whole width or the
+                    // title is cut to "Качество загруз…".
+                    valueBelowTitle = true,
                     onClick = { onOpenChoice(SettingsChoiceKind.DOWNLOAD_QUALITY) },
                 )
             }
@@ -2834,6 +2838,14 @@ internal fun SettingsRow(
     subtitle: String? = null,
     subtitleContent: (@Composable () -> Unit)? = null,
     value: String? = null,
+    /**
+     * Puts [value] under the title instead of at the row's right edge.
+     *
+     * For a value long enough to crowd the title out of its own line —
+     * "Качество загрузки" was cut to "Качество загруз…" by a "Без потерь ›"
+     * holding the whole right-hand column.
+     */
+    valueBelowTitle: Boolean = false,
     badge: String? = null,
     enabled: Boolean = true,
     iconPainter: Painter? = null,
@@ -2913,6 +2925,15 @@ internal fun SettingsRow(
                     Badge(badge)
                 }
             }
+            if (valueBelowTitle && value != null) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             if (subtitleContent != null) {
                 subtitleContent()
             } else if (subtitle != null) {
@@ -2927,8 +2948,8 @@ internal fun SettingsRow(
         Spacer(Modifier.width(12.dp))
         if (trailing != null) {
             trailing()
-        } else if (value != null || onClick != null) {
-            if (value != null) {
+        } else if (onClick != null || (value != null && !valueBelowTitle)) {
+            if (value != null && !valueBelowTitle) {
                 Text(
                     text = value,
                     style = MaterialTheme.typography.bodyLarge,
