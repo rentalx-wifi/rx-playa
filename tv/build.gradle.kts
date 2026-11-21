@@ -77,18 +77,24 @@ val vkRedirectScheme = vkIdClientId.takeIf(String::isNotBlank)?.let { "vk$it" } 
 
 /*
  * Bump this by hand before cutting each sideloaded test build ("beta2",
- * "beta3", ...) and blank it out before cutting the real release. Marks the
- * versionName below as a pre-release: AppUpdateChecker.isNewer() treats any
- * "-suffix" as older than a clean release of the same number, so testers
- * still get the update prompt once the matching tag is actually published.
+ * "beta3", ...) and blank it out before cutting the real release. The suffix
+ * makes the versionName say what this build is; an installed build is
+ * compared with a release by AppUpdateChecker.versionOrdinal, which reads the
+ * revision and the beta out of it, so testers still get the update prompt once
+ * the matching tag is actually published.
  *
  * Applied to release builds as well as debug ones, and that is the whole
  * point of it. A sideloaded beta is a *release* build — signed with the real
  * key, installed over the real package — so leaving the marker off it is
  * exactly the case that strands a tester: their build calls itself 1.6.1,
- * the published 1.6.1 then matches it, isNewer() says no, and no prompt ever
- * comes. Blanking this line is the one step that turns a beta into a release,
- * so it is the one place to get right.
+ * the published 1.6.1 then matches it, no prompt ever comes. Blanking this
+ * line is the one step that turns a beta into a release, so it is the one
+ * place to get right.
+ *
+ * The TV build also has no release assets of its own yet, and
+ * AppUpdateChecker reads only assets named with this module's
+ * UPDATE_APK_PREFIX — so a TV install is offered no update at all rather than
+ * the phone's APK, which would fail to install over `com.music.bitchord.tv`.
  */
 val betaSuffix = ""
 
@@ -131,7 +137,7 @@ android {
         // apart by name (BitChordTV-v1.8.apk, BitChordTV-v1.8_x86_64.apk), so
         // the updater installs the TV app here, never the phone app. See
         // AppUpdateChecker.apkAssetUrl.
-        buildConfigField("String", "UPDATE_APK_PREFIX", "\"RXMusicTV-\"")
+        buildConfigField("String", "UPDATE_APK_PREFIX", "\"RX-PlayaTV-\"")
     }
 
     splits {

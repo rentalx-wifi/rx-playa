@@ -135,25 +135,20 @@ object AppUpdateChecker {
         }
 
         val assets = release.optJSONArray("assets")
-        // More than one APK can hang off a release, and installing the wrong one
-        // is an INSTALL_FAILED_NO_MATCHING_ABIS at the end of the download. The
-        // release names its files by architecture ("...-arm64.apk",
-        // "...-arm32.apk"), not by the ABI string the platform reports
-        // ("arm64-v8a"), so the match is made on the short names. A universal
-        // build is the next best answer, and only then anything at all.
-        var byAbi: String? = null
-        var universal: String? = null
-        var firstApk: String? = null
-        for (index in 0 until (assets?.length() ?: 0)) {
-            val asset = assets?.optJSONObject(index) ?: continue
-            val name = asset.optString("name")
-            if (!name.endsWith(".apk", ignoreCase = true)) continue
-            val url = asset.optString("browser_download_url").ifBlank { null } ?: continue
-            if (firstApk == null) firstApk = url
-            if (universal == null && name.contains("universal", ignoreCase = true)) universal = url
-            if (byAbi == null && abiTokens().any { name.contains(it, ignoreCase = true) }) byAbi = url
+        val candidates = buildList {
+            for (index in 0 until (assets?.length() ?: 0)) {
+                val asset = assets?.optJSONObject(index) ?: continue
+                val name = asset.optString("name")
+                if (!name.endsWith(".apk", ignoreCase = true)) continue
+                val url = asset.optString("browser_download_url").ifBlank { null } ?: continue
+                add(name to url)
+            }
         }
-        val apkUrl = byAbi ?: universal ?: firstApk
+        // No asset of this app's own is no update. Offering the release anyway
+        // would send a phone to the TV build and a TV to the phone one — an
+        // INSTALL_FAILED_UPDATE_INCOMPATIBLE at the end of the download, or
+        // worse, an install over the other app's package.
+        val apkUrl = chooseApk(candidates) ?: return
         _available.value = UpdateInfo(
             version = tag,
             releaseUrl = release.optString("html_url"),
@@ -161,6 +156,33 @@ object AppUpdateChecker {
             notes = release.optString("body").takeIf { it.isNotBlank() },
             isBeta = release.optBoolean("prerelease", false),
         )
+    }
+
+    /**
+     * The APK in [assets] this app may install: this app's own platform, and its
+     * own architecture where the release splits them.
+     *
+     * [assets] is name to download URL. The release names its files by
+     * architecture ("…-arm64.apk", "…-arm32.apk") rather than by the ABI string
+     * the platform reports ("arm64-v8a"), so the match is made on the short
+     * names; a universal build is the next best answer, and only then anything at
+     * all — but never a file of the other platform.
+     */
+    internal fun chooseApk(
+        assets: List<Pair<String, String>>,
+        prefix: String = BuildConfig.UPDATE_APK_PREFIX,
+        abis: List<String> = abiTokens(),
+    ): String? {
+        var byAbi: String? = null
+        var universal: String? = null
+        var firstApk: String? = null
+        for ((name, url) in assets) {
+            if (!name.startsWith(prefix, ignoreCase = true)) continue
+            if (firstApk == null) firstApk = url
+            if (universal == null && name.contains("universal", ignoreCase = true)) universal = url
+            if (byAbi == null && abis.any { name.contains(it, ignoreCase = true) }) byAbi = url
+        }
+        return byAbi ?: universal ?: firstApk
     }
 
     /** "Remind me later", or the release page has been opened instead. */
@@ -200,12 +222,36 @@ object AppUpdateChecker {
     }
 
     /**
-     * The number at the end of a version name: `1.9-rx-playa-v35` and `v35` both
-     * answer 35. Releases are tagged `vNN`, and only that number decides whether
-     * an update is newer, so a rename of the display name cannot break it.
+     * A version comparable across release tags and installed version names.
+     *
+     * The revision number of the fork is the number, and the beta of that
+     * revision is the tie-break, so `v46b9` is above `v46b8` and `v45` is below
+     * both. All the shapes this project uses resolve to it: `v46b8`, `v45`,
+     * `rx-playa-v46b8`, `1.9-rx-playa-v46b8`. The last `vNN` wins, because a
+     * version name carries the display version in front of it and `1.9` must not
+     * be read as revision 1.
+     *
+     * A name with no revision at all falls back to its beta, and to 0 without
+     * one: that is a stable build of the base version, and any tagged revision
+     * is newer than it.
      */
-    private fun versionOrdinal(name: String): Int =
-        Regex("""v?(\d+)\s*$""").find(name.trim())?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+    internal fun versionOrdinal(name: String): Int {
+        val trimmed = name.trim()
+        val revision = Regex("""v(\d+)(?:b(\d+))?""", RegexOption.IGNORE_CASE)
+            .findAll(trimmed)
+            .lastOrNull()
+        if (revision != null) {
+            val number = revision.groupValues[1].toIntOrNull() ?: 0
+            val beta = revision.groupValues[2].toIntOrNull() ?: 0
+            return number * BETA_UNIT + beta
+        }
+        val beta = Regex("""beta(\d+)""", RegexOption.IGNORE_CASE)
+            .find(trimmed)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        return beta ?: 0
+    }
+
+    /** Room for a beta number inside one revision. */
+    private const val BETA_UNIT = 10_000
 
     /**
      * The versionCode a release states in its notes, when it states one.
