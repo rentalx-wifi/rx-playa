@@ -369,6 +369,12 @@
     <plurals name="download_failed_count">
         <item quantity="other">%1$d 個失敗</item>
     </plurals>
+    <string name="download_failed_expired">The link expired - try again</string>
+    <string name="download_failed_wait">The source asked to wait - try again in a minute</string>
+    <string name="download_failed_source">The source is having trouble (HTTP %1$d)</string>
+    <string name="download_failed_unsupported">Audio from this source can\'t be saved as a file</string>
+    <string name="download_failed_no_audio">No audio to download for this track</string>
+    <string name="download_failed_generic">Download failed - check your connection</string>
     <plurals name="all_songs_downloaded">
         <item quantity="other">全部 %1$d 首歌曲已下載</item>
     </plurals>

@@ -17,6 +17,11 @@ cast_searching_hint
 cast_track_unsupported
 dolby_atmos_subtitle
 dolby_atmos_unavailable
+download_failed_expired
+download_failed_generic
+download_failed_no_audio
+download_failed_unsupported
+download_failed_wait
 dpi_bypass_subtitle
 dpi_bypass_title
 equalizer_balance_footer

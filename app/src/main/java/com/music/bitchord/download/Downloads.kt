@@ -10,6 +10,7 @@ import androidx.core.content.ContextCompat
 import com.music.bitchord.data.innertube.StreamResolver
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.durationMillis
+import com.music.bitchord.R
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.DownloadQuality
 import com.music.bitchord.data.sources.SourceRegistry
@@ -975,7 +976,7 @@ object Downloads {
                 "download failed for $id (${song.playbackSource ?: "YouTube"}, ${song.title}): ${e.message}",
                 e,
             )
-            fail(id, e.friendly())
+            fail(id, e.friendly(context))
         }
     }
 
@@ -1688,15 +1689,35 @@ object Downloads {
      * `Unsupported MIME type audio/webm` at least sends someone looking in the
      * right direction.
      */
-    private fun Exception.friendly(): String {
+    /**
+     * A failure a user can read, in the language the app is in.
+     *
+     * Nothing raised outside this package is written for a person: the
+     * downloader reports "Expected URL scheme 'http' or 'https' but was
+     * 'rx-sc-manifest'" and the stream resolver "No downloadable audio for this
+     * track", and both of those were going straight onto the "Любимое" screen.
+     * So the message is chosen by what went wrong, not by what the exception
+     * chose to say, and the raw text stays in the log line beside it.
+     *
+     * [IllegalArgumentException] and [IllegalStateException] are in here for the
+     * same reason: they are how this app's own layers state a refusal, and the
+     * refusal is one of the cases below.
+     */
+    private fun Exception.friendly(context: Context): String {
         val text = message.orEmpty()
         val status = HTTP_STATUS.find(text)?.groupValues?.get(1)?.toIntOrNull()
         return when {
-            status in EXPIRED_CODES -> "The link expired — try again"
-            status == 429 -> "The source asked to wait — try again in a minute"
-            status != null && status >= 500 -> "The source is having trouble (HTTP $status)"
-            text.isNotBlank() -> text
-            else -> "Download failed — check your connection"
+            status in EXPIRED_CODES -> context.getString(R.string.download_failed_expired)
+            status == 429 -> context.getString(R.string.download_failed_wait)
+            status != null && status >= 500 -> context.getString(R.string.download_failed_source, status)
+            // A SoundCloud track's stream is a manifest this app synthesises and
+            // serves itself, so there is no file behind the URL to fetch: the
+            // downloader says so in the only words it has.
+            text.contains("rx-sc-manifest") || text.contains("Expected URL scheme") ->
+                context.getString(R.string.download_failed_unsupported)
+            text.contains("No downloadable audio") ->
+                context.getString(R.string.download_failed_no_audio)
+            else -> context.getString(R.string.download_failed_generic)
         }
     }
 

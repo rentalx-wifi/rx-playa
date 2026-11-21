@@ -653,6 +653,12 @@
         <item quantity="one">%1$d falhou</item>
         <item quantity="other">%1$d falharam</item>
     </plurals>
+    <string name="download_failed_expired">The link expired - try again</string>
+    <string name="download_failed_wait">The source asked to wait - try again in a minute</string>
+    <string name="download_failed_source">The source is having trouble (HTTP %1$d)</string>
+    <string name="download_failed_unsupported">Audio from this source can\'t be saved as a file</string>
+    <string name="download_failed_no_audio">No audio to download for this track</string>
+    <string name="download_failed_generic">Download failed - check your connection</string>
     <plurals name="all_songs_downloaded">
         <item quantity="one">Todas as %1$d música baixada</item>
         <item quantity="other">Todas as %1$d músicas baixadas</item>

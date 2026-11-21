@@ -444,6 +444,12 @@
         <item quantity="few">%1$d файла не загружены</item>
         <item quantity="many">%1$d файлов не загружено</item>
     </plurals>
+    <string name="download_failed_expired">Ссылка устарела - попробуйте ещё раз</string>
+    <string name="download_failed_wait">Источник просит подождать - повторите через минуту</string>
+    <string name="download_failed_source">Источник отвечает с ошибкой (HTTP %1$d)</string>
+    <string name="download_failed_unsupported">Аудио из этого источника нельзя сохранить файлом</string>
+    <string name="download_failed_no_audio">У этого трека нет аудио для скачивания</string>
+    <string name="download_failed_generic">Не удалось скачать - проверьте соединение</string>
     <plurals name="all_songs_downloaded">
         <item quantity="one">Загружена %1$d песня</item>
         <item quantity="few">Загружены все %1$d песни</item>
