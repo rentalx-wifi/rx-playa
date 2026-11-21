@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -134,6 +135,10 @@ object DiscordPresenceCoordinator {
         if (token == null) return
         val context = appContext ?: return
         rpc = DiscordRPC(context, token)
+        // A new gateway hears this session's current card first, whatever the
+        // window said about the old one.
+        lastPushedKey = null
+        lastPushAtMs = 0L
         refresh()
     }
 
@@ -145,6 +150,10 @@ object DiscordPresenceCoordinator {
         if (snapshot == null) {
             if (!presenceUp) return
             presenceUp = false
+            // The next card is a new one whatever it says: a track replayed
+            // after its card closed must not wait out the old window.
+            lastPushedKey = null
+            lastPushAtMs = 0L
             updateJob = scope.launch(Dispatchers.IO) {
                 updateMutex.withLock {
                     if (generation == updateGeneration && currentRpc === rpc) {
@@ -167,6 +176,21 @@ object DiscordPresenceCoordinator {
         }
 
         presenceUp = true
+        val key = presenceKey(snapshot)
+        if (!shouldPushPresence(now, lastPushAtMs, key, lastPushedKey, MIN_PUSH_INTERVAL_MS)) {
+            // Coalesced, not dropped: the card carries a position, and the one
+            // that goes out when the window ends carries the latest of it.
+            if (pendingPush?.isActive != true) {
+                val wait = (MIN_PUSH_INTERVAL_MS - (now - lastPushAtMs)).coerceAtLeast(0L)
+                pendingPush = scope.launch {
+                    delay(wait)
+                    refresh()
+                }
+            }
+            return
+        }
+        lastPushAtMs = now
+        lastPushedKey = key
         updateJob = scope.launch(Dispatchers.IO) {
             updateMutex.withLock {
                 if (generation != updateGeneration || currentRpc !== rpc) {
@@ -195,5 +219,52 @@ object DiscordPresenceCoordinator {
         }
     }
 
+    /**
+     * What the card would say, apart from where in the track it is.
+     *
+     * The position is deliberately absent: it moves every state frame, and
+     * resending the card for it is what tripped Discord's rate limit. A new
+     * track, a new setting or a new source all change this key and go out at
+     * once; the same card again waits for [MIN_PUSH_INTERVAL_MS].
+     */
+    private fun presenceKey(snapshot: Snapshot): String = buildString {
+        append(snapshot.song.videoId).append('|')
+        append(snapshot.durationMs).append('|')
+        append(snapshot.playbackSpeed).append('|')
+        append(snapshot.audioQuality).append('|')
+        append(snapshot.listenUrl).append('|')
+        append(AppSettings.discordUseDetails.value).append('|')
+        append(AppSettings.discordStatus.value).append('|')
+        append(AppSettings.discordActivityType.value).append('|')
+        append(AppSettings.discordActivityName.value).append('|')
+        append(AppSettings.discordButton1Text.value).append('|')
+        append(AppSettings.discordButton1Visible.value).append('|')
+        append(AppSettings.discordButton2Text.value).append('|')
+        append(AppSettings.discordButton2Visible.value)
+    }
+
+    private var lastPushAtMs = 0L
+    private var lastPushedKey: String? = null
+
+    /** A card held back by the window, waiting to go out once it ends. */
+    private var pendingPush: Job? = null
+
+    private const val MIN_PUSH_INTERVAL_MS = 15_000L
+
     private const val TEARDOWN_TIMEOUT_MS = 3_000L
 }
+
+/**
+ * Whether a presence card may go out now.
+ *
+ * A different card goes out at once; the same one again waits for the window.
+ * Discord rate-limits presence updates, and an update per Yandex state frame
+ * got the card stalled or dropped instead of moving.
+ */
+internal fun shouldPushPresence(
+    nowMs: Long,
+    lastPushAtMs: Long,
+    key: String,
+    lastKey: String?,
+    windowMs: Long,
+): Boolean = key != lastKey || nowMs - lastPushAtMs >= windowMs
