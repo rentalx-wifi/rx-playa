@@ -21,6 +21,7 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
 import androidx.media3.exoplayer.audio.AudioSink
+import com.music.bitchord.playback.AudioEnergy
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.abs
@@ -132,6 +133,9 @@ internal class BitPerfectAudioSink(private val outputs: BitPerfectOutputs) : Aud
         // Opening waits for the first buffer: whatever is being replaced may
         // still be playing out into this same device.
         configured = Input(format)
+        // The wave's meter reads the rate of what it is fed, and this path never
+        // passes through the DSP chain that would otherwise set it.
+        AudioEnergy.configure(format.sampleRate)
     }
 
     override fun handleBuffer(
@@ -360,9 +364,32 @@ internal class BitPerfectAudioSink(private val outputs: BitPerfectOutputs) : Aud
 
     private fun writeOutput() {
         val active = transport ?: return
+        val before = output.position()
         val taken = active.write(output)
-        if (taken > 0) writtenFrames += taken / outputFrameBytes
+        if (taken > 0) {
+            writtenFrames += taken / outputFrameBytes
+            // The meter reads exactly the bytes the device took, once each —
+            // a partial write re-enters this function with the rest.
+            meter(active.outputBits, before, taken)
+        }
         startIfReady()
+    }
+
+    /**
+     * Feeds the wave's meter from bytes on their way to the device.
+     *
+     * This path holds no float block to read — that is the whole point of it —
+     * so the first channel is read straight out of what was just written. On
+     * the audio thread: no allocation, no lock, and nothing is written back to
+     * the buffer.
+     */
+    private fun meter(bits: Int, from: Int, count: Int) {
+        val input = configured ?: return
+        val bytesPerSample = bits / 8
+        if (bytesPerSample < 2 || input.channelCount <= 0) return
+        val frames = count / (bytesPerSample * input.channelCount)
+        if (frames <= 0) return
+        AudioEnergy.feedPcm(output, from, bytesPerSample, input.channelCount, frames)
     }
 
     /** Starts the device once it is both wanted and has something to play. */

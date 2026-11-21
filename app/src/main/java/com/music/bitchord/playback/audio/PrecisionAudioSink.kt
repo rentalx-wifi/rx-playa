@@ -411,9 +411,12 @@ class PrecisionAudioSink(
 
             // Process normalized Float32 samples through custom DSP chain
             dspChain.process(audioBlock)
-            // The meter reads what leaves the chain, and only from the sink
-            // the listener can hear — see [AudioEnergy].
-            if (isAudible()) AudioEnergy.feed(audioBlock)
+            // The meter reads what leaves the chain. Normally only from the sink
+            // the listener can hear — see [AudioEnergy] — but a block this sink is
+            // splicing a loop mix into *is* what plays while the handoff runs, even
+            // at the moment the transition filter has already moved to the other
+            // sink.
+            if (isAudible() || outArm != null) AudioEnergy.feed(audioBlock)
 
             // Encode processed samples to target PCM output buffer (Float32 or PCM16)
             outputByteBuffer.clear()
@@ -593,7 +596,10 @@ class PrecisionAudioSink(
             arm.renderer.render(loopNextFrame, audioBlock.samples, 0, frames)
             loopNextFrame += frames
             dspChain.process(audioBlock)
-            if (isAudible()) AudioEnergy.feed(audioBlock)
+            // Blocks rendered here come from the decks and go straight to the
+            // device — the blend is the music while it lasts, so the meter
+            // follows it rather than waiting for the track to take over.
+            AudioEnergy.feed(audioBlock)
             outputByteBuffer.clear()
             PcmBoundary.encode(sourceBlock = audioBlock, encoding = outEncoding, outputBuffer = outputByteBuffer)
             outputByteBuffer.flip()

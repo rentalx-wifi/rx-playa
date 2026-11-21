@@ -1,6 +1,7 @@
 package com.music.bitchord.playback
 
 import com.music.bitchord.playback.audio.AudioBlock
+import java.nio.ByteBuffer
 import kotlin.math.exp
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -119,11 +120,55 @@ object AudioEnergy {
         val frames = block.frameCount
         if (channels <= 0 || frames <= 0) return
         val samples = block.samples
+        accumulate(frames) { frame -> samples[frame * channels] }
+    }
+
+    /**
+     * The same meter, for a sink whose samples are interleaved PCM rather than
+     * floats.
+     *
+     * Bit-perfect output hands the device exactly what the decoder produced and
+     * never builds a float block at all — that is the point of the path — so the
+     * first channel is read straight out of the bytes that were just written.
+     * Reading is absolute: the buffer's own position is left where the writer
+     * put it.
+     *
+     * [bytesPerSample] is 2, 3 or 4 (16-, 24- and 32-bit PCM); anything else is
+     * a stream this meter has no reading for and is ignored.
+     */
+    fun feedPcm(buffer: ByteBuffer, offset: Int, bytesPerSample: Int, channels: Int, frames: Int) {
+        if (bytesPerSample !in 2..4 || channels <= 0 || frames <= 0) return
+        val stride = bytesPerSample * channels
+        val usable = minOf(frames, (buffer.limit() - offset).coerceAtLeast(0) / stride)
+        if (usable <= 0) return
+        accumulate(usable) { frame -> sampleAt(buffer, offset + frame * stride, bytesPerSample) }
+    }
+
+    /** One sample of the first channel, unscaled to -1..1. */
+    private fun sampleAt(buffer: ByteBuffer, index: Int, bytesPerSample: Int): Float =
+        when (bytesPerSample) {
+            2 -> buffer.getShort(index).toFloat() / 32_768f
+            3 -> {
+                val low = buffer.get(index).toInt() and 0xFF
+                val middle = buffer.get(index + 1).toInt() and 0xFF
+                // The top byte is sign-extended by Byte.toInt(), which is
+                // exactly what the 24-bit value needs.
+                val high = buffer.get(index + 2).toInt() shl 16
+                (high or (middle shl 8) or low).toFloat() / 8_388_608f
+            }
+            else -> buffer.getInt(index).toFloat() / 2_147_483_648f
+        }
+
+    /**
+     * The filter and the level, over [frames] samples of the first channel.
+     * Inline so neither caller allocates a lambda on the audio thread.
+     */
+    private inline fun accumulate(frames: Int, sampleAt: (Int) -> Float) {
         var sum = 0f
         var counted = 0
         var frame = 0
         while (frame < frames) {
-            val x = samples[frame * channels]
+            val x = sampleAt(frame)
             // A one-pole high pass at the kick's lower edge, then a one-pole low
             // pass at its upper one. Two multiplies each, per sample.
             highPassed = highPassCoefficient * (highPassed + x - previousInput)
@@ -135,6 +180,11 @@ object AudioEnergy {
             }
             frame++
         }
+        publish(sum, counted)
+    }
+
+    /** Turns a block's summed band energy into [bass]. */
+    private fun publish(sum: Float, counted: Int) {
         if (counted == 0) return
         val rms = sqrt(sum / counted)
 
