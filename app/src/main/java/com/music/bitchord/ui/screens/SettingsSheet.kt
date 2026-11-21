@@ -2808,7 +2808,10 @@ internal fun SettingsGroup(
 @Composable
 internal fun RowDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(start = TEXT_INSET),
+        // Both ends, not just the left one: with the start inset alone the rule ran
+        // out to the card's own edge while the text beside it stopped a row inset
+        // short, and the gap read as a mistake on every settings page.
+        modifier = Modifier.padding(start = TEXT_INSET, end = ROW_INSET),
         thickness = if (LocalMaterial3StyleEnabled.current) 1.dp else 0.5.dp,
         color = if (LocalMaterial3StyleEnabled.current) MaterialTheme.colorScheme.outlineVariant
         else MaterialTheme.colorScheme.outline,
@@ -2884,7 +2887,12 @@ internal fun SettingsRow(
             }
         }
         Spacer(Modifier.width(ICON_GAP))
-        Column(Modifier.weight(1f)) {
+        // The 8dp is the title's own right-hand breathing room: the trailing
+        // control is separated from this column already, but a one-line title
+        // that fits its measured width ends flush against it, which is the
+        // "Экспорт совместимых загрузок" row with a switch glued to its last
+        // letter.
+        Column(Modifier.weight(1f).padding(end = 8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 // The badge is measured first and keeps its whole width; the
                 // title gives way with an ellipsis. Without the weight the title
@@ -3327,7 +3335,7 @@ internal fun <T> ChoiceGroup(
         options.forEachIndexed { index, option ->
             if (index > 0) {
                 HorizontalDivider(
-                    modifier = Modifier.padding(start = ROW_INSET),
+                    modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET),
                     thickness = 0.5.dp,
                     color = MaterialTheme.colorScheme.outline,
                 )
