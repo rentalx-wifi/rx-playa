@@ -68,11 +68,17 @@ import kotlinx.coroutines.delay
 private const val VIDEO_CONTROLS_IDLE_MS = 3_500L
 
 /**
- * A music video on a phone held sideways: the picture is the whole screen,
- * letterboxed in black, with the system bars away. A tap brings the controls
- * up over it — the title, the scrubber and the transport — and they stand
- * down again a few seconds after the last touch while it plays, as in every
- * video player. [onExitFullscreen] goes back to the ordinary landscape player.
+ * A music video on a phone held sideways: the picture is the whole screen with
+ * the system bars away. It is cropped to fill, not letterboxed: a 16:9 clip on
+ * a 20:9 phone left black bars a finger wide above and below, and a fullscreen
+ * player whose picture takes half the screen is not fullscreen. The picture's
+ * own shape is kept — the overflow goes off the edges rather than the picture
+ * being stretched.
+ *
+ * A tap brings the controls up over it — the title, the scrubber and the
+ * transport — and they stand down again a few seconds after the last touch
+ * while it plays, as in every video player. [onExitFullscreen] goes back to the
+ * ordinary landscape player.
  */
 @Composable
 internal fun FullscreenVideoPlayer(
@@ -111,7 +117,7 @@ internal fun FullscreenVideoPlayer(
         if (!rendered) VideoLoadingBackdrop(Modifier.fillMaxSize())
         MusicVideoSurface(
             videoId = song.videoId,
-            fit = true,
+            fit = false,
             onRenderedChanged = onRenderedChanged,
             modifier = Modifier.fillMaxSize(),
         )
