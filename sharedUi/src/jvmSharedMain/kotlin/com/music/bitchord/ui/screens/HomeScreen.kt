@@ -261,6 +261,8 @@ private fun RxWavePill(
     // read only in the draw block below.
     val phase = remember { mutableFloatStateOf(0f) }
     val beat = remember { mutableFloatStateOf(0f) }
+    // Where the accent's light is on its way across the plate, 0 to 1.
+    val sweep = remember { mutableFloatStateOf(0f) }
     val scheme = MaterialTheme.colorScheme
     val ink = scheme.onPrimary
     // Strokes are made once: a Stroke is an object, and building eight of them
@@ -276,7 +278,7 @@ private fun RxWavePill(
     }
     val path = remember { Path() }
     val sheen = remember(ink) {
-        Brush.verticalGradient(listOf(ink.copy(alpha = 0.14f), Color.Transparent))
+        Brush.verticalGradient(listOf(ink.copy(alpha = 0.10f), Color.Transparent))
     }
 
     LaunchedEffect(reduceMotion, foreground, isPlaying) {
@@ -308,6 +310,11 @@ private fun RxWavePill(
                 phase.floatValue = (
                     phase.floatValue + dt * (IDLE_SPEED + 4.2f * beat.floatValue)
                     ) % TWO_PI
+                // The pass of light is slow on purpose and quickens a little
+                // with the beat: one turn takes about six seconds at rest.
+                sweep.floatValue = (
+                    sweep.floatValue + dt * (0.16f + 0.12f * beat.floatValue)
+                    ) % 1f
             }
         }
     }
@@ -338,11 +345,16 @@ private fun RxWavePill(
             }
             .clip(RoundedCornerShape(28.dp))
             .background(
+                // Four stops instead of three, and the mixes are shallower: the
+                // plate should read as one lit surface with the accent running
+                // through it, not as two bands meeting in the middle.
                 Brush.horizontalGradient(
                     listOf(
+                        lerp(scheme.primary, scheme.secondary, 0.10f),
                         scheme.primary,
-                        lerp(scheme.primary, scheme.secondary, 0.55f),
-                        lerp(scheme.primary, scheme.tertiary, 0.40f),
+                        lerp(scheme.primary, scheme.secondary, 0.34f),
+                        lerp(scheme.primary, scheme.tertiary, 0.22f),
+                        lerp(scheme.primary, scheme.secondary, 0.12f),
                     ),
                 ),
             )
@@ -352,6 +364,23 @@ private fun RxWavePill(
             // Static light: a sheen down from the top edge, drawn from a brush
             // made in composition, so it costs one rect a frame.
             drawRect(brush = sheen)
+
+            // The accent's shimmer: one soft diagonal band of light crossing the
+            // plate, gone at both edges of its own fade so it never reads as a
+            // stripe with a start and an end. One rect and one gradient.
+            val band = size.width * 0.55f
+            val travel = -band + (size.width + band * 2f) * sweep.floatValue
+            drawRect(
+                brush = Brush.linearGradient(
+                    colorStops = arrayOf(
+                        0f to Color.Transparent,
+                        0.5f to ink.copy(alpha = 0.16f),
+                        1f to Color.Transparent,
+                    ),
+                    start = Offset(travel - band, -size.height * 0.4f),
+                    end = Offset(travel + band, size.height * 1.4f),
+                ),
+            )
 
             val b = beat.floatValue
             val p = phase.floatValue
@@ -407,32 +436,32 @@ private fun RxWavePill(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 14.dp, vertical = 14.dp),
+                .padding(start = 12.dp, end = 14.dp, top = 14.dp, bottom = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // The mark sits first and close to the edge, glowing faintly in the
             // accent's own light: a halo behind the artwork rather than a tint
             // on it, so the logo stays legible on the plate's gradient.
-            Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
                 Canvas(Modifier.matchParentSize()) {
                     val glow = 0.30f + 0.35f * beat.floatValue
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(ink.copy(alpha = glow * 0.5f), Color.Transparent),
                             center = center,
-                            radius = size.minDimension * 0.62f,
+                            radius = size.minDimension * 0.68f,
                         ),
-                        radius = size.minDimension * 0.62f,
+                        radius = size.minDimension * 0.68f,
                     )
                 }
                 Icon(
                     painter = painterResource(Res.drawable.ic_rx_mark),
                     contentDescription = null,
                     tint = ink.copy(alpha = 0.92f),
-                    modifier = Modifier.size(26.dp),
+                    modifier = Modifier.size(34.dp),
                 )
             }
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     text = label,
