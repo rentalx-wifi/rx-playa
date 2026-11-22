@@ -7,11 +7,14 @@ import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,11 +50,18 @@ fun VkWebLoginScreen(
 ) {
     BackHandler(onBack = onClose)
     var loading by remember { mutableStateOf(true) }
+    // A page that never arrived used to leave a blank white sheet behind the
+    // "Sign in" label, with no way to tell a blocked network from a broken
+    // screen (issue #45). The refusal is shown instead, with the one action
+    // that could change the answer.
+    var failed by remember { mutableStateOf(false) }
+    var page by remember { mutableStateOf<WebView?>(null) }
     Box(Modifier.fillMaxSize()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { context ->
                 WebView(context).apply {
+                    page = this
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
                     settings.userAgentString =
@@ -65,6 +75,23 @@ fun VkWebLoginScreen(
 
                         override fun onPageFinished(view: WebView?, url: String?) {
                             loading = false
+                        }
+
+                        /**
+                         * The main page failing is the case worth showing: a
+                         * blocked host, no network, a captive portal. Sub-resource
+                         * failures are left alone — one dead image is not a
+                         * reason to abandon a page that did load.
+                         */
+                        override fun onReceivedError(
+                            view: WebView,
+                            request: android.webkit.WebResourceRequest,
+                            error: android.webkit.WebResourceError,
+                        ) {
+                            if (request.isForMainFrame) {
+                                loading = false
+                                failed = true
+                            }
                         }
 
                         override fun shouldOverrideUrlLoading(
@@ -106,6 +133,26 @@ fun VkWebLoginScreen(
                 contentDescription = stringResource(R.string.close),
                 tint = MaterialTheme.colorScheme.onBackground,
             )
+        }
+        if (failed) {
+            Column(
+                modifier = Modifier.align(Alignment.Center).padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.no_internet_connection),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+                Button(onClick = {
+                    failed = false
+                    loading = true
+                    page?.loadUrl(VkWebAuth.authorizationUrl())
+                }) {
+                    Text(stringResource(R.string.retry))
+                }
+            }
         }
     }
 }

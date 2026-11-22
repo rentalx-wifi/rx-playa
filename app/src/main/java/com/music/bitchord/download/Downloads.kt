@@ -57,7 +57,15 @@ sealed interface DownloadState {
     /** [fraction] is 0f until the length is known, which is the first thing asked for. */
     data class Running(val fraction: Float) : DownloadState
 
-    data class Failed(val reason: String) : DownloadState
+    /**
+     * A failure, with whether asking again could possibly help.
+     *
+     * "This track has no audio to download" is a fact about the track: the row
+     * offered a Retry button for it, and pressing it produced the same refusal
+     * (issue #40). A network fault is worth another go; a refusal from the
+     * catalogue is not, so the button is only shown for the first kind.
+     */
+    data class Failed(val reason: String, val retryable: Boolean = true) : DownloadState
 }
 
 /**
@@ -976,7 +984,7 @@ object Downloads {
                 "download failed for $id (${song.playbackSource ?: "YouTube"}, ${song.title}): ${e.message}",
                 e,
             )
-            fail(id, e.friendly(context))
+            fail(id, e.friendly(context), retryable = e.isWorthRetrying())
         }
     }
 
@@ -1672,8 +1680,8 @@ object Downloads {
         _active.update { it - videoId }
     }
 
-    private fun fail(videoId: String, reason: String) {
-        _active.update { it + (videoId to DownloadState.Failed(reason)) }
+    private fun fail(videoId: String, reason: String, retryable: Boolean = true) {
+        _active.update { it + (videoId to DownloadState.Failed(reason, retryable)) }
         DownloadSession.failed(videoId, reason)
     }
 
@@ -1719,6 +1727,21 @@ object Downloads {
                 context.getString(R.string.download_failed_no_audio)
             else -> context.getString(R.string.download_failed_generic)
         }
+    }
+
+    /**
+     * Whether this failure is worth a second press.
+     *
+     * Two of the cases above are facts about the track rather than about the
+     * connection: no audio to fetch, or a stream that only exists inside this
+     * app. Asking again returns the same answer, and a Retry button that can
+     * only fail reads as a broken button — see issue #40.
+     */
+    private fun Exception.isWorthRetrying(): Boolean {
+        val text = message.orEmpty()
+        return !(text.contains("No downloadable audio") ||
+            text.contains("rx-sc-manifest") ||
+            text.contains("Expected URL scheme"))
     }
 
     /**

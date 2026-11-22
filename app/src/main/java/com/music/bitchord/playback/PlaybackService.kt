@@ -3694,6 +3694,13 @@ class PlaybackService : MediaLibraryService() {
 
         // Match the player UI: update both surfaces immediately, then reconcile
         // the optimistic state with YouTube in the background.
+        //
+        // A device file's heart lives in its own list, which is what
+        // [isLiked] reads for it — writing only the rating store left the
+        // button on the lock screen untouched for a downloaded track (#50).
+        if (song.localUri != null && (target == LikeStatus.LIKE) != OfflinePlaylists.isLiked(song)) {
+            OfflinePlaylists.toggleLike(song)
+        }
         TrackRatingStore.set(song, target)
         refreshCustomLayouts()
         val youtubeAccountWrite = videoId.matches(Regex("[A-Za-z0-9_-]{11}")) &&

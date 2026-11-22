@@ -507,11 +507,16 @@ private fun DownloadRow(song: Song, palette: ArtworkPalette, isOffline: Boolean,
         is DownloadState.Failed -> ActionRow(
             icon = SfIcons.ErrorOutline,
             label = state.reason,
-            value = stringResource(R.string.retry),
+            // No Retry where retrying cannot change the answer: the row would
+            // only invite a second press that fails the same way (#40).
+            value = if (state.retryable) stringResource(R.string.retry) else null,
             // Not the artwork's colour: a failure has to stay legible as a
             // failure whatever the sleeve happens to be tinted.
             tint = MaterialTheme.colorScheme.error,
             accent = MaterialTheme.colorScheme.error,
+            // A row that reports a fact about the track, not a button: left
+            // disabled rather than swallowing taps, so it looks like what it is.
+            enabled = state.retryable,
             onClick = onDownload,
         )
 

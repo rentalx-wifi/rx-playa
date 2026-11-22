@@ -919,8 +919,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val previous = likeStatusOf(song.videoId)
         if (previous == status) return
         val previousEntry = TrackRatingStore.entry(song.videoId)
-        if (song.localUri != null && status == LikeStatus.DISLIKE && OfflinePlaylists.isLiked(song)) {
-            OfflinePlaylists.toggleLike(song)
+        // A file on the device keeps its heart in its own list, and the media
+        // notification reads that list rather than the rating store — see
+        // `PlaybackService.isLiked`. Writing only the rating left the heart on
+        // the lock screen empty for a downloaded track (issue #50), and the two
+        // surfaces disagreed about the same song.
+        if (song.localUri != null) {
+            val wantLiked = status == LikeStatus.LIKE
+            if (wantLiked != OfflinePlaylists.isLiked(song)) OfflinePlaylists.toggleLike(song)
         }
         TrackRatingStore.set(song, status)
 
