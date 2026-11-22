@@ -100,6 +100,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.ShelfItem
+import com.music.bitchord.data.model.cardKey
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.isMatchPending
 import com.music.bitchord.data.model.isMatchMissing
@@ -827,8 +828,7 @@ fun SearchPlayingBars(modifier: Modifier = Modifier) {
  * an album or playlist a browse id; a card with neither is identified by what
  * it says, which is the best that can be done and rare.
  */
-internal fun ShelfItem.shelfKey(): String =
-    videoId ?: browseId ?: ("text:$title\u0000$subtitle")
+internal fun ShelfItem.shelfKey(): String = cardKey()
 
 @Composable
 fun DownloadedBadge(videoId: String, tint: Color, modifier: Modifier = Modifier) {

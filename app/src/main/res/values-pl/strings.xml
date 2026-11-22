@@ -967,6 +967,7 @@
     <string name="profiles">Profile</string>
 
     <string name="radio_started">Uruchomiono radio %1$s</string>
+    <string name="player_not_ready">Player not ready</string>
 
     <string name="revert_to_original">Przywróć oryginał</string>
 

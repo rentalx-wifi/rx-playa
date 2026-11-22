@@ -929,6 +929,7 @@
     <string name="profiles">प्रोफ़ाइलें</string>
 
     <string name="radio_started">%1$s रेडियो शुरू हुआ</string>
+    <string name="player_not_ready">Player not ready</string>
 
     <string name="revert_to_original">मूल संस्करण पर वापस जाएं</string>
 

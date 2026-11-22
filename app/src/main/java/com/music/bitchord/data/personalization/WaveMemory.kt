@@ -24,7 +24,16 @@ import kotlinx.serialization.json.Json
 internal object WaveMemory {
 
     @Serializable
-    private data class Entry(val id: String, val titleKey: String, val seconds: Int, val atMs: Long)
+    private data class Entry(
+        val id: String,
+        val titleKey: String,
+        val seconds: Int,
+        val atMs: Long,
+        // Defaulted rather than required: entries written by an earlier build
+        // have no artist, and refusing them would empty the cooldown after an
+        // update.
+        val artistKey: String = "",
+    )
 
     /** How long a served track stays out of the wave. */
     const val COOLDOWN_MS = 72L * 60L * 60L * 1000L
@@ -64,7 +73,7 @@ internal object WaveMemory {
         val recordings = HashSet<PersonalWavePlanner.RecordingKey>(entries.size)
         entries.forEach {
             ids += it.id
-            recordings += PersonalWavePlanner.RecordingKey(it.titleKey, it.seconds)
+            recordings += PersonalWavePlanner.RecordingKey(it.titleKey, it.seconds, it.artistKey)
         }
         return Served(ids, recordings)
     }
@@ -78,7 +87,7 @@ internal object WaveMemory {
         songs.forEach { song ->
             if (song.videoId.isBlank() || !known.add(song.videoId)) return@forEach
             val key = PersonalWavePlanner.recordingKey(song)
-            entries += Entry(song.videoId, key.title, key.seconds, nowMs)
+            entries += Entry(song.videoId, key.title, key.seconds, nowMs, key.artist)
         }
         while (entries.size > MAX_ENTRIES) entries.removeAt(0)
         persist()

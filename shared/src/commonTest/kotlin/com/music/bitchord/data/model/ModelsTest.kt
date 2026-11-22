@@ -56,4 +56,24 @@ class ModelsTest {
         val albums = HomeShelf("Albums & singles", (1..10).map { album("a$it") })
         assertEquals(listOf(listenAgain), listOf(listenAgain).withoutRepeatsOf(listOf(recents, albums)))
     }
+
+    @Test
+    fun aShelfRepeatingACardIsDrawnOnce() {
+        // The feed keys its rows on the card's identity, so a repeat is a crash
+        // rather than a doubled card: the same artist twice, the same video
+        // twice, and two cards whose only identity is their own text.
+        val cards = listOf(
+            album("UC-nyan"),
+            album("UC-nyan"),
+            song("dQw4w9WgXcQ"),
+            song("dQw4w9WgXcQ"),
+            ShelfItem("У батарей", "nyan.mp3", null, null, null),
+            ShelfItem("У батарей", "nyan.mp3", null, null, null),
+            album("UC-other"),
+        )
+        assertEquals(
+            listOf("UC-nyan", "dQw4w9WgXcQ", "text:У батарей\u0000nyan.mp3", "UC-other"),
+            cards.withoutRepeatedCards().map { it.cardKey() },
+        )
+    }
 }

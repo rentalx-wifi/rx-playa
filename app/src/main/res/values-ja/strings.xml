@@ -993,6 +993,7 @@
     <string name="playlist_action">プレイリスト</string>
 
     <string name="radio_started">%1$s ラジオを開始しました</string>
+    <string name="player_not_ready">Player not ready</string>
 
     <string name="revert_to_original">オリジナルに戻す</string>
 

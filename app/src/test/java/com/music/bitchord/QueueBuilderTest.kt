@@ -16,6 +16,26 @@ class QueueBuilderTest {
         song(id, title, artist).copy(isVideo = true)
 
     @Test
+    fun `the artist a station was seeded on keeps its extra room`() {
+        // The queue ends with a different act than the one the station was
+        // started from — which is what an extended queue always looks like. The
+        // seed is passed in, so the extra room lands on it rather than on
+        // whoever happens to sit last.
+        val seed = song("seed", "Seed", "Kesariya")
+        val other = song("last", "Last", "Somebody Else")
+        val candidates = (1..5).map { song("k$it", "Track $it", "Kesariya") } +
+            (1..3).map { song("o$it", "Other $it", "Somebody Else") }
+        val extra = QueueBuilder.extend(
+            existing = listOf(seed, other),
+            candidates = candidates,
+            limit = 10,
+            seedSong = seed,
+        )
+        assertEquals(4, extra.count { it.artist == "Kesariya" })
+        assertEquals(2, extra.count { it.artist == "Somebody Else" })
+    }
+
+    @Test
     fun `the music video cut of a mix is left out`() {
         val extra = QueueBuilder.extend(
             existing = emptyList(),

@@ -934,6 +934,7 @@
     <string name="profiles">Perfis</string>
 
     <string name="radio_started">Rádio %1$s iniciada</string>
+    <string name="player_not_ready">Player not ready</string>
 
     <string name="revert_to_original">Reverter para o original</string>
 

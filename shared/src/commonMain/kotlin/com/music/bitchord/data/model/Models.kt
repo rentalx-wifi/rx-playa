@@ -513,6 +513,34 @@ fun List<HomeShelf>.withoutRepeatsOf(existing: List<HomeShelf>): List<HomeShelf>
     }
 }
 
+/**
+ * These cards, one per identity.
+ *
+ * The same card twice in one shelf is not hypothetical — a carousel that lists
+ * a track and then its own "re-released" twin, or a related-artists row that
+ * names one act under two spellings, is what YouTube serves on some pages. The
+ * feed keys its rows on that identity, so a repeat is not a cosmetic problem:
+ * a lazy list refuses two items with one key and the screen dies with an
+ * "already used" exception. De-duplication belongs where the shelf is built,
+ * then, rather than in each screen that draws one.
+ */
+fun List<ShelfItem>.withoutRepeatedCards(): List<ShelfItem> {
+    val seen = HashSet<String>()
+    return filter { seen.add(it.cardKey()) }
+}
+
+/**
+ * What makes two cards in one shelf the same card.
+ *
+ * One function rather than two: the feed's lazy-list keys and the de-duplication
+ * above have to agree, and a screen that kept its own idea of identity has no
+ * way to know it disagrees.
+ */
+fun ShelfItem.cardKey(): String = videoId
+    ?: browseId
+    ?: song?.videoId
+    ?: "text:$title\u0000$subtitle"
+
 /** Share of the smaller shelf's items both must hold for one to count as a repeat of the other. */
 private const val REPEAT_SHELF_SHARE = 0.6
 

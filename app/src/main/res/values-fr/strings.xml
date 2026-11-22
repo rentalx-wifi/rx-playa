@@ -930,6 +930,7 @@
     <string name="profiles">Profils</string>
 
     <string name="radio_started">Radio %1$s démarrée</string>
+    <string name="player_not_ready">Player not ready</string>
 
     <string name="revert_to_original">Rétablir l\'original</string>
 

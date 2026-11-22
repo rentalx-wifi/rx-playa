@@ -3,6 +3,7 @@ package com.music.bitchord.playback
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.durationMillis
 import com.music.bitchord.data.model.normalizedArtistName
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 
 /**
@@ -98,8 +99,16 @@ internal object PersonalWavePlanner {
         val random: Random = Random.Default,
     )
 
-    /** Title plus runtime bucket: the same master under two uploads is one track. */
-    data class RecordingKey(val title: String, val seconds: Int)
+    /**
+     * Title, artist and runtime bucket: the same master under two uploads is
+     * one track, and two different recordings that happen to share a name are
+     * still two.
+     *
+     * The artist is part of it because leaving it out made every "Intro" and
+     * "Outro" in the library one track — one of them was dropped as a duplicate
+     * of the other, and never reached the station at all.
+     */
+    data class RecordingKey(val title: String, val seconds: Int, val artist: String = "")
 
     data class Pick(val song: Song, val score: Double, val reason: String, val fresh: Boolean = true)
     data class Reject(val song: Song, val reason: String)
@@ -142,12 +151,12 @@ internal object PersonalWavePlanner {
         RegexOption.IGNORE_CASE,
     )
 
-    fun recordingKey(song: Song): RecordingKey = recordingKey(song.title, song.durationMillis())
+    fun recordingKey(song: Song): RecordingKey = recordingKey(song.title, song.durationMillis(), song.artist)
 
     /** Same key without a [Song] at hand: what [WaveMemory] keeps between runs. */
-    fun recordingKey(title: String, durationMs: Long): RecordingKey {
+    fun recordingKey(title: String, durationMs: Long, artist: String = ""): RecordingKey {
         val seconds = durationMs.let { if (it <= 0L) 0 else (it / 1000L).toInt() }
-        return RecordingKey(TrackText.titleKey(title), seconds / 2)
+        return RecordingKey(TrackText.titleKey(title), seconds / 2, normalizedArtistName(artist))
     }
 
     /**
@@ -171,7 +180,17 @@ internal object PersonalWavePlanner {
 
         for (seed in input.seeds) {
             if (candidates.size >= input.limit * 3) break
-            val tracks = runCatching { radio(seed.song) }.getOrNull().orEmpty()
+            // Cancellation is not a failing radio: swallowing it here kept a
+            // station nobody is waiting for alive through every remaining seed
+            // (up to two dozen lookups), after which the abandoned picks were
+            // remembered as already served and the next press was shorter.
+            val tracks = try {
+                radio(seed.song)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                emptyList()
+            }
             if (tracks.isEmpty()) continue
             asked += seed.song
             radios += tracks

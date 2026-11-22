@@ -908,6 +908,7 @@
     <string name="profiles">個人資料</string>
 
     <string name="radio_started">已開啟 %1$s 電臺</string>
+    <string name="player_not_ready">Player not ready</string>
 
     <string name="revert_to_original">還原為原始版本</string>
 

@@ -44,6 +44,16 @@ fun GoogleCookieImportAlert(
     onDismiss: () -> Unit,
     /** Opens Google's own page in the phone's browser, where it actually works. */
     onOpenBrowser: () -> Unit = {},
+    /**
+     * Google's page in the app's own browser.
+     *
+     * Kept next to the two other routes rather than replaced by them: Google
+     * refuses an embedded browser for most accounts and lets it through for
+     * some, so a sign-in that worked on a phone before must stay reachable on
+     * it. The cookie and the phone't browser are the ways round the refusal,
+     * not the way in for everybody.
+     */
+    onGoogleSignIn: () -> Unit = {},
     /** Shown above the instructions when the browser sign-in was refused. */
     notice: String? = null,
 ) {
@@ -146,6 +156,8 @@ fun GoogleCookieImportAlert(
                 }
                 AlertRule()
                 AlertAction(stringResource(R.string.google_cookie_import_button), true, ::importCookie, enabled = cookie.isNotBlank())
+                AlertRule()
+                AlertAction(stringResource(R.string.onboarding_sign_in_google), false, onGoogleSignIn)
                 AlertRule()
                 AlertAction(stringResource(R.string.google_open_browser_action), false, onOpenBrowser)
                 AlertRule()

@@ -908,6 +908,7 @@
     <string name="profiles">Profil</string>
 
     <string name="radio_started">Radio %1$s dimulai</string>
+    <string name="player_not_ready">Player not ready</string>
 
     <string name="revert_to_original">Kembalikan ke asli</string>
 

@@ -1008,6 +1008,7 @@
     <string name="profiles">Профили</string>
 
     <string name="radio_started">Радио %1$s запущено</string>
+    <string name="player_not_ready">Плеер не готов</string>
 
     <string name="revert_to_original">Вернуть оригинал</string>
 

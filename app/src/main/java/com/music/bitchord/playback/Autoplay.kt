@@ -161,6 +161,7 @@ suspend fun loadAutoplayTracks(
         limit = limit,
         preferVideos = videos,
         excluded = TrackRatingStore.dislikedSongs(),
+        seedSong = seedSong,
     )
     if (extra.isEmpty()) return Result.success(emptyList())
 
@@ -188,6 +189,9 @@ suspend fun loadAutoplayTracks(
  * when the filtered pool runs dry. A wave that cannot be built from the
  * listener's own liked artists is short, and a short station is honest.
  */
+/** How many of an artist's tracks must be thumbed down before the act goes too. */
+private const val DISLIKES_TO_DROP_ARTIST = 2
+
 suspend fun loadPersonalWave(
     profile: TasteProfile,
     disliked: List<Song> = TrackRatingStore.dislikedSongs(),
@@ -255,7 +259,16 @@ suspend fun loadPersonalWave(
             likedRecordings = liked.mapTo(HashSet()) { PersonalWavePlanner.recordingKey(it.song) },
             likedArtists = likedArtists,
             historyArtists = historyArtists,
-            dislikedArtists = disliked.mapTo(HashSet()) { normalizedArtistName(it.artist) },
+            // One thumb-down is a verdict on one track, not on the act: the
+            // planner bans a disliked recording on its own, and an artist only
+            // once the likes are a pattern. Desagreeing with a single song used
+            // to take the whole artist out of the station, which is a much
+            // bigger statement than the button makes.
+            dislikedArtists = disliked
+                .groupingBy { normalizedArtistName(it.artist) }
+                .eachCount()
+                .filterValues { count -> count >= DISLIKES_TO_DROP_ARTIST }
+                .keys,
             dislikedRecordings = disliked.mapTo(HashSet()) { PersonalWavePlanner.recordingKey(it) },
             limit = limit,
             recentVideoIds = recentVideoIds,

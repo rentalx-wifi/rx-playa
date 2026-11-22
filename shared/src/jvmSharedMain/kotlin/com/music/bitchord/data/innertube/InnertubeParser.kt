@@ -17,6 +17,7 @@ import com.music.bitchord.data.model.MoodGenreSection
 import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.shelfLayoutFor
+import com.music.bitchord.data.model.withoutRepeatedCards
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.SongMenu
 import com.music.bitchord.data.model.SubscriptionState
@@ -299,7 +300,14 @@ object InnertubeParser {
         // A shelf billed as videos ("Video charts", "Recommended music videos")
         // keeps the videos it can play and loses the video compilations, which
         // open onto pages with nothing on them.
-        val items = if (VIDEO_WORD.containsMatchIn(title)) parsed.filter { it.videoId != null } else parsed
+        // A shelf that repeats a card cannot be drawn: the row keys are the
+        // identity, so one repeat is a crash on the feed. Dropped here, where
+        // every home carousel is built.
+        val items = if (VIDEO_WORD.containsMatchIn(title)) {
+            parsed.filter { it.videoId != null }
+        } else {
+            parsed
+        }.withoutRepeatedCards()
         if (items.isEmpty()) return null
         val shelfTitle = title.ifBlank { "For you" }
         val fromList = contents.firstOrNull().o("musicResponsiveListItemRenderer") != null
@@ -311,6 +319,7 @@ object InnertubeParser {
         val items = shelf.a("contents").orEmpty().mapNotNull {
             parseResponsiveListItem(it.o("musicResponsiveListItemRenderer"))
         }.map { ShelfItem(it.title, it.artist, it.thumbnailUrl, it.videoId, null, isVideo = it.isVideo) }
+            .withoutRepeatedCards()
         if (items.isEmpty()) return null
         val shelfTitle = title.ifBlank { "For you" }
         return HomeShelf(shelfTitle, items, layout = shelfLayoutFor(shelfTitle, items, fromList = true))
@@ -334,6 +343,10 @@ object InnertubeParser {
         // "Top songs" rows are billed by the page they sit on: the subtitle
         // beside them counts plays where a search row names the artist.
         val credit = Credits(artistName = artistName(header))
+        // The page's own name, so a carousel listing the artist they already
+        // are — YouTube's related-artists shelf does exactly that — does not
+        // offer them back as a neighbour.
+        val pageArtist = credit.artistName.orEmpty().trim().lowercase()
 
         sections.forEach { section ->
             section.o("musicShelfRenderer")?.let { shelf ->
@@ -353,7 +366,12 @@ object InnertubeParser {
                 // cards play, now that the player can show them.
                 val items = carousel.a("contents").orEmpty().mapNotNull {
                     parseTwoRowItem(it.o("musicTwoRowItemRenderer"))
-                }.filter { it.browseId != null || it.isVideo }
+                }
+                    .filter { it.browseId != null || it.isVideo }
+                    .filter { card ->
+                        pageArtist.isBlank() || card.title.trim().lowercase() != pageArtist
+                    }
+                    .withoutRepeatedCards()
                 val moreEndpoint = header.o("title").a("runs")?.firstNotNullOfOrNull {
                     it.o("navigationEndpoint").o("browseEndpoint")
                 }

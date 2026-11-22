@@ -999,6 +999,7 @@
     <string name="sort_library">Ordenar</string>
 
     <string name="radio_started">Radio %1$s iniciada</string>
+    <string name="player_not_ready">Player not ready</string>
 
     <string name="convert_to_audio">Convertir a audio</string>
     <string name="convert_to_video">Convertir a video</string>

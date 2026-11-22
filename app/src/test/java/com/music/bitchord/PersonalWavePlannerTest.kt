@@ -273,4 +273,20 @@ class PersonalWavePlannerTest {
         }
         assertTrue("the strongest liked artist is skipped far too often: $hits of 200", hits > 150)
     }
+
+    /**
+     * Two different recordings that share a name are two tracks, not one.
+     *
+     * Without the artist in the key, every "Intro" and "Outro" in a library
+     * collapsed into whichever one was seen first, and the other never reached
+     * the station.
+     */
+    @Test
+    fun `an intro by one act does not mask an intro by another`() {
+        val mine = PersonalWavePlanner.recordingKey(song("a1", "Intro", "Kesariya", 45))
+        val theirs = PersonalWavePlanner.recordingKey(song("b1", "Intro", "Somebody Else", 45))
+        val sameMaster = PersonalWavePlanner.recordingKey(song("a2", "Intro", "Kesariya", 45))
+        assertTrue("two acts sharing a title became one recording", mine != theirs)
+        assertEquals("one master under two ids must stay one recording", mine, sameMaster)
+    }
 }

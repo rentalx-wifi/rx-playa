@@ -369,6 +369,7 @@
     <string name="starting">กำลังเริ่ม</string>
     <string name="start_radio">เริ่มวิทยุ</string>
     <string name="radio_started">เริ่มวิทยุ %1$s แล้ว</string>
+    <string name="player_not_ready">Player not ready</string>
     <string name="saved_to_bitchord_folder">บันทึกลง Music/RX Playa แล้ว</string>
     <string name="nothing_downloading">ไม่มีการดาวน์โหลด</string>
     <string name="nothing_to_explore">ยังไม่มีอะไรให้สำรวจตอนนี้</string>

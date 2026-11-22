@@ -965,6 +965,12 @@ private fun BitChordApp(
     val searchFieldFocus = remember { FocusRequester() }
     // Invalidates an in-flight radio lookup when a later play request wins.
     var playRequestGeneration by remember { mutableIntStateOf(0) }
+    // The RX Wave build that is still running, so a second press cancels it
+    // rather than running two station builds side by side. The generation above
+    // only stops the loser from touching the player; without this the loser
+    // kept walking seed radios for a minute and booked every track it found as
+    // already served.
+    var waveBuild by remember { mutableStateOf<Job?>(null) }
     // Starting radio from the item already playing must not replace that media
     // item just to add UI metadata. This temporary label covers that seed; all
     // following radio items carry radioName in their MediaItem extras.
@@ -1973,7 +1979,11 @@ private fun BitChordApp(
                 .map { it.mediaId }
             scope.launch {
                 val seed = song.withQueueSource(
-                    QueueSource(stationName, PlaybackSourceType.SHARED_LINK, song.videoId),
+                    // A station is a queue the listener is already in, so its
+                    // caption opens that queue. A shared link would have sent a
+                    // tap on "Playing from RX Wave" out to a browser on the
+                    // seed track — leaving the app to watch a video instead.
+                    QueueSource(stationName, PlaybackSourceType.QUEUE),
                 ).copy(radioName = stationName)
                 val related = loadAutoplayTracks(
                     existing = listOf(seed),
@@ -2142,7 +2152,8 @@ private fun BitChordApp(
      */
     val startPersonalWave: () -> Unit = {
         val request = ++playRequestGeneration
-        scope.launch {
+        waveBuild?.cancel()
+        waveBuild = scope.launch {
             if (refusedByHost()) return@launch
             val profile = personalizedHome.profile
             // Offline the station is the device's own files: the online one
@@ -2169,7 +2180,14 @@ private fun BitChordApp(
             }
             if (request != playRequestGeneration) return@launch
             val activeController = controller
-            if (wave.isEmpty() || activeController == null) {
+            if (activeController == null) {
+                // Nothing to put a station into, and no point building one: the
+                // player is still connecting. Say so, rather than swallow the
+                // press and leave the listener wondering whether it registered.
+                showQueueNotice(context.getString(R.string.player_not_ready))
+                return@launch
+            }
+            if (wave.isEmpty()) {
                 // Nothing of their own to build on, or nowhere to put it: a
                 // station from their strongest track, never the catalogue mix —
                 // that mix is what this whole path exists to get away from.
@@ -2191,11 +2209,11 @@ private fun BitChordApp(
             }
             val head = wave.first()
             val seed = head.withQueueSource(
-                QueueSource(bitWaveLabel, PlaybackSourceType.SHARED_LINK, head.videoId),
+                QueueSource(bitWaveLabel, PlaybackSourceType.QUEUE),
             ).copy(radioName = bitWaveLabel)
             val station = listOf(seed) + wave.drop(1).map { song ->
                 song.withQueueSource(
-                    QueueSource(bitWaveLabel, PlaybackSourceType.SHARED_LINK, seed.videoId),
+                    QueueSource(bitWaveLabel, PlaybackSourceType.QUEUE),
                 ).copy(radioName = bitWaveLabel)
             }
             // A station replaces the queue the way the explicit one does: the
@@ -6322,6 +6340,15 @@ private fun BitChordApp(
                         if (!opened) {
                             Toast.makeText(context, R.string.failed, Toast.LENGTH_SHORT).show()
                         }
+                    },
+                    // The way in for the accounts Google still serves an embedded
+                    // browser: it worked before the cookie sheet existed and it
+                    // still works for them, so it stays offered.
+                    onGoogleSignIn = {
+                        showGoogleCookieImport = false
+                        importedGoogleCookie = null
+                        navigator.clear()
+                        webSession = WebSessionMode.SIGN_IN
                     },
                     onDismiss = { showGoogleCookieImport = false },
                 )

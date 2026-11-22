@@ -44,10 +44,20 @@ object QueueBuilder {
         limit: Int,
         preferVideos: Boolean = false,
         excluded: List<Song> = emptyList(),
+        /**
+         * The track this batch is a station for.
+         *
+         * Taken from the caller rather than read off `existing.last()`: a
+         * queue's last row is the track queued most recently, which is one of
+         * this batch's own picks once AutoPlay has run once. The extra room
+         * then went to whichever artist happened to be last, while the artist
+         * the station was seeded on stayed at the ordinary two.
+         */
+        seedSong: Song? = null,
     ): List<Song> {
         val taken = existing.toMutableList()
         val perArtist = mutableMapOf<String, Int>()
-        val seedArtists = existing.lastOrNull()?.artist?.let(::artistSet).orEmpty()
+        val seedArtists = (seedSong ?: existing.lastOrNull())?.artist?.let(::artistSet).orEmpty()
         val out = mutableListOf<Song>()
 
         // A mix pairs all but every track with its own music-video upload —

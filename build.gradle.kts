@@ -40,7 +40,7 @@ buildscript {
  *
  * No "v" in the name; release tags may add it separately.
  */
-extra["bitchordVersionCode"] = 100
+extra["bitchordVersionCode"] = 101
 extra["bitchordVersionName"] = "1.9.1"
 
 /*
