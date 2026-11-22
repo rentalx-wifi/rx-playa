@@ -1453,4 +1453,12 @@
     <string name="update_beta_note">테스트 빌드입니다. 일부가 깨질 수 있습니다.</string>
     <string name="soundcloud_token_title">SoundCloud 토큰</string>
     <string name="soundcloud_token_hint">SoundCloud 클라이언트의 OAuth 액세스 토큰을 붙여넣으세요. 저장 전에 확인합니다.</string>
+    <string name="google_cookie_help_title">How to get the cookie</string>
+    <string name="google_cookie_help_body">1. Open music.youtube.com in a browser on a computer and sign in.
+2. Press F12, open the Network tab and reload the page.
+3. Pick the first request to music.youtube.com, open Headers, then Request Headers.
+4. Copy the whole Cookie header value: one long line like SID=…; HSID=…; SSID=…; APISID=…; SAPISID=…
+5. Paste it here. SID and SAPISID are required; without them sign-in is refused.
+6. On a phone, Kiwi Browser does the same: it has DevTools.
+7. If sign-in stops working a day later, the cookie has expired: repeat steps 1-5.</string>
 </resources>

@@ -1573,4 +1573,12 @@
     <string name="update_beta_note">測試版本，可能會有問題。</string>
     <string name="soundcloud_token_title">SoundCloud 權杖</string>
     <string name="soundcloud_token_hint">貼上 SoundCloud 用戶端的 OAuth 存取權杖。儲存前會先驗證。</string>
+    <string name="google_cookie_help_title">How to get the cookie</string>
+    <string name="google_cookie_help_body">1. Open music.youtube.com in a browser on a computer and sign in.
+2. Press F12, open the Network tab and reload the page.
+3. Pick the first request to music.youtube.com, open Headers, then Request Headers.
+4. Copy the whole Cookie header value: one long line like SID=…; HSID=…; SSID=…; APISID=…; SAPISID=…
+5. Paste it here. SID and SAPISID are required; without them sign-in is refused.
+6. On a phone, Kiwi Browser does the same: it has DevTools.
+7. If sign-in stops working a day later, the cookie has expired: repeat steps 1-5.</string>
 </resources>

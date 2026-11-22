@@ -1645,4 +1645,12 @@
     <string name="update_beta_note">Wersja testowa. Coś może się zepsuć.</string>
     <string name="soundcloud_token_title">Token SoundCloud</string>
     <string name="soundcloud_token_hint">Wklej token dostępu OAuth z klienta SoundCloud. Jest sprawdzany przed zapisaniem.</string>
+    <string name="google_cookie_help_title">How to get the cookie</string>
+    <string name="google_cookie_help_body">1. Open music.youtube.com in a browser on a computer and sign in.
+2. Press F12, open the Network tab and reload the page.
+3. Pick the first request to music.youtube.com, open Headers, then Request Headers.
+4. Copy the whole Cookie header value: one long line like SID=…; HSID=…; SSID=…; APISID=…; SAPISID=…
+5. Paste it here. SID and SAPISID are required; without them sign-in is refused.
+6. On a phone, Kiwi Browser does the same: it has DevTools.
+7. If sign-in stops working a day later, the cookie has expired: repeat steps 1-5.</string>
 </resources>

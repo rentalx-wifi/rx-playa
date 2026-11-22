@@ -2,14 +2,21 @@ package com.music.bitchord.ui.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +45,7 @@ fun GoogleCookieImportAlert(
     // Keep the session in memory only, never in saved state or screenshots/recents.
     var cookie by remember { mutableStateOf("") }
     var invalid by remember { mutableStateOf(false) }
+    var helpShown by remember { mutableStateOf(false) }
     fun dismiss() {
         cookie = ""
         onDismiss()
@@ -76,6 +84,31 @@ fun GoogleCookieImportAlert(
                         modifier = Modifier.padding(vertical = 12.dp),
                         style = MaterialTheme.typography.bodySmall,
                     )
+                    // Where the header comes from, step by step: the dialog asked
+                    // for a "Cookie" most people have never had to copy, and the
+                    // answer lived in chat and nowhere else (issue #32).
+                    TextButton(
+                        onClick = { helpShown = !helpShown },
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.google_cookie_help_title),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Icon(
+                            imageVector = if (helpShown) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                            contentDescription = null,
+                            modifier = Modifier.padding(start = 4.dp).size(18.dp),
+                        )
+                    }
+                    if (helpShown) {
+                        Text(
+                            stringResource(R.string.google_cookie_help_body),
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     PillTextField(
                         value = cookie,
                         onValueChange = {

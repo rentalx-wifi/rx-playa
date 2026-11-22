@@ -10,6 +10,8 @@ download_failed_unsupported
 download_failed_wait
 dpi_bypass_subtitle
 dpi_bypass_title
+google_cookie_help_body
+google_cookie_help_title
 google_cookie_import_description
 google_cookie_import_invalid
 google_cookie_import_subtitle

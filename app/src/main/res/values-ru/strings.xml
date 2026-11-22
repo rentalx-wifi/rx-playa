@@ -1637,4 +1637,12 @@
     <string name="update_beta_note">Тестовая сборка. Что-то может сломаться.</string>
     <string name="soundcloud_token_title">Токен SoundCloud</string>
     <string name="soundcloud_token_hint">Вставь OAuth access token из клиента SoundCloud. Он проверяется перед сохранением.</string>
+    <string name="google_cookie_help_title">Как получить cookie</string>
+    <string name="google_cookie_help_body">1. Откройте music.youtube.com в браузере на компьютере и войдите в аккаунт.
+2. Нажмите F12, откройте вкладку Network (Сеть) и обновите страницу.
+3. Выберите первый запрос к music.youtube.com, раздел Headers (Заголовки), блок Request Headers.
+4. Скопируйте значение заголовка Cookie целиком: одну длинную строку вида SID=…; HSID=…; SSID=…; APISID=…; SAPISID=…
+5. Вставьте её сюда. Обязательны SID и SAPISID: без них вход не примется.
+6. На телефоне то же самое делает Kiwi Browser: у него есть DevTools.
+7. Если через день вход перестал работать, cookie истёк: повторите шаги 1-5.</string>
 </resources>
