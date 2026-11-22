@@ -37,6 +37,10 @@ object AppUpdateChecker {
         val notes: String?,
         /** A test build off the beta channel, marked as such in the prompt. */
         val isBeta: Boolean = false,
+        /** The asset's size as GitHub states it, or null when it does not. */
+        val apkBytes: Long? = null,
+        /** The versionCode the release states in its notes. */
+        val versionCode: Int? = null,
     )
 
     private const val CACHE_SUBDIR = "updates"
@@ -148,13 +152,25 @@ object AppUpdateChecker {
         // would send a phone to the TV build and a TV to the phone one — an
         // INSTALL_FAILED_UPDATE_INCOMPATIBLE at the end of the download, or
         // worse, an install over the other app's package.
+        //
+        // Size and versionCode travel with the offer so the download can prove
+        // it is whole: a truncated 190 MB APK installs as "файл повреждён", and
+        // the phone that downloaded it had no way to tell the cut file apart
+        // from a good one — see [downloadApk].
         val apkUrl = chooseApk(candidates) ?: return
+        val apkBytes = (0 until (assets?.length() ?: 0))
+            .mapNotNull { assets?.optJSONObject(it) }
+            .firstOrNull { it.optString("browser_download_url") == apkUrl }
+            ?.optLong("size")
+            ?.takeIf { it > 0 }
         _available.value = UpdateInfo(
             version = tag,
             releaseUrl = release.optString("html_url"),
             apkUrl = apkUrl,
             notes = release.optString("body").takeIf { it.isNotBlank() },
             isBeta = release.optBoolean("prerelease", false),
+            apkBytes = apkBytes,
+            versionCode = publishedCode,
         )
     }
 
@@ -293,9 +309,20 @@ object AppUpdateChecker {
             val target = File(dir, "bitchord-${info.version}.apk")
 
             val request = Request.Builder().url(url).build()
-            Http.client.newCall(request).execute().use { response ->
+            // The APK is a couple of hundred megabytes, and this runs on phones
+            // that leave Wi-Fi half way through it: the shared client's 30 s read
+            // timeout is sized for API calls, not for a stream that pauses while
+            // the phone hands over between towers.
+            val client = Http.client.newBuilder()
+                .readTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+            client.newCall(request).execute().use { response ->
                 check(response.isSuccessful) { "Download failed: HTTP ${response.code}" }
                 val body = response.body ?: error("Empty download body")
+                // GitHub states the size twice — in the release JSON and on the
+                // response itself — and either is better than trusting a stream
+                // that ends early.
+                val expected = info.apkBytes ?: body.contentLength().takeIf { it > 0 }
                 val total = body.contentLength().takeIf { it > 0 }
 
                 body.byteStream().use { input ->
@@ -318,14 +345,42 @@ object AppUpdateChecker {
                         }
                     }
                 }
+                // A dropped connection ends the stream politely: the loop above
+                // reads -1 and the file is simply short. Without this check that
+                // short file was reported as Ready and the installer called it
+                // corrupted.
+                if (expected != null && target.length() != expected) {
+                    error("Download incomplete: ${target.length()} of $expected bytes")
+                }
+                verifyApk(context, target, info.versionCode)
             }
             _download.value = DownloadState.Ready(target)
         }.onFailure { error ->
+            File(context.cacheDir, CACHE_SUBDIR).listFiles()?.forEach { it.delete() }
             _download.value = if (downloadCancelled) {
                 DownloadState.Idle
             } else {
                 DownloadState.Failed(error.message ?: "Download failed")
             }
+        }
+    }
+
+    /**
+     * Refuses a file the system cannot read as this app's own next version.
+     *
+     * Belt to the size check's braces: a captive-portal HTML page, a redirect
+     * body or a half-written file all land here instead of in the installer.
+     */
+    private fun verifyApk(context: Context, file: File, expectedCode: Int?) {
+        check(file.length() > 0) { "Downloaded file is empty" }
+        val info = context.packageManager
+            .getPackageArchiveInfo(file.absolutePath, 0)
+            ?: error("Downloaded file is not an APK")
+        check(info.packageName == context.packageName) {
+            "Downloaded APK is for ${info.packageName}, not ${context.packageName}"
+        }
+        if (expectedCode != null && info.longVersionCode < expectedCode) {
+            error("Downloaded APK is version ${info.longVersionCode}, wanted $expectedCode")
         }
     }
 
