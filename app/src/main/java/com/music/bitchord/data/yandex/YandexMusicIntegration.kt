@@ -50,8 +50,12 @@ object YandexMusicIntegration {
             return
         }
         runCatching {
-            ContextCompat.startForegroundService(
-                context.applicationContext,
+            // A plain service, not a foreground one: nothing here is worth a
+            // permanent notification until a track actually starts, and
+            // `startForegroundService` would demand one within seconds. The
+            // service promotes itself the moment the engine has something to
+            // report — see the state collector in its onCreate.
+            context.applicationContext.startService(
                 Intent(context.applicationContext, YandexMusicSyncService::class.java),
             )
         }.onFailure {

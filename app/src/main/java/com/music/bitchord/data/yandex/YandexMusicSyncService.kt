@@ -50,14 +50,24 @@ class YandexMusicSyncService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        startAsForeground()
         notificationJob = scope.launch {
             combine(YandexMusicIntegration.state, YandexMusicIntegration.nowPlaying) { state, track ->
                 state to track
             }.collect { (state, track) ->
-                runCatching {
-                    getSystemService(NotificationManager::class.java)
-                        ?.notify(NOTIFICATION_ID, notification(state, track))
+                // The notification and the foreground status follow the same
+                // rule: both exist while something is playing and neither does
+                // while the engine is only waiting for a device. A foreground
+                // service that says "waiting for playback" in the shade for the
+                // whole session is not what anyone asked for (issue #39).
+                if (state.stage.keepsNotification()) {
+                    runCatching { startAsForeground(state, track) }
+                } else {
+                    runCatching {
+                        ServiceCompat.stopForeground(
+                            this@YandexMusicSyncService,
+                            ServiceCompat.STOP_FOREGROUND_REMOVE,
+                        )
+                    }
                 }
             }
         }
@@ -322,11 +332,11 @@ class YandexMusicSyncService : Service() {
         }
     }
 
-    private fun startAsForeground() {
+    private fun startAsForeground(state: YandexMusicSyncState, track: YandexMusicNowPlaying?) {
         ServiceCompat.startForeground(
             this,
             NOTIFICATION_ID,
-            notification(YandexMusicIntegration.state.value, YandexMusicIntegration.nowPlaying.value),
+            notification(state, track),
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             } else {
@@ -419,4 +429,24 @@ class YandexMusicSyncService : Service() {
         const val ACTION_STOP = "com.music.bitchord.yandex.STOP_SYNC"
         const val TRACK_END_GRACE_MS = 2_000L
     }
+}
+
+/**
+ * Whether this stage is worth a notification in the shade.
+ *
+ * True only while the engine has an actual Yandex track to report — playing,
+ * paused, or the ad break between two of them. `WAITING` means the socket is up
+ * and no device is playing, which is the ordinary state of a phone whose owner
+ * is listening to this app instead: exactly the case that must not leave a
+ * permanent "Waiting for playback on a Yandex Music device" in the shade
+ * (issue #39).
+ */
+private fun YandexMusicSyncStage.keepsNotification(): Boolean = when (this) {
+    YandexMusicSyncStage.PLAYING,
+    YandexMusicSyncStage.PAUSED,
+    YandexMusicSyncStage.ADVERTISEMENT,
+    YandexMusicSyncStage.RESTRICTED,
+    -> true
+
+    else -> false
 }
