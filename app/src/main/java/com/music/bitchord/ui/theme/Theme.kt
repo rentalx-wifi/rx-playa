@@ -33,27 +33,11 @@ import androidx.compose.ui.unit.sp
 import com.music.bitchord.R
 import com.music.bitchord.data.settings.AppFont
 
-// Apple Music's signature red. No longer the primary accent, but kept for the
-// spots (Replay's rank badge) that want that specific red regardless of theme.
+// Apple Music's signature red, kept for the spots (Replay's rank badge) that
+// want that specific red regardless of theme — and the Material 3 skin's
+// default accent, so the two skins share a brand colour instead of the violet
+// the Material skin used to inherit from the app it was modelled on.
 val AccentRed = Color(0xFFFA2D48)
-
-// The Material 3 skin's own colours, taken from the app the appearance follows
-// (Pixel Music): a deep violet ground, a violet primary, pink and orange.
-private val PixelPurpleDark = Color(0xFF1E1234)
-private val PixelPrimary = Color(0xFFAB47BC)
-private val PixelPink = Color(0xFFF06292)
-private val PixelOrange = Color(0xFFFF8A65)
-private val PixelLightPurple = Color(0xFFE1BEE7)
-private val PixelSurface = Color(0xFF2A1F40)
-private val PixelLightBackground = Color(0xFFF7F2FF)
-private val PixelLightSurface = Color(0xFFFBF8FF)
-private val PixelLightSurfaceVariant = Color(0xFFE8DEF9)
-private val PixelLightOnSurface = Color(0xFF1E1237)
-private val PixelLightOnSurfaceVariant = Color(0xFF4D4165)
-private val PixelLightPrimary = Color(0xFF6C4FF5)
-private val PixelLightPrimaryContainer = Color(0xFFE3DBFF)
-private val PixelLightOnPrimaryContainer = Color(0xFF23005C)
-private val PixelLightOutline = Color(0xFF78659A)
 
 private val DarkColors = darkColorScheme(
     primary = Color.White,
@@ -279,80 +263,76 @@ private fun Color.contrasting(): Color {
 }
 
 /**
- * The skin's palette, taken from the app it follows rather than derived from a
- * seed: a deep purple ground, a violet primary, and pink and orange as the
- * second and third accents.
+ * The Material 3 skin's palette, built from the accent the listener has.
+ *
+ * It used to be Pixel Music's own violet, seed and all: a listener who had not
+ * turned on wallpaper colours got a violet app they never asked for, and the
+ * accent picker did not reach the ground it sits on. Now the accent is the
+ * whole scheme — primary, containers and the tinted surfaces follow it — and the
+ * unchecked default is this app's own red, not someone else's purple.
  */
-private fun pixelScheme(dark: Boolean, accent: Color?): ColorScheme {
-    val base = if (dark) {
+private fun pixelScheme(dark: Boolean, accent: Color): ColorScheme {
+    val ink = accent.contrasting()
+    return if (dark) {
+        val background = Color(0xFF0E0E11)
         darkColorScheme(
-            primary = PixelPrimary,
-            onPrimary = Color.White,
-            primaryContainer = Color(0xFF5B3475),
-            onPrimaryContainer = PixelLightPurple,
-            secondary = PixelPink,
-            onSecondary = Color.White,
-            secondaryContainer = Color(0xFF5A2E43),
-            onSecondaryContainer = Color(0xFFFFD9E2),
-            tertiary = PixelOrange,
-            onTertiary = Color.White,
-            background = PixelPurpleDark,
+            primary = accent,
+            onPrimary = ink,
+            primaryContainer = lerp(background, accent, 0.34f),
+            onPrimaryContainer = lerp(Color.White, accent, 0.30f),
+            secondary = accent,
+            onSecondary = ink,
+            secondaryContainer = lerp(background, accent, 0.18f),
+            onSecondaryContainer = lerp(Color.White, accent, 0.24f),
+            tertiary = accent,
+            onTertiary = ink,
+            background = background,
             onBackground = Color.White,
-            surface = PixelSurface,
-            onSurface = PixelLightPurple,
-            surfaceVariant = Color(0xFF3A2C4D),
-            onSurfaceVariant = Color(0xFFCDB9E0),
-            surfaceContainerLowest = Color(0xFF170D28),
-            surfaceContainerLow = Color(0xFF221637),
-            surfaceContainer = PixelSurface,
-            surfaceContainerHigh = Color(0xFF352748),
-            surfaceContainerHighest = Color(0xFF402F54),
-            outline = Color(0xFF8F7CA8),
-            outlineVariant = Color(0xFF4A3A5E),
+            surface = Color(0xFF16161A),
+            onSurface = Color(0xFFECECEF),
+            surfaceVariant = Color(0xFF232329),
+            onSurfaceVariant = Color(0xFFA8A8B3),
+            surfaceContainerLowest = Color(0xFF0A0A0C),
+            surfaceContainerLow = Color(0xFF121216),
+            surfaceContainer = Color(0xFF16161A),
+            surfaceContainerHigh = Color(0xFF1E1E23),
+            surfaceContainerHighest = Color(0xFF26262C),
+            outline = Color(0xFF45454E),
+            outlineVariant = Color(0xFF2E2E35),
             error = Color(0xFFFF5252),
             onError = Color.White,
         )
     } else {
+        val background = Color(0xFFFAF7F8)
         lightColorScheme(
-            primary = PixelLightPrimary,
-            onPrimary = Color.White,
-            primaryContainer = PixelLightPrimaryContainer,
-            onPrimaryContainer = PixelLightOnPrimaryContainer,
-            secondary = PixelPink,
-            onSecondary = Color.White,
-            secondaryContainer = PixelPink.copy(alpha = 0.15f),
-            onSecondaryContainer = PixelPink.copy(alpha = 0.85f),
-            tertiary = PixelOrange,
-            onTertiary = Color.Black,
-            background = PixelLightBackground,
-            onBackground = PixelLightOnSurface,
-            surface = PixelLightSurface,
-            onSurface = PixelLightOnSurface,
-            surfaceVariant = PixelLightSurfaceVariant,
-            onSurfaceVariant = PixelLightOnSurfaceVariant,
+            primary = accent,
+            onPrimary = ink,
+            primaryContainer = lerp(background, accent, 0.16f),
+            onPrimaryContainer = lerp(Color.Black, accent, 0.45f),
+            secondary = accent,
+            onSecondary = ink,
+            secondaryContainer = lerp(background, accent, 0.10f),
+            onSecondaryContainer = lerp(Color.Black, accent, 0.35f),
+            tertiary = accent,
+            onTertiary = ink,
+            background = background,
+            onBackground = Color(0xFF1B1B1F),
+            surface = Color.White,
+            onSurface = Color(0xFF1B1B1F),
+            surfaceVariant = Color(0xFFF2EFF1),
+            onSurfaceVariant = Color(0xFF5C5C66),
             surfaceContainerLowest = Color.White,
-            surfaceContainerLow = Color(0xFFF3ECFF),
-            surfaceContainer = Color(0xFFEDE5FB),
-            surfaceContainerHigh = Color(0xFFE7DDF7),
-            surfaceContainerHighest = Color(0xFFE1D6F3),
-            outline = PixelLightOutline,
-            outlineVariant = PixelLightOutline.copy(alpha = 0.6f),
-            surfaceTint = PixelLightPrimary,
+            surfaceContainerLow = Color(0xFFF8F4F6),
+            surfaceContainer = Color(0xFFF4EFF2),
+            surfaceContainerHigh = Color(0xFFEFE9ED),
+            surfaceContainerHighest = Color(0xFFE9E3E7),
+            outline = Color(0xFFC9C3C7),
+            outlineVariant = Color(0xFFE0DBDE),
+            surfaceTint = accent,
             error = Color(0xFFD32F2F),
             onError = Color.White,
         )
     }
-    if (accent == null) return base
-    // A listener's own accent replaces the violet and nothing else: pink and
-    // orange stay the second and third roles, which is what keeps the skin
-    // recognisable under a colour of someone else's choosing.
-    val ink = accent.contrasting()
-    return base.copy(
-        primary = accent,
-        onPrimary = ink,
-        primaryContainer = lerp(base.background, accent, if (dark) 0.34f else 0.18f),
-        onPrimaryContainer = if (dark) PixelLightPurple else PixelLightOnPrimaryContainer,
-    )
 }
 
 @Composable
@@ -372,7 +352,15 @@ fun BitChordTheme(
         !material3 -> if (darkTheme) DarkColors.withAccent(accent) else LightColors.withAccent(accent)
         materialYou && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        else -> pixelScheme(darkTheme, customAccent ?: accent.color.takeIf { accent != AppAccent.DEFAULT })
+        else -> pixelScheme(
+            dark = darkTheme,
+            // The accent picker first, then this app's own red: Material 3 with
+            // wallpaper colours off used to be Pixel Music's violet whatever the
+            // listener had chosen, which is the "всё фиолетовое" in the reports.
+            accent = customAccent
+                ?: accent.color.takeIf { accent != AppAccent.DEFAULT }
+                ?: AccentRed,
+        )
     }
     CompositionLocalProvider(
         LocalNothingStyleEnabled provides false,
