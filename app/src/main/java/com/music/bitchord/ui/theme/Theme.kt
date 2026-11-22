@@ -33,10 +33,8 @@ import androidx.compose.ui.unit.sp
 import com.music.bitchord.R
 import com.music.bitchord.data.settings.AppFont
 
-// Apple Music's signature red, kept for the spots (Replay's rank badge) that
-// want that specific red regardless of theme — and the Material 3 skin's
-// default accent, so the two skins share a brand colour instead of the violet
-// the Material skin used to inherit from the app it was modelled on.
+// Apple Music's signature red. No longer the primary accent, but kept for the
+// spots (Replay's rank badge) that want that specific red regardless of theme.
 val AccentRed = Color(0xFFFA2D48)
 
 private val DarkColors = darkColorScheme(
@@ -263,29 +261,32 @@ private fun Color.contrasting(): Color {
 }
 
 /**
- * The Material 3 skin's palette, built from the accent the listener has.
+ * The Material 3 skin's palette.
  *
- * It used to be Pixel Music's own violet, seed and all: a listener who had not
- * turned on wallpaper colours got a violet app they never asked for, and the
- * accent picker did not reach the ground it sits on. Now the accent is the
- * whole scheme — primary, containers and the tinted surfaces follow it — and the
- * unchecked default is this app's own red, not someone else's purple.
+ * A [accent] of null is the default look and it is monochrome, like the classic
+ * skin's: black on white in the light theme, white on black in the dark one.
+ * The skin used to be Pixel Music's violet, seed and all — a listener who had
+ * not asked for wallpaper colours got a violet app they never chose, and the
+ * accent picker did not reach the ground it sat on. Now the accent (a preset or
+ * wallpaper colours) is the whole scheme — primary, containers and tinted
+ * surfaces follow it — and nothing is coloured when nobody asked for colour.
  */
-private fun pixelScheme(dark: Boolean, accent: Color): ColorScheme {
-    val ink = accent.contrasting()
-    return if (dark) {
+private fun pixelScheme(dark: Boolean, accent: Color?): ColorScheme {
+    if (dark) {
         val background = Color(0xFF0E0E11)
-        darkColorScheme(
-            primary = accent,
+        val primary = accent ?: Color.White
+        val ink = if (accent == null) Color.Black else accent.contrasting()
+        return darkColorScheme(
+            primary = primary,
             onPrimary = ink,
-            primaryContainer = lerp(background, accent, 0.34f),
-            onPrimaryContainer = lerp(Color.White, accent, 0.30f),
-            secondary = accent,
+            primaryContainer = if (accent == null) Color(0xFF26262C) else lerp(background, accent, 0.34f),
+            onPrimaryContainer = if (accent == null) Color.White else lerp(Color.White, accent, 0.30f),
+            secondary = if (accent == null) Color(0xFFECECEF) else accent,
             onSecondary = ink,
-            secondaryContainer = lerp(background, accent, 0.18f),
-            onSecondaryContainer = lerp(Color.White, accent, 0.24f),
-            tertiary = accent,
-            onTertiary = ink,
+            secondaryContainer = if (accent == null) Color(0xFF2E2E35) else lerp(background, accent, 0.18f),
+            onSecondaryContainer = if (accent == null) Color.White else lerp(Color.White, accent, 0.24f),
+            tertiary = if (accent == null) Color(0xFFA8A8B3) else accent,
+            onTertiary = if (accent == null) Color.Black else ink,
             background = background,
             onBackground = Color.White,
             surface = Color(0xFF16161A),
@@ -302,37 +303,38 @@ private fun pixelScheme(dark: Boolean, accent: Color): ColorScheme {
             error = Color(0xFFFF5252),
             onError = Color.White,
         )
-    } else {
-        val background = Color(0xFFFAF7F8)
-        lightColorScheme(
-            primary = accent,
-            onPrimary = ink,
-            primaryContainer = lerp(background, accent, 0.16f),
-            onPrimaryContainer = lerp(Color.Black, accent, 0.45f),
-            secondary = accent,
-            onSecondary = ink,
-            secondaryContainer = lerp(background, accent, 0.10f),
-            onSecondaryContainer = lerp(Color.Black, accent, 0.35f),
-            tertiary = accent,
-            onTertiary = ink,
-            background = background,
-            onBackground = Color(0xFF1B1B1F),
-            surface = Color.White,
-            onSurface = Color(0xFF1B1B1F),
-            surfaceVariant = Color(0xFFF2EFF1),
-            onSurfaceVariant = Color(0xFF5C5C66),
-            surfaceContainerLowest = Color.White,
-            surfaceContainerLow = Color(0xFFF8F4F6),
-            surfaceContainer = Color(0xFFF4EFF2),
-            surfaceContainerHigh = Color(0xFFEFE9ED),
-            surfaceContainerHighest = Color(0xFFE9E3E7),
-            outline = Color(0xFFC9C3C7),
-            outlineVariant = Color(0xFFE0DBDE),
-            surfaceTint = accent,
-            error = Color(0xFFD32F2F),
-            onError = Color.White,
-        )
     }
+    val background = Color(0xFFFAF7F8)
+    val primary = accent ?: Color(0xFF111114)
+    val ink = if (accent == null) Color.White else accent.contrasting()
+    return lightColorScheme(
+        primary = primary,
+        onPrimary = ink,
+        primaryContainer = if (accent == null) Color(0xFFE9E3E7) else lerp(background, accent, 0.16f),
+        onPrimaryContainer = if (accent == null) Color(0xFF1B1B1F) else lerp(Color.Black, accent, 0.45f),
+        secondary = if (accent == null) Color(0xFF5C5C66) else accent,
+        onSecondary = if (accent == null) Color.White else ink,
+        secondaryContainer = if (accent == null) Color(0xFFEFE9ED) else lerp(background, accent, 0.10f),
+        onSecondaryContainer = if (accent == null) Color(0xFF1B1B1F) else lerp(Color.Black, accent, 0.35f),
+        tertiary = if (accent == null) Color(0xFF8A8A93) else accent,
+        onTertiary = if (accent == null) Color.White else ink,
+        background = background,
+        onBackground = Color(0xFF1B1B1F),
+        surface = Color.White,
+        onSurface = Color(0xFF1B1B1F),
+        surfaceVariant = Color(0xFFF2EFF1),
+        onSurfaceVariant = Color(0xFF5C5C66),
+        surfaceContainerLowest = Color.White,
+        surfaceContainerLow = Color(0xFFF8F4F6),
+        surfaceContainer = Color(0xFFF4EFF2),
+        surfaceContainerHigh = Color(0xFFEFE9ED),
+        surfaceContainerHighest = Color(0xFFE9E3E7),
+        outline = Color(0xFFC9C3C7),
+        outlineVariant = Color(0xFFE0DBDE),
+        surfaceTint = accent ?: Color.Transparent,
+        error = Color(0xFFD32F2F),
+        onError = Color.White,
+    )
 }
 
 @Composable
@@ -354,12 +356,12 @@ fun BitChordTheme(
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         else -> pixelScheme(
             dark = darkTheme,
-            // The accent picker first, then this app's own red: Material 3 with
-            // wallpaper colours off used to be Pixel Music's violet whatever the
-            // listener had chosen, which is the "всё фиолетовое" in the reports.
+            // A preset, a custom colour, or nothing at all — and nothing at all
+            // is monochrome. Material 3 with wallpaper colours off used to be
+            // Pixel Music's violet whatever the listener had chosen, which is
+            // the "всё фиолетовое" in the reports.
             accent = customAccent
-                ?: accent.color.takeIf { accent != AppAccent.DEFAULT }
-                ?: AccentRed,
+                ?: accent.color.takeIf { accent != AppAccent.DEFAULT },
         )
     }
     CompositionLocalProvider(
