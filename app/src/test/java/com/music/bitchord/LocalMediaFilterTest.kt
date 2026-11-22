@@ -37,6 +37,20 @@ class LocalMediaFilterTest {
     }
 
     @Test
+    fun keepsWaveFilesInTheMusicFolder() {
+        for (name in listOf("Song.wav", "Song.WAV")) {
+            assertTrue(
+                name,
+                LocalMediaRepository.isEligibleLocalMusic(
+                    durationMs = 180_000,
+                    displayName = name,
+                    path = "/storage/emulated/0/Music/Artist/$name",
+                ),
+            )
+        }
+    }
+
+    @Test
     fun keepsSupportedMusicFiles() {
         assertTrue(
             LocalMediaRepository.isEligibleLocalMusic(

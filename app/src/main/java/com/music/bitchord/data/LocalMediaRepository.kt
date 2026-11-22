@@ -33,8 +33,13 @@ object LocalMediaRepository {
     // video .mp4 under Video, not Audio — so it is the audio-only MP4s Dolby
     // and Apple music downloads come as (AC-4, E-AC-3, ALAC). `dsf`/`dff` are
     // DSD, which DsdExtractor plays.
+    // `wav` was left out of this list while the download side already knew the
+    // extension, so a WAV in the music folder was scanned in as a row and then
+    // judged non-music here: listed, marked as not music, never played.
+    // MediaStore reports WAV fully — duration, tags, MIME — and ExoPlayer decodes
+    // it, so the only thing keeping it out was this set.
     private val localMusicExtensions = setOf(
-        "mp3", "m4a", "mp4", "flac", "ogg", "opus", "aac", "webm", "dsf", "dff",
+        "mp3", "m4a", "mp4", "flac", "wav", "ogg", "opus", "aac", "webm", "dsf", "dff",
     )
 
     private val nonMusicPathSegments = listOf(
@@ -502,7 +507,7 @@ object LocalMediaRepository {
 
     private fun String.removeAudioExtension(): String {
         val extension = substringAfterLast('.', "").lowercase(Locale.ROOT)
-        return if (extension in localMusicExtensions || extension == "wav") {
+        return if (extension in localMusicExtensions) {
             substringBeforeLast('.').ifBlank { this }
         } else {
             this
