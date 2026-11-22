@@ -18,6 +18,10 @@ class AutoplayFallbackTest {
         assertTrue(isExternalProviderTrackId("spotify-track:abc"))
         assertTrue(isExternalProviderTrackId("vk-audio:-1:2"))
         assertTrue(isExternalProviderTrackId("soundcloud:tracks:123"))
+        // #42: a liked track imported from Yandex Music carries a taste: id, and
+        // asking YouTube for it as a video id is why it never started.
+        assertTrue(isExternalProviderTrackId("taste:yandex:108773150"))
+        assertTrue(isExternalProviderTrackId("taste:spotify:4uLU6hMCjMI75M1A2tKUQC"))
         assertFalse(isExternalProviderTrackId("dQw4w9WgXcQ"))
     }
 

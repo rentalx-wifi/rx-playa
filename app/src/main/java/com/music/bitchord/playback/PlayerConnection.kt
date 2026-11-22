@@ -840,9 +840,25 @@ private fun Song.directYouTubeUri(): String =
 private fun Song.externalYouTubeFallbackUri(): String =
     "bitchord://source?id=${Uri.encode(videoId)}&$DIRECT_YOUTUBE_PARAMETER=1${matchQuery()}"
 
+/**
+ * Whether this id names a track in somebody else's catalogue rather than a
+ * YouTube video, and so can only be played once a copy of it is matched.
+ *
+ * `taste:` is the prefix every provider-library row carries — a track imported
+ * from Yandex Music's liked list or a playlist, a Spotify like, a VK row — see
+ * `metadataSong`. Those have no stream of their own here, and asking YouTube
+ * for `taste:yandex:12345` as if it were a video id failed every time: the
+ * track spun at 0:00 and the player moved on to whatever came next, which is
+ * what a liked track that would not start turned into (issue #42). Title,
+ * artist and runtime are what the fallback matches on, and every one of these
+ * rows carries them.
+ */
 internal fun isExternalProviderTrackId(id: String): Boolean =
     id.startsWith(SPOTIFY_TRACK_PREFIX) || id.startsWith(VK_TRACK_PREFIX) ||
-        id.startsWith(SOUNDCLOUD_TRACK_PREFIX)
+        id.startsWith(SOUNDCLOUD_TRACK_PREFIX) || id.startsWith(TASTE_TRACK_PREFIX)
+
+/** Prefix of a row from another catalogue's library — see [isExternalProviderTrackId]. */
+internal const val TASTE_TRACK_PREFIX = "taste:"
 
 /**
  * Whether there is a YouTube upload behind this song to go back *to* — the
