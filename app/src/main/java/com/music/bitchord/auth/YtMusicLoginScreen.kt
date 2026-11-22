@@ -27,10 +27,18 @@ import java.net.URI
 private const val MUSIC_ORIGIN = "https://music.youtube.com"
 private const val MUSIC_WEB_URL = "$MUSIC_ORIGIN/?app=desktop"
 
-private const val LOGIN_URL =
+/**
+ * Where a listener who has to sign in with Google is sent.
+ *
+ * Opened in the phone's own browser, not in a WebView: Google refuses its
+ * sign-in page to embedded browsers for most accounts, and the cookie that
+ * comes out of a real browser is the one this app can use — see the sheet that
+ * asks for it.
+ */
+const val YOUTUBE_MUSIC_LOGIN_URL =
     "https://accounts.google.com/ServiceLogin" +
         "?ltmpl=music&service=youtube&prompt=select_account" +
-    "&continue=https%3A%2F%2Fmusic.youtube.com%2F%3Fapp%3Ddesktop"
+        "&continue=https%3A%2F%2Fmusic.youtube.com%2F%3Fapp%3Ddesktop"
 
 private const val TAG = "BitChord"
 
@@ -175,7 +183,7 @@ fun YtMusicLoginScreen(
                     // into a WebView Compose has already released and destroyed.
                     if (webView === view) {
                         view.loadUrl(
-                            if (mode == WebSessionMode.SIGN_IN && initialCookie == null) LOGIN_URL else MUSIC_WEB_URL,
+                            if (mode == WebSessionMode.SIGN_IN && initialCookie == null) YOUTUBE_MUSIC_LOGIN_URL else MUSIC_WEB_URL,
                         )
                     }
                 }

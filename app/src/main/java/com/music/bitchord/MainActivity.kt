@@ -138,6 +138,7 @@ import com.music.bitchord.auth.SpotifyLoginScreen
 import com.music.bitchord.auth.YandexMusicLoginScreen
 import com.music.bitchord.auth.OAuthRedirect
 import com.music.bitchord.auth.WebSessionMode
+import com.music.bitchord.auth.YOUTUBE_MUSIC_LOGIN_URL
 import com.music.bitchord.auth.YtMusicLoginScreen
 import com.music.bitchord.auth.VkWebLoginScreen
 import com.music.bitchord.data.LocalMediaRepository
@@ -6309,12 +6310,18 @@ private fun BitChordApp(
                         navigator.clear()
                         webSession = WebSessionMode.SIGN_IN
                     },
-                    // The browser path, kept for the accounts Google still opens
-                    // its page for — and labelled as what it is.
-                    onWebSignIn = {
-                        showGoogleCookieImport = false
-                        navigator.clear()
-                        webSession = WebSessionMode.SIGN_IN
+                    // Google's own page, in the phone's browser: an embedded
+                    // browser is refused outright for most accounts, and a
+                    // sign-in that works beats one that loops (issue #24).
+                    onOpenBrowser = {
+                        val opened = runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(YOUTUBE_MUSIC_LOGIN_URL)),
+                            )
+                        }.isSuccess
+                        if (!opened) {
+                            Toast.makeText(context, R.string.failed, Toast.LENGTH_SHORT).show()
+                        }
                     },
                     onDismiss = { showGoogleCookieImport = false },
                 )

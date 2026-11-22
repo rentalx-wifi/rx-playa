@@ -1649,4 +1649,5 @@
     <string name="yandex_search_unavailable">Яндекс Музыка не отвечает из этой сети. Нужен VPN или свой ключ VLESS в настройках.</string>
     <string name="search_sources_unavailable">Не ответили: %1$s</string>
     <string name="search_source_vk" translatable="false">VK Music</string>
+    <string name="google_open_browser_action">Открыть в браузере</string>
 </resources>
