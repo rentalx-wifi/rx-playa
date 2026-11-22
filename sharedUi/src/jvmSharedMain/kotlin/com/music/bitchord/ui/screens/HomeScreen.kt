@@ -1,5 +1,9 @@
 package com.music.bitchord.ui.screens
 
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawBehind
 import com.music.bitchord.ui.components.trackArtSize
 import com.music.bitchord.ui.components.contextClick
 import com.music.bitchord.ui.AppUi
@@ -312,6 +316,26 @@ private fun RxWavePill(
         Modifier
             .fillMaxWidth()
             .height(WAVE_PLATE_HEIGHT)
+            // Accent light around the plate rather than a drop shadow: three
+            // faint rings in the theme's own primary, breathing with the beat,
+            // drawn before the clip so they read as the plate glowing instead
+            // of as a border. Only the alpha changes per frame, so a frame
+            // costs three rounded rects, not a blur.
+            .drawBehind {
+                val b = beat.floatValue
+                val radius = with(density) { 28.dp.toPx() }
+                repeat(3) { ring ->
+                    val grow = (ring + 1) * with(density) { 5.dp.toPx() }
+                    drawRoundRect(
+                        color = scheme.primary.copy(
+                            alpha = (0.13f - ring * 0.035f) * (0.55f + 0.7f * b),
+                        ),
+                        topLeft = Offset(-grow, -grow),
+                        size = Size(size.width + grow * 2, size.height + grow * 2),
+                        cornerRadius = CornerRadius(radius + grow),
+                    )
+                }
+            }
             .clip(RoundedCornerShape(28.dp))
             .background(
                 Brush.horizontalGradient(
@@ -383,9 +407,32 @@ private fun RxWavePill(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 18.dp, vertical = 14.dp),
+                .padding(horizontal = 14.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // The mark sits first and close to the edge, glowing faintly in the
+            // accent's own light: a halo behind the artwork rather than a tint
+            // on it, so the logo stays legible on the plate's gradient.
+            Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                Canvas(Modifier.matchParentSize()) {
+                    val glow = 0.30f + 0.35f * beat.floatValue
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(ink.copy(alpha = glow * 0.5f), Color.Transparent),
+                            center = center,
+                            radius = size.minDimension * 0.62f,
+                        ),
+                        radius = size.minDimension * 0.62f,
+                    )
+                }
+                Icon(
+                    painter = painterResource(Res.drawable.ic_logo),
+                    contentDescription = null,
+                    tint = ink.copy(alpha = 0.92f),
+                    modifier = Modifier.size(26.dp),
+                )
+            }
+            Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     text = label,
