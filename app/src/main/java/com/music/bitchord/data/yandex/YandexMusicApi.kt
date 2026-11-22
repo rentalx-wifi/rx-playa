@@ -403,6 +403,48 @@ class YandexMusicApi internal constructor(
         )
     }
 
+    /**
+     * Where a track's audio lives, signed as the Android client signs it.
+     *
+     * The endpoint (`get-file-info`) is not the older `download-info`: it
+     * carries an HMAC over its own parameters — see [YandexAudio.sign] — and
+     * answers `encraw` URLs whose bytes are encrypted end to end. [quality] is
+     * one of [YandexAudio.QUALITY_LOSSLESS] and friends.
+     *
+     * @return every rendition offered, best first, or an empty list when the
+     *   account cannot have this track at this tier (a free account asking for
+     *   lossless gets nothing, which is an answer, not an error).
+     */
+    suspend fun fileInfo(token: String, trackId: String, quality: String): List<YandexStream> {
+        val timestamp = System.currentTimeMillis() / 1000
+        val url = baseUrl.newBuilder()
+            .addPathSegment("get-file-info")
+            .addQueryParameter("ts", timestamp.toString())
+            .addQueryParameter("trackId", trackId)
+            .addQueryParameter("quality", quality)
+            .addQueryParameter("codecs", YandexAudio.CODECS.joinToString(","))
+            .addQueryParameter("transports", "encraw")
+            .addQueryParameter("sign", YandexAudio.sign(timestamp, trackId, quality))
+            .build()
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", "OAuth $token")
+            .header("X-Yandex-Music-Client", CLIENT_HEADER)
+            .header("Accept-Language", "ru")
+            .header("Accept", "application/json")
+            .get()
+            .build()
+        val response = execute(request)
+        val info = response.resultObject().objectAt("downloadInfo") ?: return emptyList()
+        val codec = info.stringAt("codec").orEmpty()
+        val bitrate = info.longAt("bitrate")?.toInt()?.takeIf { it > 0 }
+        val key = info.stringAt("key")?.takeIf(String::isNotBlank)
+        return info.arrayAt("urls").orEmpty()
+            .mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+            .filter { it.startsWith("https://") }
+            .map { YandexStream(url = it, codec = codec, bitrateKbps = bitrate, keyHex = key) }
+    }
+
     suspend fun track(token: String, trackId: String, albumId: String?): YandexMusicTrack {
         val compositeId = albumId?.takeIf { it.isNotBlank() }?.let { "$trackId:$it" } ?: trackId
         val body = FormBody.Builder()
