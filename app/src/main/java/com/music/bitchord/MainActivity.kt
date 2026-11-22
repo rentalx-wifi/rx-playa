@@ -5155,6 +5155,14 @@ private fun BitChordApp(
                 // rating it comes back with is more authoritative than anything
                 // the library feed knew — so the menu asks as it opens.
                 LaunchedEffect(song.videoId) { viewModel.loadSongMenu(song.videoId) }
+                // Whose playlist this page is, asked as the menu opens. Without
+                // this, "Remove from this playlist" only appeared on pages that
+                // had been reached through a card, which is the one path that
+                // asks — a playlist opened from the library offered no way to
+                // clean it up at all (issue #35).
+                LaunchedEffect(detail?.browseId) {
+                    viewModel.resolvePlaylistOwnership(detail?.browseId)
+                }
                 // "Remove from this playlist" is only a sentence on a playlist
                 // page the account can actually edit, and only for a row that
                 // carries the per-entry id a removal is expressed in.
