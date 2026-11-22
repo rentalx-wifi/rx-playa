@@ -442,23 +442,25 @@ private fun RxWavePill(
             // The mark sits first and close to the edge, glowing faintly in the
             // accent's own light: a halo behind the artwork rather than a tint
             // on it, so the logo stays legible on the plate's gradient.
-            Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
                 Canvas(Modifier.matchParentSize()) {
                     val glow = 0.30f + 0.35f * beat.floatValue
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(ink.copy(alpha = glow * 0.5f), Color.Transparent),
                             center = center,
-                            radius = size.minDimension * 0.68f,
+                            radius = size.minDimension * 0.62f,
                         ),
-                        radius = size.minDimension * 0.68f,
+                        radius = size.minDimension * 0.62f,
                     )
                 }
+                // The artwork is trimmed to its ink, so this size is the sign
+                // itself and not a canvas with margins around it.
                 Icon(
                     painter = painterResource(Res.drawable.ic_rx_mark),
                     contentDescription = null,
                     tint = ink.copy(alpha = 0.92f),
-                    modifier = Modifier.size(34.dp),
+                    modifier = Modifier.size(48.dp),
                 )
             }
             Spacer(Modifier.width(8.dp))

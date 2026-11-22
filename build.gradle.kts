@@ -40,7 +40,7 @@ buildscript {
  *
  * No "v" in the name; release tags may add it separately.
  */
-extra["bitchordVersionCode"] = 98
+extra["bitchordVersionCode"] = 99
 extra["bitchordVersionName"] = "1.9.1"
 
 /*
@@ -49,7 +49,7 @@ extra["bitchordVersionName"] = "1.9.1"
  * deliberately does not query or install releases from the upstream repo.
  * The bundled watch APK receives the same suffix and version code.
  */
-extra["bitchordBetaSuffix"] = "v46b19-beta"
+extra["bitchordBetaSuffix"] = "v46b20-beta"
 
 plugins {
     id("com.android.application") version "8.10.1" apply false
