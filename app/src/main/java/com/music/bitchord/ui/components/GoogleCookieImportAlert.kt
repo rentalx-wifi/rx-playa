@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -102,9 +105,15 @@ fun GoogleCookieImportAlert(
                         )
                     }
                     if (helpShown) {
+                        // A long seven-step text in an alert that has no scroll
+                        // of its own would run off the screen: bound it and let
+                        // it scroll.
                         Text(
                             stringResource(R.string.google_cookie_help_body),
-                            modifier = Modifier.padding(bottom = 8.dp),
+                            modifier = Modifier
+                                .heightIn(max = 240.dp)
+                                .verticalScroll(rememberScrollState())
+                                .padding(bottom = 8.dp),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
