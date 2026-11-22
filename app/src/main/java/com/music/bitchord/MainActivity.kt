@@ -1048,6 +1048,7 @@ private fun BitChordApp(
     val libraryResults by viewModel.libraryResults.collectAsStateWithLifecycle()
     val addonResults by viewModel.addonResults.collectAsStateWithLifecycle()
     val platformResults by viewModel.platformResults.collectAsStateWithLifecycle()
+    val unavailablePlatforms by viewModel.unavailablePlatforms.collectAsStateWithLifecycle()
     val platformLoadingMore by viewModel.platformLoadingMore.collectAsStateWithLifecycle()
     // Collected rather than read once, so addon rows in search re-dim the
     // moment the quality setting, the connection or the watch's cap moves.
@@ -1751,6 +1752,32 @@ private fun BitChordApp(
             if (holdUntilAligned) AppSettings.versionAlignmentInProgress.value = false
             switchingAudioVersion = false
         }
+    }
+
+    /**
+     * Where "sign in to YouTube Music" leads.
+     *
+     * Not to Google's own page: it answers an embedded browser with "couldn't
+     * sign you in" for most accounts, so that path ends in a loop for real
+     * people (issues #24 and #32). The cookie is what works, so the sheet that
+     * explains and accepts it comes first, and the browser is one tap away for
+     * the accounts Google still lets through.
+     */
+    fun startYouTubeSignIn() {
+        googleBlockedNotice = true
+        showGoogleCookieImport = true
+    }
+
+    /** The label a search source has in the selector, for the "no answer from" line. */
+    fun searchSourceLabel(source: SearchSource): Int = when (source) {
+        SearchSource.ALL -> R.string.search_source_all
+        SearchSource.YOUTUBE -> R.string.search_source_youtube
+        SearchSource.YANDEX -> R.string.yandex_music
+        SearchSource.SPOTIFY -> R.string.spotify
+        SearchSource.SOUNDCLOUD -> R.string.soundcloud
+        SearchSource.VK -> R.string.search_source_vk
+        SearchSource.LIBRARY -> R.string.library
+        SearchSource.ADDONS -> R.string.search_source_addons
     }
 
     fun playFrom(
@@ -3489,7 +3516,7 @@ private fun BitChordApp(
                                 channelName = selectedChannelName,
                                 onSignIn = {
                                     navigator.clear()
-                                    webSession = WebSessionMode.SIGN_IN
+                                    startYouTubeSignIn()
                                 },
                                 onImportGoogleCookie = { showGoogleCookieImport = true },
                                 onSwitchChannel = {
@@ -3566,7 +3593,7 @@ private fun BitChordApp(
                                 },
                                 onSignIn = {
                                     navigator.clear()
-                                    webSession = WebSessionMode.SIGN_IN
+                                    startYouTubeSignIn()
                                 },
                                 contentPadding = listPadding,
                                 onEditServer = { editingPartyServer = true },
@@ -3600,7 +3627,7 @@ private fun BitChordApp(
                                 account = account,
                                 onSignIn = {
                                     navigator.clear()
-                                    webSession = WebSessionMode.SIGN_IN
+                                    startYouTubeSignIn()
                                 },
                                 onSignOut = { viewModel.signOut() },
                                 onAccountScrobbling = { navigator.push(AppRoute.AccountScrobbling) },
@@ -4097,6 +4124,25 @@ private fun BitChordApp(
                                 scrollResetTrigger = searchScrollReset,
                                 focusRequested = searchFocusRequested,
                                 onFocusHandled = { searchFocusRequested = false },
+                                // Which sources stayed silent on "all platforms",
+                                // named rather than left to guess. Yandex is the one
+                                // that needs a sentence of its own: it refuses whole
+                                // networks, not requests.
+                                platformNotice = if (unavailablePlatforms.isEmpty()) {
+                                    emptyList()
+                                } else {
+                                    listOfNotNull(
+                                        stringResource(
+                                            R.string.search_sources_unavailable,
+                                            unavailablePlatforms
+                                                .map { stringResource(searchSourceLabel(it)) }
+                                                .sorted()
+                                                .joinToString(", "),
+                                        ),
+                                        stringResource(R.string.yandex_search_unavailable)
+                                            .takeIf { SearchSource.YANDEX in unavailablePlatforms },
+                                    )
+                                },
                                 // Search hits are alternatives to each other, not a running
                                 // order — play the one tapped and build a station from it.
                                 onSongClick = { songs, index ->
@@ -4385,7 +4431,7 @@ private fun BitChordApp(
                                         },
                                     )
                                 },
-                                onSignIn = { webSession = WebSessionMode.SIGN_IN },
+                                onSignIn = { startYouTubeSignIn() },
                                 onRetry = viewModel::loadLibrary,
                                 refreshing = MainViewModel.Feed.LIBRARY in refreshing,
                                 onRefresh = { viewModel.refresh(MainViewModel.Feed.LIBRARY) },
@@ -6096,7 +6142,7 @@ private fun BitChordApp(
                         ListenTogether.setNickname(name)
                         if (!signedIn) AppSettings.setGuestProfile(name)
                     },
-                    onSignIn = { webSession = WebSessionMode.SIGN_IN },
+                    onSignIn = { startYouTubeSignIn() },
                     onFinish = AppSettings::setOnboardingComplete,
                 )
             }
@@ -6255,6 +6301,13 @@ private fun BitChordApp(
                         navigator.clear()
                         webSession = WebSessionMode.SIGN_IN
                     },
+                    // The browser path, kept for the accounts Google still opens
+                    // its page for — and labelled as what it is.
+                    onWebSignIn = {
+                        showGoogleCookieImport = false
+                        navigator.clear()
+                        webSession = WebSessionMode.SIGN_IN
+                    },
                     onDismiss = { showGoogleCookieImport = false },
                 )
             }
@@ -6328,7 +6381,7 @@ private fun BitChordApp(
                     onSelect = { selected, profile -> viewModel.selectProfile(selected.accountId, profile.profileId) },
                     onAddAccount = {
                         showAccountSelector = false
-                        webSession = WebSessionMode.SIGN_IN
+                        startYouTubeSignIn()
                     },
                     onRemoveAccount = { selected ->
                         viewModel.removeAccount(selected.accountId)

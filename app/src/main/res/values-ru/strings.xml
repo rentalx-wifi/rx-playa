@@ -1645,4 +1645,8 @@
 5. Вставьте её сюда. Обязательны SID и SAPISID: без них вход не примется.
 6. На телефоне то же самое делает Kiwi Browser: у него есть DevTools.
 7. Если через день вход перестал работать, cookie истёк: повторите шаги 1-5.</string>
+    <string name="google_web_signin_action">Войти через Google</string>
+    <string name="yandex_search_unavailable">Яндекс Музыка не отвечает из этой сети. Обычно помогает VPN.</string>
+    <string name="search_sources_unavailable">Не ответили: %1$s</string>
+    <string name="search_source_vk" translatable="false">VK Music</string>
 </resources>

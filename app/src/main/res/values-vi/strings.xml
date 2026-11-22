@@ -1528,4 +1528,8 @@
 5. Paste it here. SID and SAPISID are required; without them sign-in is refused.
 6. On a phone, Kiwi Browser does the same: it has DevTools.
 7. If sign-in stops working a day later, the cookie has expired: repeat steps 1-5.</string>
+    <string name="google_web_signin_action">Sign in through Google</string>
+    <string name="yandex_search_unavailable">Yandex Music does not answer from this network. A VPN usually helps.</string>
+    <string name="search_sources_unavailable">No answer from: %1$s</string>
+    <string name="search_source_vk" translatable="false">VK Music</string>
 </resources>

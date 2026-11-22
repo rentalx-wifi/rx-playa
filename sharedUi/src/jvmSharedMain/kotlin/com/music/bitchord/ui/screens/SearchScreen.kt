@@ -153,6 +153,15 @@ fun SearchScreen(
     platformEmptyMessage: String = "",
     platformNoResultsMessage: String = "",
     /**
+     * Sources that gave nothing back on this search, as sentences to show above
+     * the rows.
+     *
+     * Empty for a search that asked one source: it either answered or the page
+     * is showing its error. Used by "all platforms", where a silent source used
+     * to look like a catalogue that simply had nothing to match.
+     */
+    platformNotice: List<String> = emptyList(),
+    /**
      * Addon rows the connection's quality setting won't play. Shown dimmed,
      * kept out of the queue a tap builds, and answered by [onBlockedSongClick]
      * instead of being played.
@@ -301,6 +310,7 @@ fun SearchScreen(
                     external = searchingPlatforms,
                     externalEmptyMessage = platformEmptyMessage,
                     externalNoResultsMessage = platformNoResultsMessage,
+                    notice = if (searchingPlatforms) platformNotice else emptyList(),
                     addonHistory = addonHistory,
                     onAddonHistoryClick = onAddonHistoryClick,
                     onAddonHistoryRemove = onAddonHistoryRemove,
@@ -462,6 +472,20 @@ private fun searchSections(rows: List<SearchResult>, filter: SearchFilter): List
     ).filter { it.rows.isNotEmpty() }
 }
 
+/** One small line per source that stayed silent on this search; see [platformNotice]. */
+private fun LazyListScope.noticeRows(notices: List<String>) {
+    notices.forEachIndexed { index, line ->
+        item(key = "notice:$index") {
+            Text(
+                text = line,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = PAGE_GUTTER, vertical = 4.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 /**
  * The Library source's page: the Local Music folder's tracks that match, as
  * plain song rows. An artist or album hit needs no row of its own — every
@@ -474,6 +498,7 @@ private fun LazyListScope.librarySearchResults(
     external: Boolean,
     externalEmptyMessage: String,
     externalNoResultsMessage: String,
+    notice: List<String>,
     addonHistory: List<String>,
     onAddonHistoryClick: (String) -> Unit,
     onAddonHistoryRemove: (String) -> Unit,
@@ -500,8 +525,12 @@ private fun LazyListScope.librarySearchResults(
             )
         }
         UiState.Loading -> songListSkeleton(keyPrefix = "skeleton:search:library")
-        is UiState.Error -> item(key = "library:error") { MessageState(results.message) }
+        is UiState.Error -> {
+            noticeRows(notice)
+            item(key = "library:error") { MessageState(results.message) }
+        }
         is UiState.Success -> if (results.data.isEmpty()) {
+            noticeRows(notice)
             item(key = "library:no-match") {
                 MessageState(
                     if (external && externalNoResultsMessage.isNotBlank()) {
@@ -514,6 +543,7 @@ private fun LazyListScope.librarySearchResults(
                 )
             }
         } else {
+            noticeRows(notice)
             val tracks = results.data
             val isCurrentRow = playingRowMatcher(tracks, currentSong)
             itemsIndexed(tracks, key = { index, song -> "${if (addons) "addon" else "library"}_${song.videoId}_$index" }) { index, song ->

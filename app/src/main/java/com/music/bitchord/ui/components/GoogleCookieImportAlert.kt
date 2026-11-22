@@ -42,6 +42,8 @@ fun GoogleCookieImportAlert(
     hazeState: HazeState,
     onImport: (String) -> Unit,
     onDismiss: () -> Unit,
+    /** Google's own page, for the accounts it still lets through an embedded browser. */
+    onWebSignIn: () -> Unit = {},
     /** Shown above the instructions when the browser sign-in was refused. */
     notice: String? = null,
 ) {
@@ -144,6 +146,8 @@ fun GoogleCookieImportAlert(
                 }
                 AlertRule()
                 AlertAction(stringResource(R.string.google_cookie_import_button), true, ::importCookie, enabled = cookie.isNotBlank())
+                AlertRule()
+                AlertAction(stringResource(R.string.google_web_signin_action), false, onWebSignIn)
                 AlertRule()
                 AlertAction(stringResource(R.string.cancel), false, ::dismiss)
             }

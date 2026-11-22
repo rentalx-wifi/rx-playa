@@ -37,6 +37,7 @@ google_cookie_import_invalid
 google_cookie_import_subtitle
 google_cookie_import_title
 google_signin_blocked_notice
+google_web_signin_action
 legacy_mesh_gradient
 legacy_mesh_gradient_subtitle
 liquid_glass_subtitle
@@ -72,6 +73,7 @@ vk_import_title
 vk_public_import_subtitle
 vless_subtitle
 wave_offline
+yandex_search_unavailable
 zapret_status_binary_absent
 zapret_status_binary_missing
 zapret_status_import_unreadable

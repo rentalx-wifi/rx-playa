@@ -282,6 +282,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _platformResults = MutableStateFlow<UiState<List<Song>>?>(null)
     val platformResults: StateFlow<UiState<List<Song>>?> = _platformResults.asStateFlow()
+
+    /**
+     * Sources that gave nothing back on the last "all platforms" search.
+     *
+     * Kept apart from the rows so the screen can say which ones stayed silent
+     * instead of leaving a listener to guess why the list looks thin.
+     */
+    private val _unavailablePlatforms = MutableStateFlow<Set<SearchSource>>(emptySet())
+    val unavailablePlatforms: StateFlow<Set<SearchSource>> = _unavailablePlatforms.asStateFlow()
     private val _platformLoadingMore = MutableStateFlow(false)
     val platformLoadingMore: StateFlow<Boolean> = _platformLoadingMore.asStateFlow()
     private var platformSearchJob: Job? = null
@@ -2740,7 +2749,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 throw cancelled
             } catch (error: Throwable) {
                 if (generation == platformSearchGeneration && source == _searchSource.value) {
-                    _platformResults.value = UiState.Error(error.message ?: text(R.string.failed))
+                    _platformResults.value = UiState.Error(
+                        // Yandex refuses whole countries, not requests: a status
+                        // code there means "this network is not allowed", and
+                        // the useful sentence is the one about the VPN.
+                        if (source == SearchSource.YANDEX) {
+                            text(R.string.yandex_search_unavailable)
+                        } else {
+                            error.message ?: text(R.string.failed)
+                        },
+                    )
                 }
                 return@launch
             }
@@ -2753,6 +2771,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun cancelPlatformSearch() {
         platformSearchGeneration++
+        _unavailablePlatforms.value = emptySet()
         platformSearchJob?.cancel()
         platformSearchJob = null
         platformLoadMoreJob?.cancel()
@@ -2796,10 +2815,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun searchAllPlatforms(query: String): List<Song> = coroutineScope {
+        // Which sources did not answer this time. A source that failed used to
+        // vanish from "all platforms" without a word: from a network Yandex
+        // refuses, the list simply had no Yandex rows and looked like the app
+        // had stopped searching there (issue reported as "только саундклауд").
+        val failed = java.util.Collections.synchronizedSet(mutableSetOf<SearchSource>())
         val youtube = async {
-            val rows = YtMusicRepository.search(query, SearchFilter.SONGS).getOrNull().orEmpty()
+            val rows = YtMusicRepository.search(query, SearchFilter.SONGS).getOrNull()
+            if (rows == null) failed += SearchSource.YOUTUBE
             currentCoroutineContext().ensureActive()
-            rows.mapNotNull {
+            rows.orEmpty().mapNotNull {
                 when (it) {
                     is SearchResult.Track -> it.song
                     is SearchResult.TopTrack -> it.song
@@ -2811,7 +2836,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val token = AppSettings.yandexMusicToken.value
             // Anonymous callers get the public endpoint, so Yandex contributes to
             // "all platforms" without an account instead of silently vanishing.
-            optionalPlatformRows {
+            optionalPlatformRows(SearchSource.YANDEX, failed) {
                 if (token.isBlank()) {
                     YandexMusicApi().searchTracksAnonymous(query, ALL_PLATFORM_PER_SOURCE)
                 } else {
@@ -2820,23 +2845,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         val spotify = async {
-            if (AppSettings.spotifySpdcToken.value.isBlank()) emptyList<Song>() else optionalPlatformRows {
+            if (AppSettings.spotifySpdcToken.value.isBlank()) emptyList<Song>() else optionalPlatformRows(SearchSource.SPOTIFY, failed) {
                 SpotifyLibrary.searchTracks(query, ALL_PLATFORM_PER_SOURCE).map(SpotifyTrack::toSourceSong)
             }
         }
         val soundCloud = async {
-            optionalPlatformRows {
+            optionalPlatformRows(SearchSource.SOUNDCLOUD, failed) {
                 withTimeoutOrNull(SOUNDCLOUD_SEARCH_TIMEOUT_MS) {
                     SoundCloudPlaylistImporter.search(query, ALL_PLATFORM_PER_SOURCE)
                 }.orEmpty().mapIndexed { index, track -> track.toSearchSong(index) }
             }
         }
         val vk = async {
-            optionalPlatformRows { VkMusicApi.search(query, ALL_PLATFORM_PER_SOURCE) }
+            optionalPlatformRows(SearchSource.VK, failed) {
+                VkMusicApi.search(query, ALL_PLATFORM_PER_SOURCE)
+            }
         }
         val yandexSongs = ExternalPlaylistImporter.resolve(yandex.await()) { _, _ -> }.first
         currentCoroutineContext().ensureActive()
-        mergePlatformSearchRows(spotify.await() + soundCloud.await() + vk.await() + youtube.await() + yandexSongs)
+        val merged = mergePlatformSearchRows(spotify.await() + soundCloud.await() + vk.await() + youtube.await() + yandexSongs)
+        _unavailablePlatforms.value = failed.toSet()
+        merged
     }
 
     /** One recording, one row; keep a real provider identity over its catalogue duplicate. */
@@ -2860,11 +2889,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         else -> 1
     }
 
-    private suspend fun <T> optionalPlatformRows(block: suspend () -> List<T>): List<T> = try {
+    private suspend fun <T> optionalPlatformRows(
+        source: SearchSource? = null,
+        failed: MutableSet<SearchSource>? = null,
+        block: suspend () -> List<T>,
+    ): List<T> = try {
         block()
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Throwable) {
+        if (source != null) failed?.add(source)
         emptyList()
     }
 
@@ -2872,6 +2906,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val token = AppSettings.yandexMusicToken.value
         // Without an account the public search endpoint still answers; the rows
         // are then matched to playable recordings like any other provider.
+        //
+        // A network that Yandex does not answer from lands here as a throw, and
+        // the caller turns it into the VPN hint rather than into "HTTP 403":
+        // from abroad the endpoint is simply unreachable, and a raw status code
+        // reads as a broken app.
         val tracks = if (token.isNotBlank()) {
             YandexMusicApi().searchTracks(token, query, limit)
         } else {
