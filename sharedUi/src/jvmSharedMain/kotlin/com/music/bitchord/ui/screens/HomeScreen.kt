@@ -426,7 +426,7 @@ private fun RxWavePill(
                     )
                 }
                 Icon(
-                    painter = painterResource(Res.drawable.ic_logo),
+                    painter = painterResource(Res.drawable.ic_rx_mark),
                     contentDescription = null,
                     tint = ink.copy(alpha = 0.92f),
                     modifier = Modifier.size(26.dp),
@@ -1062,7 +1062,7 @@ private fun HomeTitle(title: String, modifier: Modifier = Modifier) {
     val logoHeight = with(LocalDensity.current) { (style.fontSize * LOGO_TO_FONT).toDp() }
     Column(modifier = modifier.padding(horizontal = PAGE_GUTTER, vertical = 8.dp)) {
         Icon(
-            painter = painterResource(Res.drawable.ic_logo),
+            painter = painterResource(Res.drawable.ic_rx_mark),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier
