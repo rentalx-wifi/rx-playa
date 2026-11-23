@@ -1366,6 +1366,15 @@
     <string name="search_addons_none">未启用任何插件。请在“设置 → 音源”中添加。</string>
     <string name="app_icon">应用图标</string>
     <string name="app_icon_default">默认</string>
+    <string name="icon_family_modern">Modern</string>
+    <string name="icon_family_glass">Glass</string>
+    <string name="icon_family_neon">Neon</string>
+    <string name="icon_family_legacy">Legacy</string>
+    <string name="app_icon_legacy_classic">Old mark</string>
+    <string name="app_icon_legacy_dark">Old mark, dark</string>
+    <string name="app_icon_legacy_accent">Old mark, accent</string>
+    <string name="app_icon_accent_title">Colours from the icon</string>
+    <string name="app_icon_accent_subtitle">Take the accent of the icon you pick</string>
     <string name="show_queue_history">显示队列历史</string>
     <string name="show_queue_history_subtitle">在队列中“正在播放”上方显示最多 25 首已播放的歌曲</string>
     <string name="not_enough_this_week">本周再多播放几首歌曲即可解锁你的 Replay。</string>

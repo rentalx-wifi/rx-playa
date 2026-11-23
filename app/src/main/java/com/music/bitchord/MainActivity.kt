@@ -519,6 +519,8 @@ class MainActivity : AppCompatActivity() {
             val uiStyleKey by AppSettings.uiStyleKey.collectAsStateWithLifecycle()
             val materialYou by AppSettings.materialYou.collectAsStateWithLifecycle()
             val customAccent by AppSettings.customAccent.collectAsStateWithLifecycle()
+            val accentFollowsIcon by AppSettings.accentFollowsIcon.collectAsStateWithLifecycle()
+            val iconAccent by AppSettings.iconAccent.collectAsStateWithLifecycle()
             val reduceAnimation by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
             val iosOverscrollFactory = rememberIosOverscrollFactory()
             val performanceRefreshRate by AppSettings.performanceRefreshRate.collectAsStateWithLifecycle()
@@ -538,7 +540,13 @@ class MainActivity : AppCompatActivity() {
                 liquidGlass = liquidGlass,
                 style = com.music.bitchord.ui.theme.UiStyle.of(uiStyleKey),
                 materialYou = materialYou,
-                customAccent = customAccent?.let { Color(it) },
+                customAccent = com.music.bitchord.resolvedAccent(
+                    manual = customAccent,
+                    followsIcon = accentFollowsIcon,
+                    // A build that predates the setting never recorded the accent,
+                    // so the icon already on the home screen answers for it.
+                    iconAccent = iconAccent ?: remember { AppIcon.current(applicationContext).accent },
+                )?.let { Color(it) },
             ) {
                 // The glass surfaces sample this layer, and a layer records only
                 // what is drawn into it — which, for BitChord, is a page that

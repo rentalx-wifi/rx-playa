@@ -1400,6 +1400,15 @@
     <string name="search_addons_none">Nenhum addon ativado. Adicione um em Configurações → Fontes.</string>
     <string name="app_icon">Ícone do app</string>
     <string name="app_icon_default">Padrão</string>
+    <string name="icon_family_modern">Modern</string>
+    <string name="icon_family_glass">Glass</string>
+    <string name="icon_family_neon">Neon</string>
+    <string name="icon_family_legacy">Legacy</string>
+    <string name="app_icon_legacy_classic">Old mark</string>
+    <string name="app_icon_legacy_dark">Old mark, dark</string>
+    <string name="app_icon_legacy_accent">Old mark, accent</string>
+    <string name="app_icon_accent_title">Colours from the icon</string>
+    <string name="app_icon_accent_subtitle">Take the accent of the icon you pick</string>
     <string name="show_queue_history">Mostrar histórico da fila</string>
     <string name="show_queue_history_subtitle">Mostra até 25 músicas já tocadas acima de «Tocando agora» na fila</string>
     <string name="not_enough_this_week">Ouça mais algumas músicas esta semana para desbloquear seu Replay.</string>

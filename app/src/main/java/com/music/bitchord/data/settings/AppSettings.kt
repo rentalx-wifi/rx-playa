@@ -525,6 +525,18 @@ object AppSettings {
     val materialYou = MutableStateFlow(false)
 
     /**
+     * Whether the interface takes its accent from the launcher icon (issue #44).
+     *
+     * On by default: the icon and the app are one choice or two, and somebody
+     * who picks the violet mark expects the app to be violet. A manually chosen
+     * accent outranks this — a colour set by hand is not a preset to overwrite.
+     */
+    val accentFollowsIcon = MutableStateFlow(true)
+
+    /** The accent the current launcher icon carries, or null when it has none. */
+    val iconAccent = MutableStateFlow<Long?>(null)
+
+    /**
      * A listener-picked accent as `0xFFRRGGBB`, or null for the preset list.
      *
      * Stored as a plain ARGB number rather than a named colour so the picker can
@@ -1110,6 +1122,8 @@ object AppSettings {
         uiStyleKey.value = prefs.getString(KEY_UI_STYLE, "material3").orEmpty()
         materialYou.value = prefs.getBoolean(KEY_MATERIAL_YOU, false)
         customAccent.value = prefs.getLong(KEY_CUSTOM_ACCENT, 0L).takeIf { it != 0L }
+        accentFollowsIcon.value = prefs.getBoolean(KEY_ACCENT_FROM_ICON, true)
+        iconAccent.value = prefs.getLong(KEY_ICON_ACCENT, 0L).takeIf { it != 0L }
         liquidGlassEnabled.value = prefs.getBoolean(KEY_LIQUID_GLASS_ENABLED, false)
         zapretPath.value = prefs.getString(KEY_ZAPRET_PATH, "").orEmpty()
         zapretStrategy.value = prefs.getString(KEY_ZAPRET_STRATEGY, "fake_split").orEmpty()
@@ -1579,6 +1593,17 @@ object AppSettings {
     fun setCustomAccent(argb: Long?) {
         customAccent.value = argb
         prefs.edit().putLong(KEY_CUSTOM_ACCENT, argb ?: 0L).apply()
+    }
+
+    fun setAccentFollowsIcon(value: Boolean) {
+        accentFollowsIcon.value = value
+        prefs.edit().putBoolean(KEY_ACCENT_FROM_ICON, value).apply()
+    }
+
+    /** @param argb the accent of the icon just applied, or null for one with no opinion. */
+    fun setIconAccent(argb: Long?) {
+        iconAccent.value = argb
+        prefs.edit().putLong(KEY_ICON_ACCENT, argb ?: 0L).apply()
     }
 
     fun setDpiStrategy(value: String) {
@@ -2510,6 +2535,8 @@ object AppSettings {
     private const val KEY_ZAPRET_STRATEGY = "zapret_strategy"
     private const val KEY_DPI_STRATEGY = "dpi_strategy"
     private const val KEY_ACCENT = "accent_key"
+    private const val KEY_ACCENT_FROM_ICON = "accent_follows_icon"
+    private const val KEY_ICON_ACCENT = "icon_accent"
     private const val KEY_UI_STYLE = "ui_style"
     private const val KEY_MATERIAL_YOU = "material_you"
     private const val KEY_CUSTOM_ACCENT = "custom_accent"

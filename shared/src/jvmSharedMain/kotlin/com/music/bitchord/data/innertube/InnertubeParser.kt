@@ -338,6 +338,7 @@ object InnertubeParser {
 
         val songs = mutableListOf<Song>()
         var moreSongs: String? = null
+        var moreSongsParams: String? = null
         val shelves = mutableListOf<HomeShelf>()
         val header = response["header"]
         // "Top songs" rows are billed by the page they sit on: the subtitle
@@ -355,8 +356,22 @@ object InnertubeParser {
                         ?.let(songs::add)
                 }
                 if (moreSongs == null) {
-                    moreSongs = shelf.o("title").a("runs")?.firstOrNull()
-                        .o("navigationEndpoint").o("browseEndpoint").s("browseId")
+                    // The "Top songs" header links two ways: the runs carry the
+                    // playlist of the top rows, and the shelf's own "More"
+                    // button carries the artist's complete song list — a browse
+                    // with params, not a playlist. The second is the one that
+                    // answers "where are the rest of their tracks" (#41), and
+                    // it was being ignored.
+                    val titleEndpoint = shelf.o("title").a("runs")?.firstOrNull()
+                        .o("navigationEndpoint").o("browseEndpoint")
+                    val moreEndpoint = shelf.o("moreContentButton").o("buttonRenderer")
+                        .o("navigationEndpoint").o("browseEndpoint")
+                        ?: shelf.a("buttons")?.firstNotNullOfOrNull {
+                            it.o("buttonRenderer").o("navigationEndpoint").o("browseEndpoint")
+                        }
+                    moreSongs = moreEndpoint.s("browseId") ?: titleEndpoint.s("browseId")
+                    moreSongsParams = moreEndpoint.s("params")
+                        ?.takeIf { moreEndpoint.s("browseId") != null }
                 }
             }
             section.o("musicCarouselShelfRenderer")?.let { carousel ->
@@ -399,6 +414,7 @@ object InnertubeParser {
         }
         return ArtistPage(
             songs, moreSongs, shelves,
+            moreSongsParams = moreSongsParams,
             thumbnailUrl = artistThumbnail(header),
             name = credit.artistName,
             description = parseDescription(response),

@@ -1367,6 +1367,15 @@
     <string name="search_addons_none">No hay addons activados. Añade uno en Ajustes → Fuentes.</string>
     <string name="app_icon">Icono de la app</string>
     <string name="app_icon_default">Predeterminado</string>
+    <string name="icon_family_modern">Modern</string>
+    <string name="icon_family_glass">Glass</string>
+    <string name="icon_family_neon">Neon</string>
+    <string name="icon_family_legacy">Legacy</string>
+    <string name="app_icon_legacy_classic">Old mark</string>
+    <string name="app_icon_legacy_dark">Old mark, dark</string>
+    <string name="app_icon_legacy_accent">Old mark, accent</string>
+    <string name="app_icon_accent_title">Colours from the icon</string>
+    <string name="app_icon_accent_subtitle">Take the accent of the icon you pick</string>
     <string name="show_queue_history">Mostrar historial de la cola</string>
     <string name="show_queue_history_subtitle">Muestra hasta 25 canciones reproducidas antes de «Reproduciendo ahora» en la cola</string>
     <string name="not_enough_this_week">Escucha unas cuantas canciones más esta semana para desbloquear tu Replay.</string>

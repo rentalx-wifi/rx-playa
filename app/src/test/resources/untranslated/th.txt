@@ -1,5 +1,7 @@
 add_addon_detail
 addon_url_description
+app_icon_accent_subtitle
+app_icon_accent_title
 auto_empty_offline_subtitle
 auto_empty_playlists_subtitle
 auto_empty_playlists_title

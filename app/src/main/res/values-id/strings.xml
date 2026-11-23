@@ -1372,6 +1372,15 @@
     <string name="search_addons_none">Tidak ada addon yang aktif. Tambahkan satu di Pengaturan → Sumber.</string>
     <string name="app_icon">Ikon aplikasi</string>
     <string name="app_icon_default">Default</string>
+    <string name="icon_family_modern">Modern</string>
+    <string name="icon_family_glass">Glass</string>
+    <string name="icon_family_neon">Neon</string>
+    <string name="icon_family_legacy">Legacy</string>
+    <string name="app_icon_legacy_classic">Old mark</string>
+    <string name="app_icon_legacy_dark">Old mark, dark</string>
+    <string name="app_icon_legacy_accent">Old mark, accent</string>
+    <string name="app_icon_accent_title">Colours from the icon</string>
+    <string name="app_icon_accent_subtitle">Take the accent of the icon you pick</string>
     <string name="show_queue_history">Tampilkan riwayat antrean</string>
     <string name="show_queue_history_subtitle">Menampilkan hingga 25 lagu yang sudah diputar di atas “Sedang diputar” di antrean</string>
     <string name="not_enough_this_week">Putar beberapa lagu lagi minggu ini untuk membuka Replay Anda.</string>

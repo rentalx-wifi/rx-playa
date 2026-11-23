@@ -669,6 +669,16 @@ data class ArtistPage(
     /** Playlist holding the artist's full song list, when the page links one. */
     val moreSongsBrowseId: String?,
     val sections: List<HomeShelf>,
+    /**
+     * Params for [moreSongsBrowseId], when the page's "More" button names the
+     * artist's complete song list rather than the top-rows playlist.
+     *
+     * The same browse id with different params is a different page: the artist
+     * landing page, their songs, their albums. Without this the full list was
+     * unreachable and the page stopped at the twenty rows of "Top songs"
+     * (issue #41).
+     */
+    val moreSongsParams: String? = null,
     /** The artist's own picture, off the page header. */
     val thumbnailUrl: String? = null,
     /** The single artist this page is for, as the header bills them. */

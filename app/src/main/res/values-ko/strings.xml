@@ -388,6 +388,15 @@
     <string name="show_nerd_stats_subtitle">플레이어에 코덱, 비트레이트, 샘플 레이트 표시</string>
     <string name="app_icon">앱 아이콘</string>
     <string name="app_icon_default">기본값</string>
+    <string name="icon_family_modern">Modern</string>
+    <string name="icon_family_glass">Glass</string>
+    <string name="icon_family_neon">Neon</string>
+    <string name="icon_family_legacy">Legacy</string>
+    <string name="app_icon_legacy_classic">Old mark</string>
+    <string name="app_icon_legacy_dark">Old mark, dark</string>
+    <string name="app_icon_legacy_accent">Old mark, accent</string>
+    <string name="app_icon_accent_title">Colours from the icon</string>
+    <string name="app_icon_accent_subtitle">Take the accent of the icon you pick</string>
     <string name="app_icon_liquid_glass" translatable="false">Liquid Glass</string>
     <string name="app_icon_liquid_glass_dark" translatable="false">Liquid Glass Dark</string>
     <string name="app_icon_liquid_glass_clear" translatable="false">Liquid Glass Clear</string>

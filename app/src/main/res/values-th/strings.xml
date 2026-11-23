@@ -1378,6 +1378,15 @@
     <string name="search_addons_none">ยังไม่ได้เปิดใช้แอดออน เพิ่มได้ที่ การตั้งค่า → แหล่งที่มา</string>
     <string name="app_icon">ไอคอนแอป</string>
     <string name="app_icon_default">ค่าเริ่มต้น</string>
+    <string name="icon_family_modern">Modern</string>
+    <string name="icon_family_glass">Glass</string>
+    <string name="icon_family_neon">Neon</string>
+    <string name="icon_family_legacy">Legacy</string>
+    <string name="app_icon_legacy_classic">Old mark</string>
+    <string name="app_icon_legacy_dark">Old mark, dark</string>
+    <string name="app_icon_legacy_accent">Old mark, accent</string>
+    <string name="app_icon_accent_title">Colours from the icon</string>
+    <string name="app_icon_accent_subtitle">Take the accent of the icon you pick</string>
     <string name="show_queue_history">แสดงประวัติคิว</string>
     <string name="show_queue_history_subtitle">แสดงเพลงที่เล่นไปแล้วสูงสุด 25 เพลงเหนือ “กำลังเล่น” ในคิว</string>
     <string name="not_enough_this_week">ฟังเพลงอีกสักหน่อยในสัปดาห์นี้เพื่อปลดล็อก Replay ของคุณ</string>

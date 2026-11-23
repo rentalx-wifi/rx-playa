@@ -1395,6 +1395,15 @@
     <string name="search_addons_none">Es sind keine Addons aktiviert. Füge eines unter Einstellungen → Quellen hinzu.</string>
     <string name="app_icon">App-Symbol</string>
     <string name="app_icon_default">Standard</string>
+    <string name="icon_family_modern">Modern</string>
+    <string name="icon_family_glass">Glass</string>
+    <string name="icon_family_neon">Neon</string>
+    <string name="icon_family_legacy">Legacy</string>
+    <string name="app_icon_legacy_classic">Old mark</string>
+    <string name="app_icon_legacy_dark">Old mark, dark</string>
+    <string name="app_icon_legacy_accent">Old mark, accent</string>
+    <string name="app_icon_accent_title">Colours from the icon</string>
+    <string name="app_icon_accent_subtitle">Take the accent of the icon you pick</string>
     <string name="show_queue_history">Wiedergabeverlauf anzeigen</string>
     <string name="show_queue_history_subtitle">Bis zu 25 zuletzt gespielte Songs über „Aktuelle Wiedergabe“ in der Warteschlange anzeigen</string>
     <string name="not_enough_this_week">Höre diese Woche noch ein paar Songs mehr, um dein Replay freizuschalten.</string>

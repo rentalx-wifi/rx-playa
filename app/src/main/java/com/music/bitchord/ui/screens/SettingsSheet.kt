@@ -142,6 +142,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.viewinterop.AndroidView
 import com.music.bitchord.AppIcon
+import com.music.bitchord.IconFamily
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
@@ -2013,63 +2014,65 @@ fun SettingsScreen(
             val appIconTitle = stringResource(R.string.app_icon)
             row(appIconTitle, "icon", "launcher", "logo") {
                 var selectedIcon by remember { mutableStateOf(AppIcon.current(context)) }
+                // One family open at a time: a tap on a mark reveals the colours
+                // drawn for it, not every icon in the app (issues #46, #47).
+                var openFamily by remember { mutableStateOf(selectedIcon.family) }
                 SettingsRow(icon = SfIcons.Apps, title = appIconTitle)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(start = ROW_INSET, end = ROW_INSET, bottom = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    AppIcon.entries.forEach { option ->
-                        val selected = option == selectedIcon
-                        Column(
-                            modifier = Modifier
-                                .width(84.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .clickable {
+                IconFamily.entries.forEach { family ->
+                    val icons = AppIcon.inFamily(family)
+                    if (icons.isEmpty()) return@forEach
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = ROW_INSET, end = ROW_INSET, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(family.labelRes),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(start = ROW_INSET, end = ROW_INSET, bottom = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        icons.forEach { option ->
+                            val selected = option == selectedIcon
+                            val open = option.family == openFamily
+                            IconTile(
+                                option = option,
+                                selected = selected,
+                                open = open,
+                                onClick = {
+                                    openFamily = option.family
                                     selectedIcon = option
                                     AppIcon.apply(context, option)
-                                }
-                                .padding(vertical = 6.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            // A glass foreground holds the finished icon in its own shape on the
-                            // central 72 of 108 dp: scaled 1.5× it fills the tile as designed.
-                            // The default JPEG goes through Android's drawable loader unchanged.
-                            val preview = option.previewRes
-                            if (preview == null) {
-                                AndroidView(
-                                    factory = { ctx ->
-                                        android.widget.ImageView(ctx).apply { setImageResource(option.iconRes) }
-                                    },
-                                    modifier = Modifier
-                                        .size(68.dp)
-                                        .clip(RoundedCornerShape(22.dp)),
-                                )
-                            } else {
-                                Image(
-                                    painter = painterResource(preview),
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier
-                                        .size(68.dp)
-                                        .scale(1.5f),
-                                )
-                            }
-                            Text(
-                                text = stringResource(option.labelRes),
-                                textAlign = TextAlign.Center,
-                                maxLines = 2,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = if (selected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                modifier = Modifier.padding(top = 6.dp),
+                                    AppSettings.setIconAccent(option.accent)
+                                },
                             )
                         }
                     }
                 }
+                // The theme follows the icon unless a colour was chosen by hand —
+                // see `resolvedAccent`. The switch is here because the same person
+                // may want their magenta accent to survive an icon change.
+                val followIcon by AppSettings.accentFollowsIcon.collectAsStateWithLifecycle()
+                SettingsRow(
+                    icon = SfIcons.Appearance,
+                    title = stringResource(R.string.app_icon_accent_title),
+                    subtitle = stringResource(R.string.app_icon_accent_subtitle),
+                    trailing = {
+                        IosSwitch(
+                            checked = followIcon,
+                            onCheckedChange = AppSettings::setAccentFollowsIcon,
+                        )
+                    },
+                    onClick = { AppSettings.setAccentFollowsIcon(!followIcon) },
+                )
             }
         }
 
@@ -3437,6 +3440,66 @@ private fun AccentHuePicker(initial: Color, onChange: (Color) -> Unit) {
             valueRange = 0f..360f,
             modifier = Modifier.weight(1f),
             colors = SliderDefaults.colors(),
+        )
+    }
+}
+
+/**
+ * One icon in the grid, drawn as the launcher would draw it.
+ *
+ * A glass foreground holds the finished icon in its own shape on the central
+ * 72 of 108 dp, so it is scaled 1.5× to fill the tile as designed; an ordinary
+ * drawable goes through Android's loader unchanged. The border marks the tile
+ * whose colourways are open, which is what a tap on the family row reveals.
+ */
+@Composable
+private fun IconTile(
+    option: AppIcon,
+    selected: Boolean,
+    open: Boolean,
+    onClick: () -> Unit,
+) {
+    val border = if (open) MaterialTheme.colorScheme.primary else Color.Transparent
+    Column(
+        modifier = Modifier
+            .width(84.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        val preview = option.previewRes
+        if (preview == null) {
+            AndroidView(
+                factory = { ctx ->
+                    android.widget.ImageView(ctx).apply { setImageResource(option.iconRes) }
+                },
+                modifier = Modifier
+                    .size(68.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .border(2.dp, border, RoundedCornerShape(22.dp)),
+            )
+        } else {
+            Image(
+                painter = painterResource(preview),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .size(68.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .border(2.dp, border, RoundedCornerShape(22.dp))
+                    .scale(1.5f),
+            )
+        }
+        Text(
+            text = stringResource(option.labelRes),
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (selected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.padding(top = 6.dp),
         )
     }
 }

@@ -1396,6 +1396,15 @@
     <string name="search_addons_none">Aucun addon n\'est activé. Ajoutez-en un dans Réglages → Sources.</string>
     <string name="app_icon">Icône de l\'app</string>
     <string name="app_icon_default">Par défaut</string>
+    <string name="icon_family_modern">Modern</string>
+    <string name="icon_family_glass">Glass</string>
+    <string name="icon_family_neon">Neon</string>
+    <string name="icon_family_legacy">Legacy</string>
+    <string name="app_icon_legacy_classic">Old mark</string>
+    <string name="app_icon_legacy_dark">Old mark, dark</string>
+    <string name="app_icon_legacy_accent">Old mark, accent</string>
+    <string name="app_icon_accent_title">Colours from the icon</string>
+    <string name="app_icon_accent_subtitle">Take the accent of the icon you pick</string>
     <string name="show_queue_history">Afficher l\'historique de la file</string>
     <string name="show_queue_history_subtitle">Affiche jusqu\'à 25 titres déjà écoutés au-dessus de « En cours de lecture » dans la file</string>
     <string name="not_enough_this_week">Écoutez encore quelques titres cette semaine pour débloquer votre Replay.</string>

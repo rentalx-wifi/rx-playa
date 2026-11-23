@@ -1361,6 +1361,15 @@
     <string name="search_addons_none">Etkin eklenti yok. Ayarlar → Kaynaklar bölümünden bir tane ekleyin.</string>
     <string name="app_icon">Uygulama simgesi</string>
     <string name="app_icon_default">Varsayılan</string>
+    <string name="icon_family_modern">Modern</string>
+    <string name="icon_family_glass">Glass</string>
+    <string name="icon_family_neon">Neon</string>
+    <string name="icon_family_legacy">Legacy</string>
+    <string name="app_icon_legacy_classic">Old mark</string>
+    <string name="app_icon_legacy_dark">Old mark, dark</string>
+    <string name="app_icon_legacy_accent">Old mark, accent</string>
+    <string name="app_icon_accent_title">Colours from the icon</string>
+    <string name="app_icon_accent_subtitle">Take the accent of the icon you pick</string>
     <string name="show_queue_history">Sıra geçmişini göster</string>
     <string name="show_queue_history_subtitle">Sırada “Şimdi çalıyor” öğesinin üstünde daha önce çalınan en fazla 25 şarkıyı gösterir</string>
     <string name="not_enough_this_week">Replay’inizin kilidini açmak için bu hafta birkaç şarkı daha dinleyin.</string>

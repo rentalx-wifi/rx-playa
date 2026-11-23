@@ -1,3 +1,5 @@
+app_icon_accent_subtitle
+app_icon_accent_title
 cast_connect_failed
 cast_dialog_subtitle
 cast_searching

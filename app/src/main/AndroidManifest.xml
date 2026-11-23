@@ -321,6 +321,48 @@
         </activity-alias>
 
         <activity-alias
+            android:name=".LauncherLegacy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_rx_legacy"
+            android:roundIcon="@drawable/ic_rx_legacy"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".LauncherLegacyDark"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_rx_legacy_dark"
+            android:roundIcon="@drawable/ic_rx_legacy_dark"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".LauncherLegacyAccent"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_rx_legacy_accent"
+            android:roundIcon="@drawable/ic_rx_legacy_accent"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
             android:name=".LauncherGlassLight"
             android:enabled="false"
             android:exported="true"

@@ -968,9 +968,9 @@ object YtMusicRepository {
      * nobody is watching — the library sync, an artist's back catalogue. For
      * anything a screen is waiting on, use [browseSongs] and [moreSongs].
      */
-    private suspend fun songsPaged(browseId: String): List<Song> {
+    private suspend fun songsPaged(browseId: String, params: String? = null): List<Song> {
         val out = LinkedHashMap<String, Song>()
-        var response = Innertube.browse(browseId)
+        var response = Innertube.browse(browseId, params)
         if (browseId.startsWith("MPREb")) {
             val albumRows = InnertubeParser.collectSongsDeep(response).size
             albumPlaylistOf(response, albumRows)?.let { response = it }
@@ -1209,8 +1209,15 @@ object YtMusicRepository {
         val page = InnertubeParser.parseArtistPage(Innertube.browse(browseId))
         coroutineScope {
             val fullSongsDeferred = async {
-                page.moreSongsBrowseId?.let { playlistId ->
-                    runCatching { songsPaged(playlistId) }.getOrNull()
+                val wanted = page.moreSongsBrowseId ?: return@async null
+                // With params the id names the artist's own songs page, which
+                // is the complete list; without them it is the playlist of the
+                // top rows, which is the twenty the landing page already showed.
+                val byList = runCatching { songsPaged(wanted, page.moreSongsParams) }.getOrNull()
+                if (page.moreSongsParams == null || !byList.isNullOrEmpty()) {
+                    byList
+                } else {
+                    runCatching { songsPaged(wanted) }.getOrNull()
                 }
             }
             val shelvesDeferred = page.sections.map { shelf ->

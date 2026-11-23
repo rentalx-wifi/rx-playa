@@ -1435,6 +1435,15 @@
     <string name="search_addons_none">Brak włączonych dodatków. Dodaj jeden w Ustawienia → Źródła.</string>
     <string name="app_icon">Ikona aplikacji</string>
     <string name="app_icon_default">Domyślna</string>
+    <string name="icon_family_modern">Modern</string>
+    <string name="icon_family_glass">Glass</string>
+    <string name="icon_family_neon">Neon</string>
+    <string name="icon_family_legacy">Legacy</string>
+    <string name="app_icon_legacy_classic">Old mark</string>
+    <string name="app_icon_legacy_dark">Old mark, dark</string>
+    <string name="app_icon_legacy_accent">Old mark, accent</string>
+    <string name="app_icon_accent_title">Colours from the icon</string>
+    <string name="app_icon_accent_subtitle">Take the accent of the icon you pick</string>
     <string name="show_queue_history">Pokaż historię kolejki</string>
     <string name="show_queue_history_subtitle">Pokazuje do 25 wcześniej odtworzonych utworów nad pozycją „Teraz odtwarzane” w kolejce</string>
     <string name="not_enough_this_week">Posłuchaj w tym tygodniu jeszcze kilku utworów, aby odblokować swój Replay.</string>

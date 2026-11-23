@@ -1312,6 +1312,15 @@
     <string name="search_addons_none">Chưa bật addon nào. Hãy thêm một addon trong Cài đặt → Nguồn.</string>
     <string name="app_icon">Biểu tượng ứng dụng</string>
     <string name="app_icon_default">Mặc định</string>
+    <string name="icon_family_modern">Modern</string>
+    <string name="icon_family_glass">Glass</string>
+    <string name="icon_family_neon">Neon</string>
+    <string name="icon_family_legacy">Legacy</string>
+    <string name="app_icon_legacy_classic">Old mark</string>
+    <string name="app_icon_legacy_dark">Old mark, dark</string>
+    <string name="app_icon_legacy_accent">Old mark, accent</string>
+    <string name="app_icon_accent_title">Colours from the icon</string>
+    <string name="app_icon_accent_subtitle">Take the accent of the icon you pick</string>
     <string name="show_queue_history">Hiện lịch sử hàng đợi</string>
     <string name="show_queue_history_subtitle">Hiện tối đa 25 bài đã phát phía trên “Đang phát” trong hàng đợi</string>
     <string name="not_enough_this_week">Hãy nghe thêm vài bài trong tuần này để mở khóa Replay của bạn.</string>

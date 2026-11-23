@@ -1,3 +1,5 @@
+app_icon_accent_subtitle
+app_icon_accent_title
 download_failed_expired
 download_failed_generic
 download_failed_no_audio
