@@ -271,7 +271,14 @@ object SourceRegistry {
      */
     fun activeForPlayback(): List<MusicSource> {
         val ceiling = AppSettings.effectiveAudioQuality
-        return active().filter { ceiling.permits(it.kind) }
+        // Yandex stays out of the walk until an account is connected: an
+        // unconnected source answers nothing, and being ranked above YouTube
+        // would otherwise make every track pay for a race that cannot produce
+        // a stream.
+        val yandexConnected = AppSettings.yandexMusicToken.value.isNotBlank()
+        return active()
+            .filter { ceiling.permits(it.kind) }
+            .filter { it.kind != SourceKind.YANDEX_MUSIC || yandexConnected }
     }
 
     /**
