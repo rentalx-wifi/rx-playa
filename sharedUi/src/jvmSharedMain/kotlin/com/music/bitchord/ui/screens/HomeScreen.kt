@@ -785,7 +785,10 @@ fun HomeScreen(
                                 onClick = onItemClick,
                                 onLongPress = onItemLongPress,
                             )
-                        } else {
+                        } else if (state is UiState.Loading) {
+                            // Only while there is still a request behind it. An
+                            // empty feed drew this placeholder grid forever,
+                            // above a message saying there was nothing to play.
                             SpotifyQuickGridPlaceholder()
                         }
                     }
@@ -830,6 +833,21 @@ fun HomeScreen(
                 is UiState.Success -> {
                     if (recentlyPlayedLoading) {
                         recentlyPlayedSkeleton()
+                    }
+                    // An answer that carried nothing is still an answer: the
+                    // home feed is empty for a listener with no account and
+                    // nothing listened to yet, and drawing nothing under the
+                    // filter chips looks like a page that failed to arrive.
+                    if (displayedState.data.isEmpty() && !recentlyPlayedLoading) {
+                        item(key = "home-empty") {
+                            Box(feedItem()) {
+                                MessageState(
+                                    stringResource(Res.string.home_empty),
+                                    actionLabel = stringResource(Res.string.retry),
+                                    onAction = onRetry,
+                                )
+                            }
+                        }
                     }
                     // The loading skeleton already owns the hero slot. Until
                     // Recently Played lands, every real shelf must retain its

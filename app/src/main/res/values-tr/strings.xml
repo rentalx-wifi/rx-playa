@@ -31,6 +31,10 @@
     <string name="save">Kaydet</string>
     <string name="close">Kapat</string>
     <string name="back">Geri</string>
+    <string name="flashmusic_address">Sunucu adresi</string>
+    <string name="flashmusic_url_description">FlashMusic sunucunun adresi: çalıştığı makine ve dinlediği bağlantı noktası.</string>
+    <string name="flashmusic_cross_match">Diğer platformlardaki parçaları işaretle</string>
+    <string name="flashmusic_cross_match_subtitle">Sunucunda zaten olan satırlara FM rozeti ekler</string>
     <string name="settings">Ayarlar</string>
     <string name="search">Ara</string>
     <string name="clear_search">Aramayı temizle</string>
@@ -223,6 +227,10 @@
     <string name="switch_to_list_view">Liste görünümüne geç</string>
     <string name="audio_quality">Ses kalitesi</string>
     <string name="playback">Oynatma</string>
+    <string name="playback_speed">Oynatma hızı</string>
+    <string name="keep_pitch">Tonu koru</string>
+    <string name="keep_pitch_subtitle">Kapalı: ses hızla birlikte düşer — slowed ve sped up sürümler</string>
+    <string name="keep_pitch_off">ton hızı takip eder</string>
     <string name="appearance">Görünüm</string>
     <string name="storage">Depolama</string>
     <string name="your_data">Verileriniz</string>
@@ -1570,6 +1578,9 @@
     <string name="update_beta_note">Test sürümü. Bir şeyler bozulabilir.</string>
     <string name="soundcloud_token_title">SoundCloud belirteci</string>
     <string name="soundcloud_token_hint">Bir SoundCloud istemcisinden OAuth erişim belirtecini yapıştır. Kaydedilmeden önce denetlenir.</string>
+    <string name="soundcloud_token_help">Hesap olmadan herkese açık çalma listeleri ve beğeniler çalışır. Token — bir SoundCloud istemcisinde «Authorization: OAuth» sonrasındaki uzun harf, rakam ve tire dizisi — özel listelerini de açar.</string>
+    <string name="soundcloud_token_placeholder">2-123456-…</string>
+    <string name="soundcloud_token_not_a_token">Bu bir erişim belirteci değil: bağlantı, çerez ya da JSON parçasına benziyor.</string>
     <string name="google_cookie_help_title">How to get the cookie</string>
     <string name="google_cookie_help_body">1. Open music.youtube.com in a browser on a computer and sign in.
 2. Press F12, open the Network tab and reload the page.
@@ -1583,4 +1594,14 @@
     <string name="search_sources_unavailable">No answer from: %1$s</string>
     <string name="search_source_vk" translatable="false">VK Music</string>
     <string name="google_open_browser_action">Open in browser</string>
+    <string name="playlist_local_only_note">Bu parça YouTube’dan değil; bu yüzden bu cihazdaki bir çalma listesine gider.</string>
+    <string name="show_less">Daha az göster</string>
+    <string name="download_folder">İndirme klasörü</string>
+    <string name="download_folder_usage">%1$s kullanılıyor</string>
+    <string name="download_folder_app_storage">Bu uygulamanın kendi depolaması</string>
+    <string name="download_folder_unwritable">Bu klasöre yazılamıyor. Başka bir klasör seç.</string>
+    <string name="download_folder_lost">Klasör kayboldu — indirmeler uygulamanın kendi depolamasına dönüyor.</string>
+    <string name="download_folder_existing_note">Daha önce indirilen parçalar olduğu yerde kalır.</string>
+    <string name="download_folder_reset">Varsayılan klasörü kullan</string>
+    <string name="download_folder_reset_subtitle">Bu uygulamanın depolamasına dön</string>
 </resources>

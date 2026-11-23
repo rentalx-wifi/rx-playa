@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The app ships with its own music server, and that server is a plain HTTP host
+  on the local network: HTTPS there would mean certificates the listener has to
+  install on the phone before any music plays.
+
+  Cleartext is therefore permitted, but nothing is downgraded by it: every
+  platform this app talks to (YouTube Music, JioSaavn, addons, SoundCloud) is
+  addressed over https in code, and a server the listener typed in Sources is
+  theirs to secure or not. Blocking it globally is what stopped the bundled
+  server answering at all — "CLEARTEXT communication not permitted".
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

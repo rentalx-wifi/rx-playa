@@ -62,6 +62,22 @@ import com.music.bitchord.data.model.artworkAt
 import com.music.bitchord.ui.theme.ArtworkPalette
 
 /**
+ * One row of the reorder page: the song, plus a key of its own.
+ *
+ * The key is the playlist position at the moment the page opened, which is the
+ * only identity that is unique even when the same song is in the playlist
+ * twice — [Song.setVideoId] is null for anything not read off a YouTube
+ * playlist, and [Song.videoId] repeats on a deliberate duplicate. Two rows with
+ * one key is LazyColumn's own crash, and it was reported as "падает при
+ * прокрутке".
+ */
+internal data class ReorderEntry(val key: String, val song: Song)
+
+internal fun List<Song>.asReorderEntries(): List<ReorderEntry> = mapIndexed { index, song ->
+    ReorderEntry("${song.setVideoId ?: song.videoId}#$index", song)
+}
+
+/**
  * Rearranges one of the account's playlists: every entry with a handle to drag
  * it by, and nothing sent until Save.
  *
@@ -90,9 +106,12 @@ fun ReorderPlaylistPage(
     contentPadding: PaddingValues = PaddingValues(),
 ) {
     BackHandler(onBack = onClose)
-    val original = (entries as? UiState.Success)?.data.orEmpty()
-    val order = remember(original) { mutableStateListOf<Song>().apply { addAll(original) } }
-    val changed = order.map { it.setVideoId } != original.map { it.setVideoId }
+    val original = remember(entries) { (entries as? UiState.Success)?.data.orEmpty().asReorderEntries() }
+    val order = remember(original) { mutableStateListOf<ReorderEntry>().apply { addAll(original) } }
+    // By the row's own key, not by setVideoId: a playlist imported from a file,
+    // or one this app built itself, has no setVideoId at all, so every position
+    // compared equal and Save stayed dead through any amount of dragging.
+    val changed = order.map { it.key } != original.map { it.key }
 
     Column(modifier.fillMaxSize().padding(top = topBarContentPadding())) {
         Row(
@@ -124,7 +143,7 @@ fun ReorderPlaylistPage(
             }
             // The page's filled pill — white with dark text, as its Play is.
             Button(
-                onClick = { onSave(order.toList()) },
+                onClick = { onSave(order.map { it.song }) },
                 enabled = changed && !saving,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color.White,
@@ -184,7 +203,7 @@ fun ReorderPlaylistPage(
  */
 @Composable
 private fun ReorderableSongList(
-    order: MutableList<Song>,
+    order: MutableList<ReorderEntry>,
     enabled: Boolean,
     palette: ArtworkPalette,
     contentPadding: PaddingValues,
@@ -255,8 +274,9 @@ private fun ReorderableSongList(
     }
 
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = contentPadding) {
-        itemsIndexed(order, key = { _, song -> song.setVideoId ?: song.videoId }) { _, song ->
-            val key = song.setVideoId ?: song.videoId
+        itemsIndexed(order, key = { _, entry -> entry.key }) { _, entry ->
+            val song = entry.song
+            val key = entry.key
             val dragging = held == key
             val start: () -> Unit = {
                 held = key

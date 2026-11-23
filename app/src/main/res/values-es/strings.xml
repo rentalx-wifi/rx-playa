@@ -32,6 +32,10 @@
     <string name="save">Guardar</string>
     <string name="close">Cerrar</string>
     <string name="back">Volver</string>
+    <string name="flashmusic_address">Dirección del servidor</string>
+    <string name="flashmusic_url_description">La dirección de tu servidor FlashMusic: la máquina que lo ejecuta y el puerto en el que escucha.</string>
+    <string name="flashmusic_cross_match">Marcar temas de otras plataformas</string>
+    <string name="flashmusic_cross_match_subtitle">Añade la insignia FM a las filas que tu servidor ya tiene</string>
     <string name="settings">Ajustes</string>
     <string name="search">Buscar</string>
     <string name="clear_search">Borrar búsqueda</string>
@@ -211,6 +215,10 @@
     <string name="switch_to_list_view">Cambiar a vista de lista</string>
     <string name="audio_quality">Calidad de audio</string>
     <string name="playback">Reproducción</string>
+    <string name="playback_speed">Velocidad de reproducción</string>
+    <string name="keep_pitch">Mantener el tono</string>
+    <string name="keep_pitch_subtitle">Desactivado: la voz baja con el tempo — versiones ralentizadas y aceleradas</string>
+    <string name="keep_pitch_off">el tono sigue la velocidad</string>
     <string name="appearance">Apariencia</string>
     <string name="storage">Almacenamiento</string>
     <string name="your_data">Tus datos</string>
@@ -1586,6 +1594,9 @@
     <string name="update_beta_note">Versión de prueba. Algo puede fallar.</string>
     <string name="soundcloud_token_title">Token de SoundCloud</string>
     <string name="soundcloud_token_hint">Pega un token de acceso OAuth de un cliente de SoundCloud. Se comprueba antes de guardarlo.</string>
+    <string name="soundcloud_token_help">Sin cuenta hay listas públicas y me gusta. El token —la larga cadena de letras, cifras y guiones tras «Authorization: OAuth» en un cliente de SoundCloud— también abre tus listas privadas.</string>
+    <string name="soundcloud_token_placeholder">2-123456-…</string>
+    <string name="soundcloud_token_not_a_token">Eso no es un token de acceso: parece un enlace, una cookie o un fragmento de JSON.</string>
     <string name="google_cookie_help_title">How to get the cookie</string>
     <string name="google_cookie_help_body">1. Open music.youtube.com in a browser on a computer and sign in.
 2. Press F12, open the Network tab and reload the page.
@@ -1599,4 +1610,14 @@
     <string name="search_sources_unavailable">No answer from: %1$s</string>
     <string name="search_source_vk" translatable="false">VK Music</string>
     <string name="google_open_browser_action">Open in browser</string>
+    <string name="playlist_local_only_note">Esta pista no es de YouTube, así que va a una lista en este dispositivo.</string>
+    <string name="show_less">Mostrar menos</string>
+    <string name="download_folder">Carpeta de descargas</string>
+    <string name="download_folder_usage">%1$s ocupados</string>
+    <string name="download_folder_app_storage">Almacenamiento de esta aplicación</string>
+    <string name="download_folder_unwritable">No se puede escribir en esta carpeta. Elige otra.</string>
+    <string name="download_folder_lost">La carpeta desapareció: las descargas vuelven al almacenamiento de la aplicación.</string>
+    <string name="download_folder_existing_note">Las pistas descargadas antes se quedan donde están.</string>
+    <string name="download_folder_reset">Usar la carpeta predeterminada</string>
+    <string name="download_folder_reset_subtitle">Volver al almacenamiento de esta aplicación</string>
 </resources>

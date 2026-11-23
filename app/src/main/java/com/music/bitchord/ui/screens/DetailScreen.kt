@@ -437,6 +437,9 @@ fun DetailScreen(
     // on an album that was closed and reopened would be a page that appears to
     // have lost most of its tracks.
     var query by rememberSaveable(page.browseId) { mutableStateOf("") }
+    // Artist pages open on the twenty-row "Top songs" carousel; the whole
+    // loaded list is one tap away (issue #41).
+    var allSongsShown by rememberSaveable(page.browseId) { mutableStateOf(false) }
     // Whether the field still owes the keyboard an appearance. Held here rather
     // than in the field, which is a row in a lazy list: scrolled out of sight it
     // is disposed, and a field that asks for focus every time it is composed
@@ -712,40 +715,80 @@ fun DetailScreen(
                         onSongSwipe = onSongSwipe,
                     )
                 } else if (isArtist) {
-                    // An artist's full song list would bury the album shelves, so
-                    // it pages sideways four at a time and stops at twenty.
-                    item {
-                        val top = state.data.take(MAX_ARTIST_SONGS)
+                    // Top songs pages sideways and stops at twenty so the album
+                    // shelves keep the page: that is the first screen, not the
+                    // whole discography. "Show all" turns the same rows into a
+                    // plain list of everything the page loaded (issue #41).
+                    item(key = "artist-songs") {
+                        val top = if (allSongsShown) state.data else state.data.take(MAX_ARTIST_SONGS)
                         val isCurrentRow = playingRowMatcher(top, currentSong)
                         SectionHeading(
                             title = stringResource(R.string.top_songs),
                             palette = palette,
+                            onShowAll = if (state.data.size > MAX_ARTIST_SONGS) {
+                                { allSongsShown = !allSongsShown }
+                            } else {
+                                null
+                            },
+                            actionLabel = stringResource(
+                                if (allSongsShown) R.string.show_less else R.string.show_all,
+                            ),
                             horizontalPadding = ARTIST_CONTENT_GUTTER,
                         )
-                        BoxWithConstraints {
-                            val columnWidth = trackColumnWidth(maxWidth)
-                            val topSongsState = rememberLazyListState()
-                            LazyRow(
-                                state = topSongsState,
-                                contentPadding = PaddingValues(horizontal = ARTIST_CONTENT_GUTTER),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                flingBehavior = rememberSnapFlingBehavior(lazyListState = topSongsState),
-                            ) {
-                                items(top.chunked(SONGS_PER_COLUMN)) { column ->
-                                    Column(Modifier.width(columnWidth)) {
-                                        column.forEach { song ->
-                                            CompactSongRow(
-                                                song = song,
-                                                palette = palette,
-                                                onClick = { onSongClick(top, top.indexOf(song)) },
-                                                onLongPress = { onSongLongPress(song) },
-                                                downloadedTint = downloadedTint,
-                                                isCurrent = isCurrentRow(song),
-                                                isPlaying = isCurrentRow(song) && isPlaying,
-                                            )
+                        if (!allSongsShown) {
+                            BoxWithConstraints {
+                                val columnWidth = trackColumnWidth(maxWidth)
+                                val topSongsState = rememberLazyListState()
+                                LazyRow(
+                                    state = topSongsState,
+                                    contentPadding = PaddingValues(horizontal = ARTIST_CONTENT_GUTTER),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    flingBehavior = rememberSnapFlingBehavior(lazyListState = topSongsState),
+                                ) {
+                                    items(top.chunked(SONGS_PER_COLUMN)) { column ->
+                                        Column(Modifier.width(columnWidth)) {
+                                            column.forEach { song ->
+                                                CompactSongRow(
+                                                    song = song,
+                                                    palette = palette,
+                                                    onClick = { onSongClick(top, top.indexOf(song)) },
+                                                    onLongPress = { onSongLongPress(song) },
+                                                    downloadedTint = downloadedTint,
+                                                    isCurrent = isCurrentRow(song),
+                                                    isPlaying = isCurrentRow(song) && isPlaying,
+                                                )
+                                            }
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+                    if (allSongsShown) {
+                        itemsIndexed(
+                            items = state.data,
+                            key = { position, song -> "artist_all_${position}_${song.videoId}" },
+                        ) { position, song ->
+                            val isCurrent = playingRowMatcher(listOf(song), currentSong)(song)
+                            SongRow(
+                                song = song,
+                                onClick = { onSongClick(state.data, position) },
+                                onLongPress = { onSongLongPress(song) },
+                                onSwipeToQueue = { onSongSwipe(song) },
+                                rowBackground = Color.Transparent,
+                                subtitleColor = palette.onBackgroundVariant,
+                                downloadedTint = downloadedTint,
+                                isCurrent = isCurrent,
+                                isPlaying = isCurrent && isPlaying,
+                                activeTint = palette.accent,
+                                searchPlayingStyle = true,
+                            )
+                            if (position < state.data.lastIndex) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(start = ROW_DIVIDER_INSET),
+                                    thickness = 0.5.dp,
+                                    color = palette.onBackgroundVariant.copy(alpha = 0.15f),
+                                )
                             }
                         }
                     }
@@ -1969,6 +2012,7 @@ private fun SectionHeading(
     title: String,
     palette: ArtworkPalette,
     onShowAll: (() -> Unit)? = null,
+    actionLabel: String? = null,
     horizontalPadding: Dp = PAGE_GUTTER,
 ) {
     Row(
@@ -1991,7 +2035,7 @@ private fun SectionHeading(
         )
         if (onShowAll != null) {
             Text(
-                text = stringResource(R.string.show_all),
+                text = actionLabel ?: stringResource(R.string.show_all),
                 style = MaterialTheme.typography.titleSmall,
                 color = palette.accent,
                 modifier = Modifier

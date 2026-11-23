@@ -150,10 +150,34 @@ class DiscordRPC(
         /** Discord draws the sleeve at roughly 96dp; 480px covers it on any density. */
         private const val ART_PX = 480
 
-        fun watchUrl(song: Song): String =
+        /**
+         * Where the card's button sends whoever taps it.
+         *
+         * A SoundCloud row has a page of its own and links there. Anything else
+         * without a YouTube video id — a SoundCloud row that came back without
+         * a permalink, a track on the listener's own server — used to get
+         * `music.youtube.com/watch?v=soundcloud:tracks:123`, which is a dead
+         * link with somebody else's id in it. A search for the recording is the
+         * honest answer: it opens, and it finds the song.
+         */
+        fun watchUrl(song: Song): String {
             song.playbackSourceId
                 ?.takeIf { song.playbackSource == "SoundCloud" && it.startsWith("https://") }
-                ?: "https://music.youtube.com/watch?v=${song.videoId}"
+                ?.let { return it }
+            return if (isYouTubeVideoId(song.videoId)) {
+                "https://music.youtube.com/watch?v=${song.videoId}"
+            } else {
+                // URLEncoder rather than android.net.Uri: a plain JVM test gets
+                // null back from any framework call, and this is a string.
+                "https://music.youtube.com/search?q=" +
+                    java.net.URLEncoder.encode("${song.artist} ${song.title}".trim(), "UTF-8")
+                        .replace("+", "%20")
+            }
+        }
+
+        /** Eleven characters of URL-safe alphabet: what YouTube gives every video. */
+        private fun isYouTubeVideoId(id: String): Boolean =
+            id.length == 11 && id.all { it.isLetterOrDigit() || it == '-' || it == '_' }
 
         /**
          * Resolves template variables in text.

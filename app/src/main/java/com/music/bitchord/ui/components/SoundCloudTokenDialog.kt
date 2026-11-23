@@ -30,6 +30,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /**
+ * What a pasted SoundCloud token can look like. Everything else — a URL, a
+ * cookie, a fragment of JSON — is refused before a request is made.
+ */
+private val TOKEN_SHAPE = Regex("^[A-Za-z0-9._~-]{16,}$")
+
+/**
  * Connect SoundCloud with an OAuth token from another client.
  *
  * Shown where the official flow cannot run — it needs the broker's client
@@ -50,12 +56,23 @@ fun SoundCloudTokenDialog(
     var error by remember { mutableStateOf<String?>(null) }
 
     fun connect() {
-        if (working || token.isBlank()) return
+        if (working) return
+        val candidate = token.trim()
+        if (candidate.isEmpty()) return
+        // A token is one long run of letters, digits and dashes. A colon, a
+        // percent sign, quotes or braces mean a URL, a cookie or a piece of a
+        // JSON reply was pasted instead — and SoundCloud would answer that with
+        // a session error, which is exactly the unhelpful answer this dialog
+        // used to give (issue #48). Say what is wrong here, without a request.
+        if (!TOKEN_SHAPE.matches(candidate)) {
+            error = context.getString(R.string.soundcloud_token_not_a_token)
+            return
+        }
         working = true
         error = null
         scope.launch {
             try {
-                SoundCloudOAuth.signInWithToken(token)
+                SoundCloudOAuth.signInWithToken(candidate)
                 onConnected()
                 onDismiss()
             } catch (cancelled: CancellationException) {
@@ -80,37 +97,42 @@ fun SoundCloudTokenDialog(
             )
             Text(
                 text = error ?: stringResource(R.string.soundcloud_token_hint),
-                modifier = Modifier.padding(top = 4.dp, bottom = if (error != null) 4.dp else 12.dp),
+                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp),
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 17.sp),
-                color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
             )
-            // The reason a session did not work is not an instruction: the sheet
-            // used to replace the one line explaining what a token is with the
-            // complaint that the old one expired, leaving nothing to act on
-            // (issue #48). Both are shown now.
-            if (error != null) {
-                Text(
-                    text = stringResource(R.string.soundcloud_token_hint),
-                    modifier = Modifier.padding(bottom = 12.dp),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 17.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-            }
+            // Where a token comes from, spelled out: the dialog used to name a
+            // "SoundCloud client" and leave the rest to imagination (issue #48).
+            Text(
+                text = stringResource(R.string.soundcloud_token_help),
+                modifier = Modifier.padding(bottom = 12.dp),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 18.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
             PillTextField(
                 value = token,
                 onValueChange = {
                     token = it
                     error = null
                 },
-                placeholder = stringResource(R.string.google_cookie_import_hint),
+                placeholder = stringResource(R.string.soundcloud_token_placeholder),
                 enabled = !working,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Done,
                 ),
             )
+            if (error != null) {
+                Text(
+                    text = error ?: "",
+                    modifier = Modifier.padding(top = 8.dp),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 17.sp),
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
         AlertRule()
         AlertAction(

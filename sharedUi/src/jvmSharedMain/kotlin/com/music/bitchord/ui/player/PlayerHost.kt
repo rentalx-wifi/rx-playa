@@ -246,6 +246,10 @@ interface PlayerSettingsSource {
     val lyricsOffsetMs: StateFlow<Int>
     val lyricsSourceOrder: StateFlow<List<LyricsSource>>
     val meteredConnection: StateFlow<Boolean?>
+    /** Whether the pitch stays put when [playbackSpeed] changes. */
+    val pitchCorrection: StateFlow<Boolean>
+    /** The listener's own speed, 1 for unmodified. */
+    val playbackSpeed: StateFlow<Float>
     /** A temporary cap over both ceilings, null when none applies — the watch's, on the phone. */
     val streamCeilingOverride: StateFlow<AudioQuality?>
     val preferUsbDac: StateFlow<Boolean>
@@ -279,6 +283,8 @@ interface PlayerSettingsSource {
 
     fun setLastPlayerScreen(value: LastPlayerScreen)
     fun setLyricsOffsetMs(value: Int)
+    fun setPitchCorrection(value: Boolean)
+    fun setPlaybackSpeed(value: Float)
 }
 
 /** The player's name for the installed host's settings, read where AppSettings used to be. */

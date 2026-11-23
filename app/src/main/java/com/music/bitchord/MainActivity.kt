@@ -160,6 +160,7 @@ import com.music.bitchord.data.model.SearchFilter
 import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.model.isYouTubeTrack
 import com.music.bitchord.data.model.isUnresolvedSpotify
 import com.music.bitchord.data.model.UiState
 import com.music.bitchord.data.model.UserPlaylist
@@ -811,7 +812,6 @@ private fun BitChordApp(
     // background at all. Hosting it here also puts the scrim over the tab bar
     // and the mini player, like every other alert in the app.
     var editingSource by remember { mutableStateOf<SourceConfig?>(null) }
-    var confirmJioSaavn by remember { mutableStateOf(false) }
     var confirmBitPerfect by remember { mutableStateOf<BitPerfectMode?>(null) }
     var confirmFixedVolume by remember { mutableStateOf(false) }
     /** An addon search row tapped while the quality setting skips its addon; see [AddonBlockedAlert]. */
@@ -3600,7 +3600,6 @@ private fun BitChordApp(
                                 onEditSource = { editingSource = it },
                                 onEditWebDav = { showWebDavEditor = true },
                                 onEditSmb = { showSmbEditor = true },
-                                onConfirmJioSaavn = { confirmJioSaavn = true },
                             )
                         } else if (pageRoute == AppRoute.Downloads) {
                             DownloadManagerPage(
@@ -5686,11 +5685,21 @@ private fun BitChordApp(
                         thumbnailUrl = local.songs.firstOrNull()?.thumbnailUrl,
                     )
                 }
+                // A track from another catalogue can only live in a playlist
+                // this device keeps: YouTube would take the id, accept it, and
+                // never show the row (issue #59). Offer what actually works
+                // rather than a tick that does nothing.
+                val foreignTrack = target != null && !target.isYouTubeTrack
                 PlaylistPickerSheet(
-                    playlists = sheetPlaylists,
+                    playlists = if (foreignTrack) {
+                        sheetPlaylists.filter {
+                            it.playlistId.startsWith("sp_local_") || it.browseId.startsWith("local:playlist:")
+                        }
+                    } else sheetPlaylists,
                     loading = playlistsLoading,
                     song = target,
-                    localTarget = !signedIn,
+                    localOnly = foreignTrack,
+                    localTarget = !signedIn || foreignTrack,
                     onDelete = { viewModel.deletePlaylist(it) },
                     startCreating = target == null,
                     onDismiss = dismiss,
@@ -6907,22 +6916,6 @@ private fun BitChordApp(
                         editingSource = null
                     },
                     scope = scope,
-                )
-            }
-
-            if (confirmJioSaavn) {
-                ConfirmationAlert(
-                    hazeState = hazeState,
-                    title = stringResource(R.string.enable_jiosaavn),
-                    description = stringResource(R.string.jiosaavn_mismatch_warning),
-                    confirmLabel = stringResource(R.string.enable_anyway),
-                    onConfirm = {
-                        SourceRegistry.configs.value
-                            .firstOrNull { it.kind == SourceKind.JIOSAAVN }
-                            ?.let { SourceRegistry.setEnabled(it.id, true) }
-                        confirmJioSaavn = false
-                    },
-                    onDismiss = { confirmJioSaavn = false },
                 )
             }
 

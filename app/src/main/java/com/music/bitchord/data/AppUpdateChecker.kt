@@ -71,11 +71,22 @@ object AppUpdateChecker {
      * a test build is visible while it is still a pre-release and the stable
      * one replaces it the moment it is published.
      */
-    private const val RELEASES_LATEST =
-        "https://api.github.com/repos/rentalx-wifi/rx-playa/releases/latest"
+    /**
+     * Where the releases live, newest location first.
+     *
+     * The project moved from a personal account to the `rx-playa-team`
+     * organisation, and an installed phone cannot be told about that: it keeps
+     * asking the address it was built with. Both are tried, so a build made
+     * before the move still finds the new releases and one made after it still
+     * works if the old repository is what answers.
+     */
+    private val RELEASE_HOSTS = listOf(
+        "https://api.github.com/repos/rx-playa-team/rx-playa",
+        "https://api.github.com/repos/rentalx-wifi/rx-playa",
+    )
 
-    private const val RELEASES_ALL =
-        "https://api.github.com/repos/rentalx-wifi/rx-playa/releases?per_page=20"
+    private const val LATEST_PATH = "/releases/latest"
+    private const val LIST_PATH = "/releases?per_page=20"
 
     /**
      * Asks GitHub for the latest release of this fork and offers it when its
@@ -101,12 +112,15 @@ object AppUpdateChecker {
         if (!force && now - last < CHECK_INTERVAL_MS) return
         val json = runCatching {
             withContext(Dispatchers.IO) {
-                val request = Request.Builder()
-                    .url(if (beta) RELEASES_ALL else RELEASES_LATEST)
-                    .header("Accept", "application/vnd.github+json")
-                    .build()
-                Http.client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) null else response.body?.string()
+                val path = if (beta) LIST_PATH else LATEST_PATH
+                RELEASE_HOSTS.firstNotNullOfOrNull { host ->
+                    val request = Request.Builder()
+                        .url(host + path)
+                        .header("Accept", "application/vnd.github+json")
+                        .build()
+                    Http.client.newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) null else response.body?.string()
+                    }
                 }
             }
         }.getOrNull() ?: return
@@ -127,6 +141,17 @@ object AppUpdateChecker {
         prefs?.edit()?.putLong(KEY_LAST_CHECK, now)?.apply()
         val tag = release.optString("tag_name").ifBlank { return }
         if (tag == dismissedTag) return
+        // Rolling releases are named for their channel, not for a version:
+        // "beta" and "stable" say nothing about which build is inside. The
+        // version is the first real one among the title, the tag and the asset
+        // names (issue #38).
+        val version = releaseVersion(
+            title = release.optString("name"),
+            tag = tag,
+            assetNames = release.optJSONArray("assets").let { assets ->
+                (0 until (assets?.length() ?: 0)).mapNotNull { assets?.optJSONObject(it)?.optString("name") }
+            },
+        )
         // A release may state the versionCode it was built with, which is the
         // only number that decides whether Android will install it. Two betas
         // of one feature share an ordinal (v46b1, v46b2), so the tag alone is
@@ -134,7 +159,7 @@ object AppUpdateChecker {
         val publishedCode = versionCodeIn(release.optString("body"))
         if (publishedCode != null) {
             if (publishedCode <= BuildConfig.VERSION_CODE) return
-        } else if (versionOrdinal(tag) <= versionOrdinal(BuildConfig.VERSION_NAME)) {
+        } else if (version == null || compareVersions(version, BuildConfig.VERSION_NAME) <= 0) {
             return
         }
 
@@ -251,6 +276,62 @@ object AppUpdateChecker {
      * one: that is a stable build of the base version, and any tagged revision
      * is newer than it.
      */
+/**
+     * The version a release actually carries.
+     *
+     * A tag is the first guess, but rolling releases are tagged with the channel
+     * name, and an organisation may name the release differently again. The
+     * first candidate that looks like a version wins; null when none does, which
+     * is the honest answer for a release nobody labelled.
+     */
+    internal fun releaseVersion(title: String?, tag: String?, assetNames: List<String>): String? =
+        (listOfNotNull(title, tag) + assetNames).firstNotNullOfOrNull { versionToken(it) }
+
+    /**
+     * The version-shaped run inside [text], without the words around it.
+     *
+     * "RX Playa v1.9.4" and "rxplaya-v1.9.4-universal.apk" both carry a version
+     * and neither *is* one; the comparison needs the run itself.
+     */
+    internal fun versionToken(text: String): String? =
+        Regex("""v\d+(?:\.\d+)*(?:b\d+)?""", RegexOption.IGNORE_CASE).findAll(text).lastOrNull()?.value
+            ?: Regex("""beta\d+""", RegexOption.IGNORE_CASE).find(text)?.value
+
+    /**
+     * Which of two versions is newer: -1, 0 or 1.
+     *
+     * Two shapes live in this project. Test builds are numbered `v<ordinal>b<n>`
+     * and compare as one integer (see [versionOrdinal]); published versions are
+     * dotted like `1.9.4`, where "1.10" is newer than "1.9" and an integer
+     * comparison of the leading `v1` would call them equal. Dotted versions are
+     * therefore compared component by component, and anything else falls back to
+     * the ordinal.
+     */
+    internal fun compareVersions(a: String, b: String): Int {
+        val left = versionToken(a) ?: a
+        val right = versionToken(b) ?: b
+        val leftParts = dottedParts(left)
+        val rightParts = dottedParts(right)
+        if (leftParts != null && rightParts != null) {
+            for (index in 0 until maxOf(leftParts.size, rightParts.size)) {
+                val one = leftParts.getOrElse(index) { 0 }
+                val two = rightParts.getOrElse(index) { 0 }
+                if (one != two) return if (one > two) 1 else -1
+            }
+            return 0
+        }
+        return versionOrdinal(left).compareTo(versionOrdinal(right))
+    }
+
+    /** "v1.9.4"/"1.9.4" as numbers, or null when the string is not dotted. */
+    private fun dottedParts(version: String): List<Int>? {
+        val body = version.removePrefix("v").removePrefix("V")
+        if (!body.contains('.')) return null
+        val numbers = body.substringBefore('b').split('.')
+        val parsed = numbers.map { it.toIntOrNull() ?: return null }
+        return parsed.ifEmpty { null }
+    }
+
     internal fun versionOrdinal(name: String): Int {
         val trimmed = name.trim()
         val revision = Regex("""v(\d+)(?:b(\d+))?""", RegexOption.IGNORE_CASE)

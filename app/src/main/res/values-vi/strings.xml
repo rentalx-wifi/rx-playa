@@ -31,6 +31,10 @@
     <string name="save">Lưu</string>
     <string name="close">Đóng</string>
     <string name="back">Quay lại</string>
+    <string name="flashmusic_address">Địa chỉ máy chủ</string>
+    <string name="flashmusic_url_description">Địa chỉ máy chủ FlashMusic của bạn: máy đang chạy nó và cổng nó lắng nghe.</string>
+    <string name="flashmusic_cross_match">Đánh dấu bài từ nền tảng khác</string>
+    <string name="flashmusic_cross_match_subtitle">Thêm nhãn FM cho các dòng máy chủ của bạn đã có</string>
     <string name="settings">Cài đặt</string>
     <string name="search">Tìm kiếm</string>
     <string name="clear_search">Xóa tìm kiếm</string>
@@ -227,6 +231,10 @@
     <string name="switch_to_list_view">Chuyển sang dạng danh sách</string>
     <string name="audio_quality">Chất lượng âm thanh</string>
     <string name="playback">Phát nhạc</string>
+    <string name="playback_speed">Tốc độ phát</string>
+    <string name="keep_pitch">Giữ cao độ</string>
+    <string name="keep_pitch_subtitle">Tắt: giọng trầm xuống theo nhịp — bản slowed và sped up</string>
+    <string name="keep_pitch_off">cao độ theo tốc độ</string>
     <string name="appearance">Giao diện</string>
     <string name="storage">Bộ nhớ</string>
     <string name="your_data">Dữ liệu của bạn</string>
@@ -1530,6 +1538,9 @@
     <string name="update_beta_note">Bản thử. Có thể có thứ bị lỗi.</string>
     <string name="soundcloud_token_title">Token SoundCloud</string>
     <string name="soundcloud_token_hint">Dán token truy cập OAuth từ ứng dụng SoundCloud. Token được kiểm tra trước khi lưu.</string>
+    <string name="soundcloud_token_help">Không cần tài khoản vẫn có playlist công khai và lượt thích. Token — chuỗi dài chữ, số và dấu gạch nối sau «Authorization: OAuth» trong một ứng dụng SoundCloud — còn mở được bộ sưu tập riêng của bạn.</string>
+    <string name="soundcloud_token_placeholder">2-123456-…</string>
+    <string name="soundcloud_token_not_a_token">Đây không phải token truy cập: trông giống liên kết, cookie hoặc một đoạn JSON.</string>
     <string name="google_cookie_help_title">How to get the cookie</string>
     <string name="google_cookie_help_body">1. Open music.youtube.com in a browser on a computer and sign in.
 2. Press F12, open the Network tab and reload the page.
@@ -1543,4 +1554,14 @@
     <string name="search_sources_unavailable">No answer from: %1$s</string>
     <string name="search_source_vk" translatable="false">VK Music</string>
     <string name="google_open_browser_action">Open in browser</string>
+    <string name="playlist_local_only_note">Bài này không phải từ YouTube nên sẽ vào playlist trên máy này.</string>
+    <string name="show_less">Thu gọn</string>
+    <string name="download_folder">Thư mục tải xuống</string>
+    <string name="download_folder_usage">đã dùng %1$s</string>
+    <string name="download_folder_app_storage">Bộ nhớ của ứng dụng này</string>
+    <string name="download_folder_unwritable">Không ghi được vào thư mục này. Hãy chọn thư mục khác.</string>
+    <string name="download_folder_lost">Thư mục đã mất — tải xuống quay lại bộ nhớ của ứng dụng.</string>
+    <string name="download_folder_existing_note">Các bản nhạc đã tải trước đó vẫn ở nguyên chỗ.</string>
+    <string name="download_folder_reset">Dùng thư mục mặc định</string>
+    <string name="download_folder_reset_subtitle">Quay lại bộ nhớ của ứng dụng này</string>
 </resources>

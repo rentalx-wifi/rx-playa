@@ -64,6 +64,12 @@ fun VkWebLoginScreen(
                     page = this
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
+                    // VK's login opens its captcha and consent pages in a new
+                    // window; a WebView without the chrome to show one drew an
+                    // empty sheet over the page instead (issue #58).
+                    settings.setSupportMultipleWindows(false)
+                    settings.loadsImagesAutomatically = true
+                    settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
                     settings.userAgentString =
                         "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 " +
                             "(KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36"
@@ -92,6 +98,24 @@ fun VkWebLoginScreen(
                                 loading = false
                                 failed = true
                             }
+                        }
+
+                        /**
+                         * A certificate refusal cancels the load without an error
+                         * page, which is the other way this sheet went white.
+                         * Since there is no way past a bad certificate that is
+                         * worth offering, the refusal screen is the honest
+                         * answer — and its retry is what a listener needs after
+                         * switching their VPN off.
+                         */
+                        override fun onReceivedSslError(
+                            view: WebView?,
+                            handler: android.webkit.SslErrorHandler?,
+                            error: android.net.http.SslError?,
+                        ) {
+                            handler?.cancel()
+                            loading = false
+                            failed = true
                         }
 
                         override fun shouldOverrideUrlLoading(

@@ -30,6 +30,10 @@
     <string name="save">บันทึก</string>
     <string name="close">ปิด</string>
     <string name="back">กลับ</string>
+    <string name="flashmusic_address">ที่อยู่เซิร์ฟเวอร์</string>
+    <string name="flashmusic_url_description">ที่อยู่เซิร์ฟเวอร์ FlashMusic ของคุณ: เครื่องที่รันและพอร์ตที่รับฟัง</string>
+    <string name="flashmusic_cross_match">ทำเครื่องหมายเพลงจากแพลตฟอร์มอื่น</string>
+    <string name="flashmusic_cross_match_subtitle">เพิ่มป้าย FM ให้แถวที่เซิร์ฟเวอร์มีอยู่แล้ว</string>
     <string name="settings">การตั้งค่า</string>
     <string name="search">ค้นหา</string>
     <string name="clear_search">ล้างการค้นหา</string>
@@ -217,6 +221,10 @@
     <string name="switch_to_list_view">สลับเป็นมุมมองรายการ</string>
     <string name="audio_quality">คุณภาพเสียง</string>
     <string name="playback">การเล่น</string>
+    <string name="playback_speed">ความเร็วในการเล่น</string>
+    <string name="keep_pitch">คงระดับเสียง</string>
+    <string name="keep_pitch_subtitle">ปิด: เสียงจะต่ำลงตามจังหวะ — เวอร์ชัน slowed และ sped up</string>
+    <string name="keep_pitch_off">ระดับเสียงตามความเร็ว</string>
     <string name="appearance">ลักษณะที่ปรากฏ</string>
     <string name="storage">พื้นที่จัดเก็บ</string>
     <string name="your_data">ข้อมูลของคุณ</string>
@@ -1596,6 +1604,9 @@
     <string name="update_beta_note">รุ่นทดสอบ บางอย่างอาจพังได้</string>
     <string name="soundcloud_token_title">โทเคน SoundCloud</string>
     <string name="soundcloud_token_hint">วางโทเคนการเข้าถึง OAuth จากไคลเอนต์ SoundCloud ระบบจะตรวจสอบก่อนบันทึก</string>
+    <string name="soundcloud_token_help">ไม่ต้องมีบัญชีก็ใช้เพลย์ลิสต์สาธารณะและรายการที่ชอบได้ โทเคน — สายยาวของตัวอักษร ตัวเลข และขีด ที่อยู่หลัง «Authorization: OAuth» ในไคลเอนต์ SoundCloud — เปิดชุดส่วนตัวของคุณด้วย</string>
+    <string name="soundcloud_token_placeholder">2-123456-…</string>
+    <string name="soundcloud_token_not_a_token">นี่ไม่ใช่แอกเซสโทเคน: ดูเหมือนลิงก์ คุกกี้ หรือส่วนหนึ่งของ JSON</string>
     <string name="google_cookie_help_title">How to get the cookie</string>
     <string name="google_cookie_help_body">1. Open music.youtube.com in a browser on a computer and sign in.
 2. Press F12, open the Network tab and reload the page.
@@ -1609,4 +1620,14 @@
     <string name="search_sources_unavailable">No answer from: %1$s</string>
     <string name="search_source_vk" translatable="false">VK Music</string>
     <string name="google_open_browser_action">Open in browser</string>
+    <string name="playlist_local_only_note">เพลงนี้ไม่ได้มาจาก YouTube จึงจะเข้าเพลย์ลิสต์ในเครื่องนี้</string>
+    <string name="show_less">แสดงน้อยลง</string>
+    <string name="download_folder">โฟลเดอร์ดาวน์โหลด</string>
+    <string name="download_folder_usage">ใช้ไป %1$s</string>
+    <string name="download_folder_app_storage">ที่เก็บของแอปนี้</string>
+    <string name="download_folder_unwritable">เขียนลงโฟลเดอร์นี้ไม่ได้ เลือกโฟลเดอร์อื่น</string>
+    <string name="download_folder_lost">โฟลเดอร์หายไป — การดาวน์โหลดกลับไปที่ที่เก็บของแอป</string>
+    <string name="download_folder_existing_note">เพลงที่ดาวน์โหลดไว้ก่อนหน้าจะอยู่ที่เดิม</string>
+    <string name="download_folder_reset">ใช้โฟลเดอร์เริ่มต้น</string>
+    <string name="download_folder_reset_subtitle">กลับไปที่ที่เก็บของแอปนี้</string>
 </resources>

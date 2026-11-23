@@ -23,6 +23,7 @@ import com.music.bitchord.data.personalization.TasteProfiles
 import com.music.bitchord.data.personalization.TasteSignalStore
 import com.music.bitchord.data.personalization.tasteDigest
 import com.music.bitchord.data.model.HomeSource
+import com.music.bitchord.data.model.isYouTubeTrack
 import com.music.bitchord.data.AppleArtistPhotos
 import com.music.bitchord.data.model.ArtistRef
 import com.music.bitchord.data.model.TopPick
@@ -93,6 +94,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -117,6 +119,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import com.music.bitchord.data.sources.AddonSource
 import com.music.bitchord.data.sources.SourceKind
+import com.music.bitchord.data.sources.FlashMusicSource
 import com.music.bitchord.data.sources.SourceRegistry
 import com.music.bitchord.data.sources.SourceResolver
 import com.music.bitchord.data.sources.TrackMatcher
@@ -1218,6 +1221,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private enum class AddOutcome { ADDED, ALREADY_THERE, FAILED }
 
     private suspend fun addOne(playlist: UserPlaylist, song: Song): AddOutcome {
+        // A YouTube playlist can only hold YouTube video ids; sending it a
+        // SoundCloud urn used to come back "accepted" and leave the track out
+        // of the list without a word (issue #59). Never ask.
+        if (!song.isYouTubeTrack) return AddOutcome.FAILED
         val openSongs = (_detailStack.value.firstOrNull { it.browseId == playlist.browseId }
             ?.songs as? UiState.Success)?.data
         val known = openSongs
@@ -1247,7 +1254,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         // device, holds whatever is dropped into it, and moves with a backup;
         // requiring a YouTube session for a list of songs was the thing people
         // kept asking not to need.
-        if (!_signedIn.value) {
+        if (!_signedIn.value || song?.isYouTubeTrack == false) {
             val local = com.music.bitchord.data.spotify.LocalPlaylistStore
                 .savePlaylist(name, listOfNotNull(song))
             editPlaylistShelf { items ->
@@ -2094,7 +2101,26 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             }
                         }
                 } finally {
+                    // A feed that was fetched and parsed to nothing — signed
+                    // out, or a shelf shape this build does not recognise —
+                    // used to leave [home] in Loading for good: skeletons with
+                    // no request behind them. Nothing arrived and nothing is
+                    // coming, so say so instead of waiting.
+                    if (isCurrentHomeLoad(identity, generation) && _home.value is UiState.Loading) {
+                        _home.value = UiState.Success(emptyList())
+                    }
                     homeShelfRequestSettled(identity, generation)
+                    // Nothing from the platforms, but the listener's own server
+                    // is a catalogue too: put it on the page rather than an
+                    // empty state over music that plays perfectly well.
+                    if (isCurrentHomeLoad(identity, generation) &&
+                        (_home.value as? UiState.Success)?.data.isNullOrEmpty()
+                    ) {
+                        val shelf = serverShelf()
+                        if (shelf != null && isCurrentHomeLoad(identity, generation)) {
+                            _home.value = UiState.Success(listOf(shelf))
+                        }
+                    }
                 }
             }
             if (_signedIn.value) {
@@ -2223,6 +2249,38 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun homeShelfRequestSettled(identity: String?, generation: Long) {
         if (!isCurrentHomeLoad(identity, generation)) return
         _homePendingShelves.value = (_homePendingShelves.value - 1).coerceAtLeast(0)
+    }
+
+    /**
+     * A Home row built from the listener's own server, or null when there is no
+     * server, it is switched off, or its catalogue is empty.
+     *
+     * The title is the server's own name rather than a translated one: it is a
+     * proper noun, and the badge on every card already says where the tracks
+     * come from.
+     */
+    private suspend fun serverShelf(): HomeShelf? {
+        val server = SourceRegistry.active().filterIsInstance<FlashMusicSource>().firstOrNull()
+        if (server == null) return null
+        val songs = withContext(Dispatchers.IO) {
+            runCatching { server.catalogue() }.getOrDefault(emptyList())
+        }
+        if (songs.isEmpty()) return null
+        return HomeShelf(
+            title = server.displayName,
+            layout = ShelfLayout.LIST,
+            items = songs.map { song ->
+                ShelfItem(
+                    title = song.title,
+                    subtitle = song.artist,
+                    thumbnailUrl = song.thumbnailUrl,
+                    videoId = song.videoId,
+                    browseId = null,
+                    song = song,
+                    sources = setOf(HomeSource.FLASHMUSIC),
+                )
+            },
+        )
     }
 
     private fun isCurrentHomeLoad(identity: String?, generation: Long) =
@@ -2867,11 +2925,81 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 VkMusicApi.search(query, ALL_PLATFORM_PER_SOURCE)
             }
         }
+        // The sources the listener configured themselves. They speak the same
+        // protocol the player resolves through, so they belong in this list:
+        // without them a configured addon or one's own server could only ever
+        // answer a track somebody else had already found, which made the
+        // Sources screen look like a setting that did nothing.
+        val configured = async {
+            val sources = SourceRegistry.active().filter { it.kind != SourceKind.YOUTUBE }
+            val rows = sources
+                .map { source ->
+                    async {
+                        // A source the listener added is a host somewhere, not a
+                        // promise: one that is switched off or behind a router
+                        // that drops it used to hold the whole "all platforms"
+                        // list until OkHttp's own thirty-second read gave up.
+                        // Its rows are the decoration here; YouTube's are the
+                        // answer.
+                        withTimeoutOrNull(CONFIGURED_SEARCH_TIMEOUT_MS) {
+                            runCatching { source.search(query, ALL_PLATFORM_PER_SOURCE) }
+                                .onFailure { Log.w("BitChord", "${source.displayName}: search failed: ${it.message}") }
+                                .getOrDefault(emptyList())
+                        }.orEmpty()
+                    }
+                }
+                .awaitAll()
+                .flatten()
+            Log.d(
+                "BitChord",
+                "sources: ${sources.size} configured (${sources.joinToString { it.displayName }}), " +
+                    "${rows.size} rows",
+            )
+            rows
+        }
         val yandexSongs = ExternalPlaylistImporter.resolve(yandex.await()) { _, _ -> }.first
         currentCoroutineContext().ensureActive()
-        val merged = mergePlatformSearchRows(spotify.await() + soundCloud.await() + vk.await() + youtube.await() + yandexSongs)
+        val merged = mergePlatformSearchRows(
+            spotify.await() + soundCloud.await() + vk.await() + youtube.await() + yandexSongs + configured.await(),
+        )
         _unavailablePlatforms.value = failed.toSet()
-        merged
+        markOtherSources(merged)
+    }
+
+    /**
+     * Adds a badge to the rows the listener's own server also holds.
+     *
+     * Asked once per result list, not once per row: the server takes a batch and
+     * answers which of them it recognises by title and artist. A server that is
+     * not configured, or that fails, leaves every row exactly as it was — this
+     * decorates a search, it does not gate one.
+     */
+    private suspend fun markOtherSources(rows: List<Song>): List<Song> {
+        if (!AppSettings.flashMusicCrossMatch.value) return rows
+        val servers = SourceRegistry.active().filterIsInstance<FlashMusicSource>()
+        if (servers.isEmpty() || rows.isEmpty()) return rows
+
+        var out = rows
+        for (server in servers) {
+            // Decorating a list that is already drawn on screen: a server that
+            // does not answer in time leaves the row without its badge rather
+            // than the search without its results.
+            val found = runCatching {
+                withTimeoutOrNull(SERVER_MATCH_TIMEOUT_MS) { server.match(out) }
+            }
+                .onFailure { Log.w("BitChord", "${server.displayName}: match failed: ${it.message}") }
+                .getOrNull()
+                .orEmpty()
+            if (found.isEmpty()) continue
+            out = out.map { row ->
+                if (found.containsKey(row.videoId) && HomeSource.FLASHMUSIC !in row.availableIn) {
+                    row.copy(availableIn = row.availableIn + HomeSource.FLASHMUSIC)
+                } else {
+                    row
+                }
+            }
+        }
+        return out
     }
 
     /** One recording, one row; keep a real provider identity over its catalogue duplicate. */
@@ -3436,6 +3564,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private const val SOUNDCLOUD_PAGE_SIZE = 50
         private const val ALL_PLATFORM_PER_SOURCE = 8
         private const val SOUNDCLOUD_SEARCH_TIMEOUT_MS = 15_000L
+
+        /** As long as a source the listener added may hold up "all platforms". */
+        private const val CONFIGURED_SEARCH_TIMEOUT_MS = 6_000L
+
+        /** The badge pass is a decoration, so it gets far less than a search. */
+        private const val SERVER_MATCH_TIMEOUT_MS = 3_000L
 
         /** How many taste entries a recommendation shelf is scored against. */
         private const val TASTE_ARTIST_POOL = 60

@@ -24,17 +24,29 @@ class AudioQualityCeilingTest {
     }
 
     @Test
-    fun `high skips every source that can serve lossless and keeps JioSaavn`() {
-        lossless.forEach { assertFalse(it.name, AudioQuality.HIGH.permits(it)) }
+    fun `high skips the slow sources that can serve lossless and keeps the fast ones`() {
+        lossless.filterNot { it.worthPrefetching }.forEach {
+            assertFalse(it.name, AudioQuality.HIGH.permits(it))
+        }
+        lossless.filter { it.worthPrefetching }.forEach {
+            assertTrue(it.name, AudioQuality.HIGH.permits(it))
+        }
         assertTrue(AudioQuality.HIGH.permits(SourceKind.JIOSAAVN))
         assertTrue(AudioQuality.HIGH.permits(SourceKind.YOUTUBE))
+        // The listener's own server answers at 320 on this rung.
+        assertTrue(AudioQuality.HIGH.permits(SourceKind.FLASHMUSIC))
     }
 
     @Test
-    fun `medium and low leave YouTube alone`() {
+    fun `medium and low leave YouTube and the listener's own server`() {
         for (ceiling in listOf(AudioQuality.MEDIUM, AudioQuality.LOW)) {
             SourceKind.entries.forEach { kind ->
-                assertEquals("$ceiling/$kind", kind == SourceKind.YOUTUBE, ceiling.permits(kind))
+                // The own server has a 192kbps tier of its own — the cheapest
+                // stream this app can ask for — and it is a host on the
+                // listener's own network, so a data cap is no reason to send
+                // the track to YouTube instead.
+                val expected = kind == SourceKind.YOUTUBE || kind.worthPrefetching
+                assertEquals("$ceiling/$kind", expected, ceiling.permits(kind))
             }
         }
     }

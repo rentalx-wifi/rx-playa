@@ -6,6 +6,7 @@ import android.net.Uri
 import android.util.Log
 import com.music.bitchord.auth.EncryptedPrefs
 import com.music.bitchord.data.TrackLog
+import com.music.bitchord.data.model.FLASH_MUSIC_NAME
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.permits
 import com.music.bitchord.data.sources.addon.AddonClient
@@ -63,9 +64,15 @@ data class SourceConfig(
     /** What the sources screen and the player show. Never blank. */
     val displayName: String
         get() = label.ifBlank {
-            baseUrl.takeIf { it.isNotBlank() }
-                ?.let { runCatching { Uri.parse(it).host }.getOrNull() }
-                ?: kind.label
+            // A FlashMusic server has a name of its own; its host is not what a
+            // listener wants to read in the player's quality badge.
+            if (kind == SourceKind.FLASHMUSIC) {
+                FLASH_MUSIC_NAME
+            } else {
+                baseUrl.takeIf { it.isNotBlank() }
+                    ?.let { runCatching { Uri.parse(it).host }.getOrNull() }
+                    ?: kind.label
+            }
         }
 
     /** Whether this has enough filled in to be worth contacting at all. */
@@ -109,51 +116,46 @@ object SourceRegistry {
         prefs = EncryptedPrefs.open(context, "bitchord_sources", "bitchord_sources_plain")
 
         val stored = prefs.getString(KEY_SOURCES, null)?.let(::decodeStored) ?: emptyList()
-        val jioOptInMigrationDone = prefs.getBoolean(KEY_JIOSAAVN_OPT_IN_V1, false)
-        val after = sourcesForInit(stored, forceJioSaavnOff = !jioOptInMigrationDone)
+        val after = sourcesForInit(stored)
 
-        // Publish state and the migration marker in one preferences edit. If a
-        // process dies after recording the marker but before recording the
-        // disabled source, the next launch would otherwise believe the forced
-        // opt-out had already happened and silently restore the old on state.
-        publish(after, persist = false)
-        if (after != stored || !jioOptInMigrationDone) {
+        // Published whether or not anything was written back: this call is what
+        // puts the seeded list into memory, and without it the app starts with
+        // no sources at all.
+        if (after != stored) {
             prefs.edit()
                 .putString(KEY_SOURCES, json.encodeToString(ListSerializer(SourceConfig.serializer()), after))
-                .putBoolean(KEY_JIOSAAVN_OPT_IN_V1, true)
                 .apply()
         }
+        publish(after, persist = false)
     }
 
     /**
-     * Built-in seeding and one-time source migrations, kept pure for tests.
+     * Built-in seeding and source migrations, kept pure for tests.
      *
-     * [forceJioSaavnOff] is true exactly once for every install that first runs
-     * this version, including upgrades whose stored config currently says on.
-     * Once the marker is written, a user who deliberately enables JioSaavn is
-     * left enabled on subsequent launches.
+     * FlashMusic takes JioSaavn's place in this build: one catalogue the
+     * listener owns, with a lossless master behind it, instead of a third
+     * party's 320 kbps. The server is seeded with [DEFAULT_FLASHMUSIC_URL] and
+     * switched on, so a fresh install has music before anyone visits Sources.
      */
-    internal fun sourcesForInit(
-        stored: List<SourceConfig>,
-        forceJioSaavnOff: Boolean,
-    ): List<SourceConfig> {
+    internal fun sourcesForInit(stored: List<SourceConfig>): List<SourceConfig> {
         // Seeded rather than persisted-on-first-write, so a build adding a new
-        // built-in kind picks it up for existing installs too. SourceConfig's
-        // default is the policy: JioSaavn off, YouTube on.
+        // built-in kind picks it up for existing installs too.
         val seeded = stored + BUILT_IN_KINDS
             .filter { kind -> stored.none { it.kind == kind } }
-            .map { SourceConfig(kind = it) }
+            .map { kind ->
+                SourceConfig(
+                    kind = kind,
+                    baseUrl = if (kind == SourceKind.FLASHMUSIC) DEFAULT_FLASHMUSIC_URL else "",
+                )
+            }
 
-        // The retired built-in module is removed, while a custom module entered
-        // by the user is preserved.
+        // Both retired kinds go, whatever an older install stored: the built-in
+        // module index was never seeded by this fork, and JioSaavn is the source
+        // FlashMusic replaces. A custom module the user entered is kept.
         return seeded
-            .filterNot { it.kind == SourceKind.MODULE }
+            .filterNot { it.kind == SourceKind.MODULE || it.kind == SourceKind.JIOSAAVN }
             .map { config ->
-                when {
-                    config.kind == SourceKind.YOUTUBE && !config.enabled -> config.copy(enabled = true)
-                    config.kind == SourceKind.JIOSAAVN && forceJioSaavnOff -> config.copy(enabled = false)
-                    else -> config
-                }
+                if (config.kind == SourceKind.YOUTUBE && !config.enabled) config.copy(enabled = true) else config
             }
     }
 
@@ -443,6 +445,13 @@ object SourceRegistry {
                     label = existing?.label.orEmpty(),
                 ),
             )
+            is DetectedFormat.FlashMusic -> Result.success(
+                (existing ?: SourceConfig(kind = SourceKind.FLASHMUSIC)).copy(
+                    kind = SourceKind.FLASHMUSIC,
+                    baseUrl = detected.baseUrl,
+                    label = existing?.label.orEmpty(),
+                ),
+            )
             is DetectedFormat.Unsupported -> Result.failure(AddonException(detected.reason))
         }
     }
@@ -502,6 +511,7 @@ object SourceRegistry {
         SourceKind.CUSTOM_MODULE -> ModuleSource(config)
         SourceKind.MODULE -> ModuleSource(config)
         SourceKind.JIOSAAVN -> JioSaavnSource(config)
+        SourceKind.FLASHMUSIC -> FlashMusicSource(config)
         SourceKind.YOUTUBE -> YouTubeSource(config)
     }
 
@@ -546,11 +556,15 @@ object SourceRegistry {
             .build()
             .toString()
 
-    private val BUILT_IN_KINDS = listOf(SourceKind.JIOSAAVN, SourceKind.YOUTUBE)
+    private val BUILT_IN_KINDS = listOf(SourceKind.FLASHMUSIC, SourceKind.YOUTUBE)
+
+    /**
+     * Where the bundled server answers. Edit here (or on the Sources screen) to
+     * point the app at another machine.
+     */
+    const val DEFAULT_FLASHMUSIC_URL = "http://192.168.10.140:8099"
 
     private const val KEY_SOURCES = "sources"
-    /** One-shot migration: existing users must explicitly opt in again. */
-    private const val KEY_JIOSAAVN_OPT_IN_V1 = "jiosaavn_opt_in_v1"
     private const val PREFIX = "src:"
     private const val SEPARATOR = "::"
 }

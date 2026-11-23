@@ -182,6 +182,9 @@ import com.music.bitchord.data.settings.AppFont
 import com.music.bitchord.data.stats.Backup
 import com.music.bitchord.playback.AudioCache
 import com.music.bitchord.ui.player.fullBleedArtworkAvailable
+import com.music.bitchord.ui.player.SPEED_PRESETS
+import com.music.bitchord.ui.player.SPEED_PRESET_LABELS
+import com.music.bitchord.ui.player.formatSpeed as speedLabel
 import com.music.bitchord.ui.theme.NothingPanelShape
 import com.music.bitchord.ui.theme.NothingCompactShape
 import com.music.bitchord.ui.theme.nothingPanelChrome
@@ -189,6 +192,10 @@ import com.music.bitchord.ui.theme.LocalMaterial3StyleEnabled
 import com.music.bitchord.ui.theme.LocalNothingStyleEnabled
 import com.music.bitchord.ui.theme.NothingRed
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.music.bitchord.download.DownloadFolder
+import com.music.bitchord.download.Downloads
 import kotlin.math.roundToInt
 import java.util.Locale
 
@@ -291,10 +298,14 @@ fun SettingsScreen(
     val wifiOnlyDownloads by AppSettings.wifiOnlyDownloads.collectAsStateWithLifecycle()
     val offlineMode by AppSettings.offlineMode.collectAsStateWithLifecycle()
     val exportDownloads by AppSettings.exportDownloads.collectAsStateWithLifecycle()
+    val downloadTreeUri by AppSettings.downloadTreeUri.collectAsStateWithLifecycle()
+    val downloadFolderFellBack by DownloadFolder.fellBack.collectAsStateWithLifecycle()
     val syncDownloadedPlaylists by AppSettings.syncDownloadedPlaylists.collectAsStateWithLifecycle()
     val stopOnTaskRemoved by AppSettings.stopOnTaskRemoved.collectAsStateWithLifecycle()
     val hideVolumeBar by AppSettings.hideVolumeBar.collectAsStateWithLifecycle()
     val hideStatusBarInPlayer by AppSettings.hideStatusBarInPlayer.collectAsStateWithLifecycle()
+    val playbackSpeed by AppSettings.playbackSpeed.collectAsStateWithLifecycle()
+    val pitchCorrection by AppSettings.pitchCorrection.collectAsStateWithLifecycle()
     val hideSongStatus by AppSettings.hideSongStatus.collectAsStateWithLifecycle()
     val showQueueHistory by AppSettings.showQueueHistory.collectAsStateWithLifecycle()
     val swipeToPlayNext by AppSettings.swipeToPlayNext.collectAsStateWithLifecycle()
@@ -348,6 +359,22 @@ fun SettingsScreen(
     var importStatus by remember { mutableStateOf<String?>(null) }
     var confirmImport by remember { mutableStateOf(false) }
     var confirmClearSongCache by remember { mutableStateOf(false) }
+    // The folder row's own line rather than a toast: a folder that refuses
+    // writes leaves the setting as it was, and that is a sentence to be read
+    // after the picker closes, not one that leaves with it.
+    var downloadFolderStatus by remember { mutableStateOf<String?>(null) }
+    var downloadFolderUsedBytes by remember { mutableStateOf<Long?>(null) }
+    val savedDownloads by Downloads.saved.collectAsStateWithLifecycle()
+    // Every file in a picked folder is a query to a document provider, so the
+    // sum is taken off the main thread and re-taken when a download finishes —
+    // on IO a folder of a few hundred tracks is still a visible pause.
+    LaunchedEffect(downloadTreeUri, savedDownloads.size) {
+        downloadFolderUsedBytes = withContext(Dispatchers.IO) {
+            // Also where a folder that has gone away is noticed: [DownloadFolder.current]
+            // drops it and records that it did, which the row reports.
+            DownloadFolder.usageBytes(context, DownloadFolder.current(context))
+        }
+    }
     var showPerformanceWarning by remember { mutableStateOf(false) }
     var showPerformanceConfirmation by remember { mutableStateOf(false) }
     val backupScope = rememberCoroutineScope()
@@ -368,6 +395,21 @@ fun SettingsScreen(
             )
         }
         AppSettings.setLocalMusicFolderUri(folder.toString())
+    }
+
+    /**
+     * The same picker as the local music folder above, with the two differences
+     * a download folder needs: it is written to, so both halves of the grant
+     * are taken, and it is tested before it is kept — a tree that accepts the
+     * grant and then refuses the file leaves the previous destination alone
+     * instead of failing every download after it.
+     */
+    val downloadFolderPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { folder ->
+        if (folder == null) return@rememberLauncherForActivityResult
+        downloadFolderStatus = if (DownloadFolder.select(context, folder)) null
+        else context.getString(R.string.download_folder_unwritable)
     }
 
     /**
@@ -637,6 +679,59 @@ fun SettingsScreen(
                 )
             }
             val exportDownloadsTitle = stringResource(R.string.export_compatible_downloads)
+            val downloadFolderTitle = stringResource(R.string.download_folder)
+            // Where new files land, then how much is already there, then why it
+            // is not the folder that was picked — a failed pick speaks first,
+            // since it is the answer to the tap the user just made.
+            val downloadFolderPath = LocalMediaRepository.selectedFolderLabel(downloadTreeUri)
+                ?: if (exportDownloads) {
+                    DownloadFolder.defaultLabel
+                } else {
+                    stringResource(R.string.download_folder_app_storage)
+                }
+            val downloadFolderNotice = downloadFolderStatus
+                ?: if (downloadFolderFellBack) {
+                    stringResource(R.string.download_folder_lost, DownloadFolder.defaultLabel)
+                } else {
+                    null
+                }
+            val downloadFolderUsage = downloadFolderUsedBytes?.let { bytes ->
+                stringResource(R.string.download_folder_usage, formatDownloadSize(bytes))
+            }
+            row(downloadFolderTitle, "folder", "storage", "sd card", "downloads") {
+                SettingsRow(
+                    icon = SfIcons.Folder,
+                    title = downloadFolderTitle,
+                    subtitle = buildString {
+                        append(downloadFolderPath)
+                        if (downloadFolderUsage != null) append('\n').append(downloadFolderUsage)
+                        if (downloadFolderNotice != null) append('\n').append(downloadFolderNotice)
+                        // Said while a folder of the user's own is in use, which
+                        // is when switching it is a tempting way to "tidy up".
+                        if (downloadTreeUri.isNotBlank()) {
+                            append('\n').append(stringResource(R.string.download_folder_existing_note))
+                        }
+                    },
+                    onClick = { downloadFolderPicker.launch(null) },
+                )
+            }
+            if (downloadTreeUri.isNotBlank()) {
+                val downloadFolderResetTitle = stringResource(R.string.download_folder_reset)
+                row(downloadFolderResetTitle, "default", "folder", "music") {
+                    SettingsRow(
+                        icon = SfIcons.LibraryMusic,
+                        title = downloadFolderResetTitle,
+                        subtitle = stringResource(
+                            R.string.download_folder_reset_subtitle,
+                            DownloadFolder.defaultLabel,
+                        ),
+                        onClick = {
+                            DownloadFolder.reset(context)
+                            downloadFolderStatus = null
+                        },
+                    )
+                }
+            }
             row(exportDownloadsTitle, "music folder") {
                 SettingsSubRow(
                     title = exportDownloadsTitle,
@@ -912,6 +1007,43 @@ fun SettingsScreen(
                         onClick = onEqualizer,
                     )
                 }
+            }
+            // The same choice the player's speed drawer offers, for the listener
+            // who goes looking in Settings instead of at the player. Bit-perfect
+            // bypasses it, like the equaliser above — the warning on that screen
+            // says so.
+            val playbackSpeedTitle = stringResource(R.string.playback_speed)
+            row(playbackSpeedTitle, "speed", "tempo", "slowed", "sped up", "nightcore", "pitch") {
+                BypassedByBitPerfect(bitPerfectReady) {
+                    SettingsRow(
+                        icon = SfIcons.Performance,
+                        title = playbackSpeedTitle,
+                        subtitle = if (pitchCorrection) {
+                            speedLabel(playbackSpeed)
+                        } else {
+                            "${speedLabel(playbackSpeed)} · ${stringResource(R.string.keep_pitch_off)}"
+                        },
+                    )
+                    SegmentedControl(
+                        options = SPEED_PRESET_LABELS,
+                        // Nothing lit for a value the drawer's slider set between
+                        // two of these — the subtitle still names it exactly.
+                        selectedIndex = SPEED_PRESETS.indexOfFirst {
+                            kotlin.math.abs(it - playbackSpeed) < 0.001f
+                        },
+                        onSelect = { AppSettings.setPlaybackSpeed(SPEED_PRESETS[it]) },
+                        modifier = Modifier.padding(start = TEXT_INSET, end = ROW_INSET, bottom = 14.dp),
+                    )
+                }
+            }
+            val keepPitchTitle = stringResource(R.string.keep_pitch)
+            row(keepPitchTitle, "pitch", "key", "tone", "correction") {
+                SettingsSubRow(
+                    title = keepPitchTitle,
+                    checked = pitchCorrection,
+                    onCheckedChange = AppSettings::setPitchCorrection,
+                    subtitle = stringResource(R.string.keep_pitch_subtitle),
+                )
             }
         }
 
@@ -2407,6 +2539,18 @@ private fun formatCacheSize(mb: Int): String {
     if (mb < 1024) return "$mb MB"
     val gb = mb / 1024f
     return if (gb == gb.toInt().toFloat()) "${gb.toInt()} GB" else "%.1f GB".format(Locale.ROOT, gb)
+}
+
+/**
+ * The download folder's size in words: "840 MB", "1.4 GB".
+ *
+ * MB and GB are not translated — they are units, not words — and a folder
+ * holding nothing reads as "0 MB" rather than being left off the row, because
+ * an empty folder and an unmeasured one are different things to be told.
+ */
+private fun formatDownloadSize(bytes: Long): String {
+    val mb = bytes / (1024.0 * 1024.0)
+    return if (mb >= 1024) "%.1f GB".format(Locale.ROOT, mb / 1024) else "%.1f MB".format(Locale.ROOT, mb)
 }
 
 /** Who you're signed in as, straight from YouTube Music's account menu. */

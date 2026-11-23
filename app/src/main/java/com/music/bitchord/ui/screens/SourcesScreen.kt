@@ -1,6 +1,11 @@
 package com.music.bitchord.ui.screens
 
 import com.music.bitchord.ui.icons.SfIcons
+import com.music.bitchord.sharedui.resources.Res as SharedRes
+import com.music.bitchord.sharedui.resources.flashmusic_logo
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import org.jetbrains.compose.resources.painterResource
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -119,11 +124,24 @@ fun SourcesScreen(
     onEditWebDav: () -> Unit,
     /** As [onEditWebDav], for the SMB share editor. */
     onEditSmb: () -> Unit,
-    /** Opens the full-window warning before JioSaavn is opted into. */
-    onConfirmJioSaavn: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The FlashMusic page replaces this screen rather than floating over it: it
+    // is a page of settings like any other, and the sources list is what it
+    // belongs to. Null means the list is what is on screen.
+    var openFlashMusic by remember { mutableStateOf<SourceConfig?>(null) }
     val context = LocalContext.current
+    // Its own page, with a back arrow, rather than the URL alert an addon gets:
+    // a server the app ships with has more to say than one address.
+    openFlashMusic?.let { server ->
+        FlashMusicSettingsPage(
+            config = server,
+            contentPadding = contentPadding,
+            onEditAddress = { onEditSource(server) },
+            onBack = { openFlashMusic = null },
+        )
+        return
+    }
     val configs by SourceRegistry.configs.collectAsStateWithLifecycle()
     val wifiQuality by AppSettings.audioQualityWifi.collectAsStateWithLifecycle()
     val cellularQuality by AppSettings.audioQualityCellular.collectAsStateWithLifecycle()
@@ -243,19 +261,19 @@ fun SourcesScreen(
                         // Anything the user configured is theirs to edit or
                         // delete. JioSaavn and YouTube have no address to
                         // change, so a tap on them would open an empty editor.
-                        onClick = if (config.kind.needsServer) ({ onEditSource(config) }) else null,
+                        onClick = if (config.kind.needsServer) ({
+                            if (config.kind == SourceKind.FLASHMUSIC) {
+                                openFlashMusic = config
+                            } else {
+                                onEditSource(config)
+                            }
+                        }) else null,
                         // YouTube gets no switch at all — see
                         // [SourceRegistry.setEnabled] for why one would be a lie.
                         onToggle = if (config.kind == SourceKind.YOUTUBE) {
                             null
                         } else {
-                            ({ enabled ->
-                                if (config.kind == SourceKind.JIOSAAVN && enabled && !config.enabled) {
-                                    onConfirmJioSaavn()
-                                } else {
-                                    SourceRegistry.setEnabled(config.id, enabled)
-                                }
-                            })
+                            ({ enabled -> SourceRegistry.setEnabled(config.id, enabled) })
                         },
                         handle = handle,
                     )
@@ -784,20 +802,34 @@ private fun SourceRow(
                 .alpha(if (dimmed) 0.4f else 1f),
         )
         Spacer(Modifier.width(6.dp))
-        Icon(
-            imageVector = when (config.kind) {
-                SourceKind.ADDON -> SfIcons.Extension
-                SourceKind.CUSTOM_MODULE -> SfIcons.Extension
-                SourceKind.MODULE -> SfIcons.Extension
-                SourceKind.JIOSAAVN -> SfIcons.GraphicEq // or some other icon
-                SourceKind.YOUTUBE -> SfIcons.PlayCircle
-            },
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier
-                .size(ICON_SIZE)
-                .alpha(if (dimmed) 0.4f else 1f),
-        )
+        if (config.kind == SourceKind.FLASHMUSIC) {
+            // The mark the player's quality badge draws, so the source reads the
+            // same in the list as it does beside a playing track.
+            Image(
+                painter = painterResource(SharedRes.drawable.flashmusic_logo),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .size(ICON_SIZE)
+                    .alpha(if (dimmed) 0.4f else 1f),
+            )
+        } else {
+            Icon(
+                imageVector = when (config.kind) {
+                    SourceKind.ADDON -> SfIcons.Extension
+                    SourceKind.CUSTOM_MODULE -> SfIcons.Extension
+                    SourceKind.MODULE -> SfIcons.Extension
+                    SourceKind.JIOSAAVN -> SfIcons.GraphicEq
+                    SourceKind.FLASHMUSIC -> SfIcons.LibraryMusic
+                    SourceKind.YOUTUBE -> SfIcons.PlayCircle
+                },
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier
+                    .size(ICON_SIZE)
+                    .alpha(if (dimmed) 0.4f else 1f),
+            )
+        }
         Spacer(Modifier.width(ICON_GAP))
         Column(
             Modifier
@@ -891,6 +923,17 @@ private fun SourceRow(
             IosSwitch(
                 checked = config.enabled,
                 onCheckedChange = onToggle,
+            )
+        }
+        // A chevron, not a bare tap: a row that opens a page says so, and the
+        // FlashMusic row is the only one here that does.
+        if (config.kind == SourceKind.FLASHMUSIC) {
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                imageVector = SfIcons.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(14.dp),
             )
         }
         // Outside the dimming above, and last in the row. A source switched off
@@ -1034,20 +1077,33 @@ internal fun SourceEditorAlert(
         } else {
             config.displayName
         },
-        description = stringResource(R.string.addon_url_description),
+        // A server the app ships with is not an addon: same field, different
+        // sentence, and no "Remove this source" at the bottom of it — that one
+        // is refused by the registry anyway, and offering it is a lie.
+        description = stringResource(
+            if (config.kind == SourceKind.FLASHMUSIC) {
+                R.string.flashmusic_url_description
+            } else {
+                R.string.addon_url_description
+            },
+        ),
         urlValue = baseUrl,
         // A result describes the address it was run against, so the moment that
         // address is edited it stops being true and is cleared. Left up, it
         // would report "Connected" over a URL nobody has tried.
         onUrlChange = { baseUrl = it; status = null },
-        urlPlaceholder = "https://my-addon.example.com",
+        urlPlaceholder = if (config.kind == SourceKind.FLASHMUSIC) {
+            "http://192.168.1.10:8099"
+        } else {
+            "https://my-addon.example.com"
+        },
         status = status,
         statusIsGood = statusIsGood,
         testing = busy,
         canSubmit = baseUrl.isNotBlank(),
         onTest = { run(thenSave = false) },
         onSave = { run(thenSave = true) },
-        onRemove = if (isNew) null else onDelete,
+        onRemove = if (isNew || config.kind == SourceKind.FLASHMUSIC) null else onDelete,
         onDismiss = onDismiss,
     )
 }

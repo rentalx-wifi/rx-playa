@@ -302,6 +302,9 @@ val newPipeExtractorRaw: Configuration by configurations.creating {
     isCanBeConsumed = false
 }
 dependencies {
+    // Used directly by download/DownloadFolder for SAF folders; it used to arrive
+    // only as a transitive dependency, which is a version nobody chose.
+    implementation("androidx.documentfile:documentfile:1.0.1")
     newPipeExtractorRaw("com.github.TeamNewPipe:NewPipeExtractor:v0.26.3")
 }
 val newPipeExtractorStripped = tasks.register<org.gradle.api.tasks.bundling.Jar>(

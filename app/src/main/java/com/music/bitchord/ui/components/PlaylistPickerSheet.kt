@@ -114,6 +114,8 @@ fun PlaylistPickerSheet(
     offline: Boolean = false,
     /** True when the playlist being made will live on this device, not on YouTube. */
     localTarget: Boolean = false,
+    /** True when only this device's own playlists are offered, and why: see the note below. */
+    localOnly: Boolean = false,
     /** Asked to remove a playlist this device owns. */
     onDelete: ((UserPlaylist) -> Unit)? = null,
 ) {
@@ -188,6 +190,16 @@ fun PlaylistPickerSheet(
                     stringResource(if (song != null) R.string.add_to_playlist else R.string.your_playlists)
                         .uppercase(Locale.getDefault()),
                 )
+                if (localOnly) {
+                    // Without this line the sheet looks like it lost the account's
+                    // playlists for no reason; with it, the reason is the track.
+                    Text(
+                        text = stringResource(R.string.playlist_local_only_note),
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
 
                 ActionRow(
                     icon = BitChordIcons.Plus,

@@ -127,6 +127,31 @@ enum class SourceKind(
         rank = 1,
     ),
 
+    /**
+     * The listener's own FlashMusic server.
+     *
+     * One catalogue and three tiers: FLAC as stored, plus Opus at 192 and 320
+     * encoded on the server and cached there. Tracks may also carry slowed and
+     * sped-up variants, which the server keeps as a measured rate rather than
+     * as extra files.
+     *
+     * Ranked above JioSaavn because it is the listener's own catalogue and the
+     * only addable source that can hand back a lossless master on demand; below
+     * the module source because a module index still fronts several catalogues.
+     * [worthPrefetching] is true and stays true: unlike an addon walking its
+     * backends, this is one host answering from a warm cache.
+     */
+    FLASHMUSIC(
+        label = "FlashMusic",
+        detail = "Your own music server. FLAC as stored, plus Opus at 192 and 320 " +
+            "encoded on the server.",
+        labels = listOf("FLAC", "Lossless", "Hi-Res"),
+        needsServer = true,
+        canServeLossless = true,
+        worthPrefetching = true,
+        rank = 2,
+    ),
+
     JIOSAAVN(
         label = "JioSaavn",
         detail = "Optional JioSaavn streams up to 320kbps AAC/MP4. Catalogue matching can select the wrong song.",
@@ -134,7 +159,7 @@ enum class SourceKind(
         needsServer = false,
         canServeLossless = false,
         worthPrefetching = true,
-        rank = 2,
+        rank = 3,
     ),
 
     /**
@@ -150,7 +175,7 @@ enum class SourceKind(
         labels = listOf("Lossy", "Full catalogue", "Radio"),
         needsServer = false,
         canServeLossless = false,
-        rank = 3,
+        rank = 4,
     ),
     ;
 

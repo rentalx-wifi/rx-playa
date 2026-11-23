@@ -30,6 +30,10 @@
     <string name="save">Simpan</string>
     <string name="close">Tutup</string>
     <string name="back">Kembali</string>
+    <string name="flashmusic_address">Alamat server</string>
+    <string name="flashmusic_url_description">Alamat server FlashMusic Anda: mesin yang menjalankannya dan porta yang didengarkannya.</string>
+    <string name="flashmusic_cross_match">Tandai trek dari platform lain</string>
+    <string name="flashmusic_cross_match_subtitle">Menambahkan lencana FM pada baris yang sudah ada di server</string>
     <string name="settings">Pengaturan</string>
     <string name="search">Cari</string>
     <string name="clear_search">Hapus pencarian</string>
@@ -205,6 +209,10 @@
     <string name="switch_to_list_view">Beralih ke tampilan daftar</string>
     <string name="audio_quality">Kualitas audio</string>
     <string name="playback">Pemutaran</string>
+    <string name="playback_speed">Kecepatan pemutaran</string>
+    <string name="keep_pitch">Pertahankan nada</string>
+    <string name="keep_pitch_subtitle">Nonaktif: suara turun mengikuti tempo — versi slowed dan sped up</string>
+    <string name="keep_pitch_off">nada mengikuti kecepatan</string>
     <string name="appearance">Tampilan</string>
     <string name="storage">Penyimpanan</string>
     <string name="your_data">Data Anda</string>
@@ -1590,6 +1598,9 @@
     <string name="update_beta_note">Build uji. Bisa ada yang rusak.</string>
     <string name="soundcloud_token_title">Token SoundCloud</string>
     <string name="soundcloud_token_hint">Tempel token akses OAuth dari klien SoundCloud. Token diperiksa sebelum disimpan.</string>
+    <string name="soundcloud_token_help">Tanpa akun ada playlist publik dan suka. Token — deretan panjang huruf, angka, dan tanda hubung setelah «Authorization: OAuth» di klien SoundCloud — juga membuka set pribadimu.</string>
+    <string name="soundcloud_token_placeholder">2-123456-…</string>
+    <string name="soundcloud_token_not_a_token">Itu bukan token akses: kelihatannya tautan, cookie, atau potongan JSON.</string>
     <string name="google_cookie_help_title">How to get the cookie</string>
     <string name="google_cookie_help_body">1. Open music.youtube.com in a browser on a computer and sign in.
 2. Press F12, open the Network tab and reload the page.
@@ -1603,4 +1614,14 @@
     <string name="search_sources_unavailable">No answer from: %1$s</string>
     <string name="search_source_vk" translatable="false">VK Music</string>
     <string name="google_open_browser_action">Open in browser</string>
+    <string name="playlist_local_only_note">Trek ini bukan dari YouTube, jadi masuk ke playlist di perangkat ini.</string>
+    <string name="show_less">Tampilkan lebih sedikit</string>
+    <string name="download_folder">Folder unduhan</string>
+    <string name="download_folder_usage">%1$s terpakai</string>
+    <string name="download_folder_app_storage">Penyimpanan aplikasi ini</string>
+    <string name="download_folder_unwritable">Folder ini tidak bisa ditulisi. Pilih yang lain.</string>
+    <string name="download_folder_lost">Foldernya hilang — unduhan kembali ke penyimpanan aplikasi.</string>
+    <string name="download_folder_existing_note">Trek yang sudah diunduh tetap di tempatnya.</string>
+    <string name="download_folder_reset">Pakai folder bawaan</string>
+    <string name="download_folder_reset_subtitle">Kembali ke penyimpanan aplikasi ini</string>
 </resources>

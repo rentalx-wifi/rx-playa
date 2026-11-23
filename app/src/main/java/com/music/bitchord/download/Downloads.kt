@@ -1205,6 +1205,12 @@ object Downloads {
 
                 val manifest = route.offlineHls
                 if (manifest != null) {
+                    // Stays in this app's storage whatever folder was picked. An
+                    // offline package is a playlist of segments a player resolves
+                    // relative to that playlist, and a document uri hands it a
+                    // naming scheme not every provider can resolve a sibling
+                    // through — a copy there would be a download that no longer
+                    // plays. Only single-file downloads follow the picked folder.
                     val onSegment: (Long, Long) -> Unit = { written, total ->
                         val fraction = written.toFloat() / total
                         _active.update { it + (id to DownloadState.Running(fraction)) }
@@ -1253,7 +1259,18 @@ object Downloads {
                 // concurrent album workers from exposing untagged tracks.
                 MediaTagger.embed(context, destination.tagUri, track, route.extension, words, cover)
                 val artworkUri = MediaTagger.persistArtwork(context, track.thumbnailUrl, cover)
-                val savedUri = destination.commit()
+                // Copied while the file is still pending, then the built-in
+                // destination is dropped instead of published: the track then
+                // exists once, in the folder the listener picked, rather than
+                // once there and once in Music. A copy that fails returns null
+                // and the original is committed where it is.
+                val chosenFolder = DownloadFolder.adopt(context, destination.tagUri, name, route.mimeType)
+                val savedUri = if (chosenFolder != null) {
+                    destination.abort()
+                    chosenFolder
+                } else {
+                    destination.commit()
+                }
                 pending = null
                 remember(song, track, savedUri, route.downloadFormat, artworkUri)
                 DownloadSession.done(id)

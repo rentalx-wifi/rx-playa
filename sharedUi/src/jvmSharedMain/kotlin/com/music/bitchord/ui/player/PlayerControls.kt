@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.isSpecified
 import com.music.bitchord.data.model.ArtistCredit
 import com.music.bitchord.data.model.CreditSegment
+import com.music.bitchord.data.model.FLASH_MUSIC_NAME
 import com.music.bitchord.data.model.creditSegments
 import com.music.bitchord.sharedui.resources.*
 
@@ -65,6 +66,7 @@ import androidx.compose.material.icons.rounded.CastConnected
 import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material.icons.rounded.Watch
 import androidx.compose.material3.CircularProgressIndicator
@@ -1661,6 +1663,9 @@ private fun LosslessOrStats(
     nerdStats: NerdStats.Snapshot?,
     modifier: Modifier = Modifier,
 ) {
+    // A FlashMusic stream is named by the tier it was asked for, not by how
+    // good the transcode happened to measure.
+    val flash = nerdStats?.let(::flashMusicLabel)
     when {
         // Still resolving — either the player itself is buffering, or a
         // module is still racing YouTube for this track in the background
@@ -1695,9 +1700,15 @@ private fun LosslessOrStats(
         )
         nerdStats?.isLossless == true -> LosslessLabel(
             // Same line Tidal, Qobuz and Apple Music draw it at — see
-            // [NerdStats.Snapshot.isHiRes].
-            text = stringResource(if (nerdStats.isHiRes) Res.string.hi_res_lossless else Res.string.lossless),
-            iconPainter = painterResource(Res.drawable.ic_lossless),
+            // [NerdStats.Snapshot.isHiRes] — except on the listener's own
+            // server, which says whose copy this is.
+            text = flash ?: stringResource(if (nerdStats.isHiRes) Res.string.hi_res_lossless else Res.string.lossless),
+            // Apple Music's interlaced wave says nothing about whose FLAC this
+            // is, so on the listener's own server the mark itself replaces it.
+            iconPainter = painterResource(
+                if (flash != null) Res.drawable.flashmusic_logo_silver else Res.drawable.ic_lossless,
+            ),
+            iconSize = if (flash != null) 15.dp else Dp.Unspecified,
             // Shimmer is reserved for the thing that was asked for and
             // confirmed. It is what makes the badge read as an achievement
             // rather than a label, which only one of these two is.
@@ -1708,6 +1719,16 @@ private fun LosslessOrStats(
             text = "Dolby Atmos",
             animated = true,
             iconPainter = painterResource(Res.drawable.ic_dolby_atmos),
+            modifier = modifier,
+        )
+        // FlashMusic's Opus tiers, which carry no quality claim the generic
+        // labels could express: 320 is the best this server has short of the
+        // master, 192 is its everyday one.
+        flash != null -> LosslessLabel(
+            text = flash,
+            animated = false,
+            iconPainter = painterResource(Res.drawable.flashmusic_logo),
+            iconSize = 15.dp,
             modifier = modifier,
         )
         // Lossy, but the good end of lossy — a module's 320kbps tier, which
@@ -1726,6 +1747,66 @@ private fun LosslessOrStats(
         else -> {}
     }
 }
+
+/**
+ * The speed, when it is not 1x, as a chip at the end of the scrubber's foot.
+ *
+ * Shown only when it says something: the foot is for what is worth announcing,
+ * and "normal speed" is not. A tap opens [SpeedSheet], which is also where the
+ * pitch switch lives, so the chip is the way back to the setting that put it
+ * there.
+ */
+@Composable
+internal fun PlaybackSpeedChip(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val speed by PlayerSettings.playbackSpeed.collectAsStateWithLifecycle()
+    if (speed == 1f) return
+    val haptics = rememberHaptics()
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(LocalPlayerTint.current.copy(alpha = 0.10f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) {
+                haptics.play(Haptic.Select)
+                onClick()
+            }
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Speed,
+            contentDescription = null,
+            tint = LocalPlayerTint.current.copy(alpha = 0.55f),
+            modifier = Modifier.size(12.dp),
+        )
+        Spacer(Modifier.width(3.dp))
+        Text(
+            text = formatSpeed(speed),
+            style = MaterialTheme.typography.labelSmall,
+            color = LocalPlayerTint.current.copy(alpha = 0.7f),
+        )
+    }
+}
+
+/**
+ * What the quality badge says for a stream the listener's own server served.
+ *
+ * The three tiers are the server's, not a measurement: FLAC is "Lossless" at
+ * whatever resolution it happens to be, 320 is "Hi-Res" and 192 is the plain
+ * name. Null for every other source, which leaves their labels as they were.
+ */
+internal fun flashMusicLabel(stats: NerdStats.Snapshot): String? = when {
+    stats.sourceName != FLASH_MUSIC_NAME -> null
+    stats.isLossless == true -> "$FLASH_MUSIC_NAME Lossless"
+    (stats.claimed?.kbps ?: stats.bitrateKbps ?: 0) >= FLASH_MUSIC_HIRES_KBPS ->
+        "$FLASH_MUSIC_NAME Hi-Res"
+    else -> FLASH_MUSIC_NAME
+}
+
+/** Anything at or above this is the server's high tier rather than its default. */
+private const val FLASH_MUSIC_HIRES_KBPS = 256
 
 /** A quality glyph ahead of the status label. */
 @Composable

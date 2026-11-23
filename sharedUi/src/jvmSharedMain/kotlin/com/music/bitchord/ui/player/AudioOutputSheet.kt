@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Speaker
+import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material.icons.rounded.Usb
 import androidx.compose.material.icons.rounded.Watch
@@ -87,6 +88,7 @@ internal fun AudioOutputSheet(
     onDismiss: () -> Unit,
     onOpenPipeline: () -> Unit,
     onOpenCast: () -> Unit,
+    onOpenSpeed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val outputs = rememberAudioOutputs()
@@ -132,6 +134,83 @@ internal fun AudioOutputSheet(
 
         Spacer(Modifier.height(6.dp))
         AudioPipelineRow(onClick = onOpenPipeline)
+
+        Spacer(Modifier.height(6.dp))
+        SpeedRow(onClick = onOpenSpeed)
+    }
+}
+
+/**
+ * Drills into [SpeedSheet] — the speed, then whether the pitch comes with it.
+ *
+ * Lives here rather than only on the scrubber's foot because that chip appears
+ * only once the speed is already something other than 1x: a listener who has
+ * never changed it has nowhere else to find this.
+ */
+@Composable
+private fun SpeedRow(onClick: () -> Unit) {
+    val haptics = rememberHaptics()
+    val speed by PlayerSettings.playbackSpeed.collectAsStateWithLifecycle()
+    val pitchCorrection by PlayerSettings.pitchCorrection.collectAsStateWithLifecycle()
+    val subtitle = when {
+        speed == 1f -> stringResource(Res.string.playback_speed)
+        pitchCorrection -> formatSpeed(speed)
+        else -> "${formatSpeed(speed)} · ${stringResource(Res.string.keep_pitch).lowercase()}"
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(ROW_SHAPE)
+            .background(Color.White.copy(alpha = 0.05f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) {
+                haptics.play(Haptic.Select)
+                onClick()
+            }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.08f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Speed,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.7f),
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(Modifier.width(13.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = stringResource(Res.string.playback_speed),
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.White.copy(alpha = 0.85f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White.copy(alpha = 0.55f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.35f),
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 

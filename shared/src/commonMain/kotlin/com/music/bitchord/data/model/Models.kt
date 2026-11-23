@@ -141,6 +141,15 @@ data class Song(
      * non-history rows (e.g. search results, library).
      */
     val feedbackToken: String? = null,
+    /**
+     * Sources that also hold this recording, besides the one the row came from.
+     *
+     * Filled in by the search-time cross-check, not by the catalogue that issued
+     * the row: it is how a search list can say "this one you also have on your
+     * own server" next to a row that came from somewhere else. Empty for rows
+     * nobody checked, which is every row outside a search result.
+     */
+    val availableIn: Set<HomeSource> = emptySet(),
 ) {
     /** Legacy derived property: true if and only if [queueTier] is [QueueTier.AUTOPLAY]. */
     val fromAutoplay: Boolean get() = queueTier == QueueTier.AUTOPLAY
@@ -399,6 +408,23 @@ enum class SearchFilter(val label: String, val params: String?) {
 }
 
 /** A card in a home-feed carousel: either a track (videoId) or an album/playlist (browseId). */
+/**
+ * Whether YouTube itself can hold this track.
+ *
+ * A YouTube playlist stores nothing but its own video ids, so a SoundCloud
+ * urn, a source key (`src:<config>::<id>`) or a file on this device has no
+ * place in one: the add request is accepted and the row never appears, which
+ * is how a SoundCloud track used to vanish on the way to a playlist
+ * (issue #59). Those tracks go into a playlist on the device instead.
+ */
+val Song.isYouTubeTrack: Boolean
+    get() = localUri == null &&
+        videoId.isNotEmpty() &&
+        !videoId.startsWith("soundcloud:") &&
+        !videoId.startsWith("src:") &&
+        !videoId.startsWith("content://") &&
+        !videoId.startsWith("file://")
+
 data class ShelfItem(
     val title: String,
     val subtitle: String,

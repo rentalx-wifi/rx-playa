@@ -40,16 +40,18 @@ buildscript {
  *
  * No "v" in the name; release tags may add it separately.
  */
-extra["bitchordVersionCode"] = 105
-extra["bitchordVersionName"] = "1.9.1"
+extra["bitchordVersionCode"] = 106
+extra["bitchordVersionName"] = "1.9.4"
 
 /*
  * Bump this by hand for each sideloaded fork build. The suffix makes support
  * screenshots and APK metadata identify the exact fork revision; this fork
  * deliberately does not query or install releases from the upstream repo.
  * The bundled watch APK receives the same suffix and version code.
+ *
+ * Empty for a release build: 1.9.4 ships without the marker, as 1.9.1 did.
  */
-extra["bitchordBetaSuffix"] = "v46b24-beta"
+extra["bitchordBetaSuffix"] = ""
 
 plugins {
     id("com.android.application") version "8.10.1" apply false

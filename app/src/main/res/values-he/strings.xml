@@ -33,6 +33,10 @@
     <string name="save">שמירה</string>
     <string name="close">סגירה</string>
     <string name="back">חזרה</string>
+    <string name="flashmusic_address">כתובת השרת</string>
+    <string name="flashmusic_url_description">הכתובת של שרת ה-FlashMusic שלך: המחשב שמריץ אותו והפורט שהוא מאזין לו.</string>
+    <string name="flashmusic_cross_match">סמן שירים מפלטפורמות אחרות</string>
+    <string name="flashmusic_cross_match_subtitle">מוסיף תג FM לשורות שהשרת שלך כבר מחזיק</string>
     <string name="settings">הגדרות</string>
     <string name="search">חיפוש</string>
     <string name="clear_search">ניקוי חיפוש</string>
@@ -211,6 +215,10 @@
     <string name="switch_to_list_view">מעבר לתצוגת רשימה</string>
     <string name="audio_quality">איכות אודיו</string>
     <string name="playback">השמעה</string>
+    <string name="playback_speed">מהירות נגינה</string>
+    <string name="keep_pitch">שמור גובה צליל</string>
+    <string name="keep_pitch_subtitle">כבוי — הקול יורד עם הקצב: גרסאות slowed ו-sped up</string>
+    <string name="keep_pitch_off">גובה הצליל עוקב אחרי המהירות</string>
     <string name="appearance">מראה</string>
     <string name="storage">אחסון</string>
     <string name="your_data">הנתונים שלך</string>
@@ -1621,6 +1629,9 @@
     <string name="update_beta_note">גרסת ניסיון. משהו עלול להישבר.</string>
     <string name="soundcloud_token_title">אסימון SoundCloud</string>
     <string name="soundcloud_token_hint">הדבק אסימון גישה של OAuth מלקוח SoundCloud. הוא נבדק לפני השמירה.</string>
+    <string name="soundcloud_token_help">בלי חשבון יש פלייליסטים ציבוריים ולייקים. טוקן — המחרוזת הארוכה של אותיות, ספרות ומקפים שאחרי «Authorization: OAuth» בלקוח SoundCloud — פותח גם סטים פרטיים.</string>
+    <string name="soundcloud_token_placeholder">2-123456-…</string>
+    <string name="soundcloud_token_not_a_token">זה לא טוקן גישה: זה נראה כמו קישור, עוגייה או פיסת JSON.</string>
     <string name="google_cookie_help_title">How to get the cookie</string>
     <string name="google_cookie_help_body">1. Open music.youtube.com in a browser on a computer and sign in.
 2. Press F12, open the Network tab and reload the page.
@@ -1634,4 +1645,14 @@
     <string name="search_sources_unavailable">No answer from: %1$s</string>
     <string name="search_source_vk" translatable="false">VK Music</string>
     <string name="google_open_browser_action">Open in browser</string>
+    <string name="playlist_local_only_note">השיר הזה לא מיוטיוב, ולכן הוא ייכנס לפלייליסט במכשיר הזה.</string>
+    <string name="show_less">הצג פחות</string>
+    <string name="download_folder">Download folder</string>
+    <string name="download_folder_usage">%1$s used</string>
+    <string name="download_folder_app_storage">האחסון של האפליקציה הזו</string>
+    <string name="download_folder_unwritable">אי אפשר לכתוב לתיקייה הזאת. בחר אחרת.</string>
+    <string name="download_folder_lost">התיקייה נעלמה — ההורדות חוזרות לאחסון של האפליקציה.</string>
+    <string name="download_folder_existing_note">שירים שהורדו קודם נשארים במקום.</string>
+    <string name="download_folder_reset">השתמש בתיקיית ברירת המחדל</string>
+    <string name="download_folder_reset_subtitle">חזרה לאחסון של האפליקציה</string>
 </resources>

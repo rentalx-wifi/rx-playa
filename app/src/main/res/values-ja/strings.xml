@@ -30,6 +30,10 @@
     <string name="save">保存</string>
     <string name="close">閉じる</string>
     <string name="back">戻る</string>
+    <string name="flashmusic_address">サーバーのアドレス</string>
+    <string name="flashmusic_url_description">FlashMusic サーバーのアドレス：動作しているマシンと待ち受けポートです。</string>
+    <string name="flashmusic_cross_match">他のプラットフォームの曲に印を付ける</string>
+    <string name="flashmusic_cross_match_subtitle">サーバーにある曲の行に FM バッジを付けます</string>
     <string name="settings">設定</string>
     <string name="search">検索</string>
     <string name="clear_search">検索をクリア</string>
@@ -205,6 +209,10 @@
     <string name="switch_to_list_view">リスト表示に切り替え</string>
     <string name="audio_quality">音質</string>
     <string name="playback">再生</string>
+    <string name="playback_speed">再生速度</string>
+    <string name="keep_pitch">ピッチを保持</string>
+    <string name="keep_pitch_subtitle">オフにすると声がテンポと一緒に下がります — スロウ／スピードアップ版</string>
+    <string name="keep_pitch_off">ピッチが速度に追従します</string>
     <string name="appearance">外観</string>
     <string name="storage">ストレージ</string>
     <string name="your_data">あなたのデータ</string>
@@ -1591,6 +1599,9 @@
     <string name="update_beta_note">テスト版です。不具合が出る可能性があります。</string>
     <string name="soundcloud_token_title">SoundCloud トークン</string>
     <string name="soundcloud_token_hint">SoundCloud クライアントの OAuth アクセストークンを貼ってください。保存前に確認します。</string>
+    <string name="soundcloud_token_help">アカウントなしでも公開プレイリストと「いいね」は使えます。トークン（SoundCloud クライアントの「Authorization: OAuth」の後ろにある英数字とハイフンの長い文字列）があると、非公開のセットも開けます。</string>
+    <string name="soundcloud_token_placeholder">2-123456-…</string>
+    <string name="soundcloud_token_not_a_token">これはアクセストークンではありません。リンク、Cookie、JSON の断片に見えます。</string>
     <string name="google_cookie_help_title">How to get the cookie</string>
     <string name="google_cookie_help_body">1. Open music.youtube.com in a browser on a computer and sign in.
 2. Press F12, open the Network tab and reload the page.
@@ -1604,4 +1615,14 @@
     <string name="search_sources_unavailable">No answer from: %1$s</string>
     <string name="search_source_vk" translatable="false">VK Music</string>
     <string name="google_open_browser_action">Open in browser</string>
+    <string name="playlist_local_only_note">YouTube の曲ではないため、この端末のプレイリストに入ります。</string>
+    <string name="show_less">折りたたむ</string>
+    <string name="download_folder">ダウンロード先フォルダ</string>
+    <string name="download_folder_usage">%1$s 使用中</string>
+    <string name="download_folder_app_storage">このアプリの保存領域</string>
+    <string name="download_folder_unwritable">このフォルダには書き込めません。別のフォルダを選んでください。</string>
+    <string name="download_folder_lost">フォルダが見つかりません — ダウンロードはアプリの保存領域に戻ります。</string>
+    <string name="download_folder_existing_note">以前にダウンロードした曲はそのまま残ります。</string>
+    <string name="download_folder_reset">既定のフォルダを使う</string>
+    <string name="download_folder_reset_subtitle">アプリの保存領域に戻す</string>
 </resources>

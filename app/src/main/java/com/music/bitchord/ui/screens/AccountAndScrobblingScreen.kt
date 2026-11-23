@@ -243,8 +243,11 @@ fun AccountAndScrobblingScreen(
                 SettingsRow(
                     icon = SfIcons.SwitchAccount,
                     title = stringResource(R.string.sign_in),
+                    // Not the two-word title: with no official flow the row is
+                    // the only place that says what the sign-in wants, and
+                    // "SoundCloud token" left people guessing (issue #48).
                     subtitle = if (soundCloudLoginAvailable) null
-                    else stringResource(R.string.soundcloud_token_title),
+                    else stringResource(R.string.soundcloud_token_hint),
                     onClick = onOpenSoundCloudLogin,
                 )
             }

@@ -30,6 +30,10 @@
     <string name="save">儲存</string>
     <string name="close">關閉</string>
     <string name="back">返回</string>
+    <string name="flashmusic_address">伺服器位址</string>
+    <string name="flashmusic_url_description">FlashMusic 伺服器位址：執行它的機器和監聽的連接埠。</string>
+    <string name="flashmusic_cross_match">標記其他平台的曲目</string>
+    <string name="flashmusic_cross_match_subtitle">為伺服器已有的列加上 FM 標記</string>
     <string name="settings">設定</string>
     <string name="search">搜尋</string>
     <string name="clear_search">清除搜尋</string>
@@ -205,6 +209,10 @@
     <string name="switch_to_list_view">切換到列表檢視</string>
     <string name="audio_quality">音訊質量</string>
     <string name="playback">播放</string>
+    <string name="playback_speed">播放速度</string>
+    <string name="keep_pitch">保持音高</string>
+    <string name="keep_pitch_subtitle">關閉後聲音隨速度降低 — 減速與加速版本</string>
+    <string name="keep_pitch_off">音高跟隨速度</string>
     <string name="appearance">外觀</string>
     <string name="storage">儲存空間</string>
     <string name="your_data">你的資料</string>
@@ -1590,6 +1598,9 @@
     <string name="update_beta_note">測試版本，可能會有問題。</string>
     <string name="soundcloud_token_title">SoundCloud 權杖</string>
     <string name="soundcloud_token_hint">貼上 SoundCloud 用戶端的 OAuth 存取權杖。儲存前會先驗證。</string>
+    <string name="soundcloud_token_help">沒有帳號也能用公開播放清單和「讚」。權杖是 SoundCloud 用戶端裡「Authorization: OAuth」後面那一長串字母、數字和連字號，有它還能開啟你的私人歌單。</string>
+    <string name="soundcloud_token_placeholder">2-123456-…</string>
+    <string name="soundcloud_token_not_a_token">這不是存取權杖：看起來像連結、Cookie 或 JSON 片段。</string>
     <string name="google_cookie_help_title">How to get the cookie</string>
     <string name="google_cookie_help_body">1. Open music.youtube.com in a browser on a computer and sign in.
 2. Press F12, open the Network tab and reload the page.
@@ -1603,4 +1614,14 @@
     <string name="search_sources_unavailable">No answer from: %1$s</string>
     <string name="search_source_vk" translatable="false">VK Music</string>
     <string name="google_open_browser_action">Open in browser</string>
+    <string name="playlist_local_only_note">這首不是 YouTube 的曲目，因此會加入本機的播放清單。</string>
+    <string name="show_less">收合</string>
+    <string name="download_folder">下載資料夾</string>
+    <string name="download_folder_usage">已用 %1$s</string>
+    <string name="download_folder_app_storage">本應用程式的儲存空間</string>
+    <string name="download_folder_unwritable">無法寫入這個資料夾。請換一個。</string>
+    <string name="download_folder_lost">資料夾不見了 — 下載會回到本應用程式的儲存空間。</string>
+    <string name="download_folder_existing_note">先前下載的曲目會留在原處。</string>
+    <string name="download_folder_reset">使用預設資料夾</string>
+    <string name="download_folder_reset_subtitle">回到本應用程式的儲存空間</string>
 </resources>

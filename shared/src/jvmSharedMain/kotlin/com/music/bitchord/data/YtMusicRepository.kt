@@ -1240,9 +1240,59 @@ object YtMusicRepository {
             val fullSongs = fullSongsDeferred.await()
             val fullShelves = shelvesDeferred.awaitAll()
             val resolvedSongs = if (!fullSongs.isNullOrEmpty()) fullSongs else page.songs
-            page.copy(songs = resolvedSongs, sections = fullShelves)
+            page.copy(
+                songs = resolvedSongs,
+                sections = tidyRelatedArtists(fullShelves, page.name, browseId),
+            )
         }
     }
+
+    /**
+     * Cleans the "related artists" carousel that comes with an artist page.
+     *
+     * YouTube fills it from whatever sits nearby in its catalogue, so for a
+     * narrow artist it reads as a random list of strangers (issue #43). There is
+     * no genre or co-playlist signal on the landing page to rank by, but three
+     * things are worth doing anyway, because each removes a class of visible
+     * nonsense:
+     *
+     *  - the artist's own card, which YouTube sometimes offers back;
+     *  - the same artist twice, which happens when two shelves overlap;
+     *  - a shelf left with one or two names, which is not a recommendation but
+     *    an accident: the block is dropped instead.
+     *
+     * A carousel whose every card is a channel page and nothing else is the
+     * related-artists one; albums, singles and playlists all carry playable
+     * cards, so they are left alone.
+     */
+    internal fun tidyRelatedArtists(
+        shelves: List<HomeShelf>,
+        artistName: String?,
+        browseId: String,
+    ): List<HomeShelf> {
+        val self = artistName?.trim()?.lowercase().orEmpty()
+        return shelves.mapNotNull { shelf ->
+            val cardIds = shelf.items.mapNotNull { it.browseId }
+            val isArtistCarousel = cardIds.isNotEmpty() &&
+                cardIds.size == shelf.items.size &&
+                cardIds.all { it.startsWith("UC") }
+            if (!isArtistCarousel) return@mapNotNull shelf
+            val seen = HashSet<String>()
+            val kept = shelf.items.filter { item ->
+                val id = item.browseId.orEmpty()
+                if (id.isEmpty() || id == browseId) return@filter false
+                if (self.isNotEmpty() && item.title.trim().lowercase() == self) return@filter false
+                seen.add(id)
+            }
+            when {
+                kept.size >= MIN_RELATED_ARTISTS -> shelf.copy(items = kept)
+                else -> null
+            }
+        }
+    }
+
+    /** Below this the block is noise rather than a recommendation. */
+    private const val MIN_RELATED_ARTISTS = 3
 
     /**
      * The artist's landing page alone — one request. [artistPage] goes on to

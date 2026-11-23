@@ -31,6 +31,10 @@
     <string name="save">सेव करें</string>
     <string name="close">बंद करें</string>
     <string name="back">वापस</string>
+    <string name="flashmusic_address">सर्वर पता</string>
+    <string name="flashmusic_url_description">आपके FlashMusic सर्वर का पता: वह मशीन जिस पर यह चलता है और वह पोर्ट जिस पर सुनता है।</string>
+    <string name="flashmusic_cross_match">दूसरे प्लेटफ़ॉर्म के ट्रैक चिह्नित करें</string>
+    <string name="flashmusic_cross_match_subtitle">आपके सर्वर पर मौजूद पंक्तियों पर FM बैज जोड़ता है</string>
     <string name="settings">सेटिंग्स</string>
     <string name="search">खोजें</string>
     <string name="clear_search">खोज साफ़ करें</string>
@@ -210,6 +214,10 @@
     <string name="switch_to_list_view">लिस्ट व्यू पर स्विच करें</string>
     <string name="audio_quality">ऑडियो क्वालिटी</string>
     <string name="playback">प्लेबैक</string>
+    <string name="playback_speed">प्लेबैक गति</string>
+    <string name="keep_pitch">पिच बनाए रखें</string>
+    <string name="keep_pitch_subtitle">बंद होने पर आवाज़ टेम्पो के साथ नीचे जाती है — slowed और sped up संस्करण</string>
+    <string name="keep_pitch_off">पिच गति के साथ चलती है</string>
     <string name="appearance">दिखावट</string>
     <string name="storage">स्टोरेज</string>
     <string name="your_data">आपका डेटा</string>
@@ -1614,6 +1622,9 @@
     <string name="update_beta_note">टेस्ट बिल्ड। कुछ टूट सकता है।</string>
     <string name="soundcloud_token_title">SoundCloud टोकन</string>
     <string name="soundcloud_token_hint">SoundCloud क्लाइंट से OAuth एक्सेस टोकन चिपकाएँ। सहेजने से पहले इसे जाँचा जाता है।</string>
+    <string name="soundcloud_token_help">बिना खाते के सार्वजनिक प्लेलिस्ट और पसंद उपलब्ध हैं। टोकन — किसी SoundCloud क्लाइंट में «Authorization: OAuth» के बाद आने वाली अक्षरों, अंकों और डैश की लंबी श्रृंखला — आपके निजी सेट भी खोलता है।</string>
+    <string name="soundcloud_token_placeholder">2-123456-…</string>
+    <string name="soundcloud_token_not_a_token">यह एक्सेस टोकन नहीं है: यह लिंक, कुकी या JSON के टुकड़े जैसा दिखता है।</string>
     <string name="google_cookie_help_title">How to get the cookie</string>
     <string name="google_cookie_help_body">1. Open music.youtube.com in a browser on a computer and sign in.
 2. Press F12, open the Network tab and reload the page.
@@ -1627,4 +1638,14 @@
     <string name="search_sources_unavailable">No answer from: %1$s</string>
     <string name="search_source_vk" translatable="false">VK Music</string>
     <string name="google_open_browser_action">Open in browser</string>
+    <string name="playlist_local_only_note">यह ट्रैक YouTube का नहीं है, इसलिए यह इस डिवाइस की प्लेलिस्ट में जाएगा।</string>
+    <string name="show_less">कम दिखाएँ</string>
+    <string name="download_folder">Download folder</string>
+    <string name="download_folder_usage">%1$s used</string>
+    <string name="download_folder_app_storage">इस ऐप का अपना संग्रहण</string>
+    <string name="download_folder_unwritable">इस फ़ोल्डर में लिखा नहीं जा सकता। दूसरा चुनें।</string>
+    <string name="download_folder_lost">फ़ोल्डर गायब हो गया — डाउनलोड ऐप के संग्रहण में लौट जाते हैं।</string>
+    <string name="download_folder_existing_note">पहले डाउनलोड किए गए ट्रैक जहाँ हैं वहीं रहेंगे।</string>
+    <string name="download_folder_reset">डिफ़ॉल्ट फ़ोल्डर इस्तेमाल करें</string>
+    <string name="download_folder_reset_subtitle">इस ऐप के संग्रहण में वापस</string>
 </resources>

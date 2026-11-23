@@ -7,6 +7,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
 
@@ -41,6 +43,14 @@ sealed interface DetectedFormat {
      * QuickJS sandbox. See [ModuleIndex][com.music.bitchord.data.sources.module.ModuleIndex].
      */
     data class ModuleIndex(val moduleCount: Int, val url: String) : DetectedFormat
+
+    /**
+     * A FlashMusic server — the listener's own catalogue.
+     *
+     * It publishes no manifest and no index: `/healthz` is what says it is one,
+     * and the catalogue itself is the endpoint the app will ask later.
+     */
+    data class FlashMusic(val baseUrl: String) : DetectedFormat
 
     /** Recognised, and not something this app can play. [reason] is shown to the user. */
     data class Unsupported(val reason: String) : DetectedFormat
@@ -84,6 +94,15 @@ object SourceFormats {
         }
 
         val base = AddonClient.normalizeBase(url)
+
+        // A FlashMusic server answers for itself before any document exists to
+        // describe it, so it is asked first. `/api/v1` is tolerated because
+        // that is the path people copy out of the app's own API calls.
+        val flashBase = url.trimEnd('/').removeSuffix("/api/v1")
+        if (looksLikeFlashMusic(flashBase)) {
+            TrackLog.d(TAG, "identify(${AddonClient.redact(flashBase)}) — FlashMusic server")
+            return@withContext Result.success(DetectedFormat.FlashMusic(flashBase))
+        }
         val isDocument = url.substringBefore('?').endsWith(".json", ignoreCase = true)
         val attempts = if (isDocument) {
             listOf(url, AddonClient.manifestUrl(base))
@@ -119,6 +138,23 @@ object SourceFormats {
         // the user never typed.
         firstUnsupported?.let { return@withContext Result.success(it) }
         Result.failure(lastFailure ?: AddonUnavailable("Nothing answered at that address"))
+    }
+
+    /**
+     * Whether [base] is a FlashMusic server, judged by its own status endpoint.
+     *
+     * The shape is checked, not just the status code: any static host answers
+     * 200 to `/healthz`, and calling one of those a music server would send the
+     * user off to a row that never plays anything.
+     */
+    private suspend fun looksLikeFlashMusic(base: String): Boolean {
+        val body = fetch("$base/healthz").getOrNull() ?: return false
+        val root = runCatching { json.parseToJsonElement(body) }.getOrNull() as? JsonObject ?: return false
+        // `catalog` is what tells a server with nothing in it from a server with
+        // nothing in it *yet*: the census is absent until the first scan, and
+        // requiring it made a freshly installed server impossible to add — the
+        // only answer was "Unrecognised JSON", about your own machine.
+        return (root["ok"] as? JsonPrimitive)?.booleanOrNull == true
     }
 
     /**

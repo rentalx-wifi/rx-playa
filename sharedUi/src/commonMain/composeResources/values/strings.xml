@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="analysis_complete">analysed</string>
+    <string name="home_empty">Nothing to play yet — search for a track, or add a source</string>
     <string name="analysis_in_progress">analysing…</string>
     <string name="analysis_refining">analysed, refining…</string>
     <string name="audio_output">Audio output</string>
@@ -47,6 +48,8 @@
     <string name="listen_together_open">Listen together</string>
     <string name="listen_together_open_count">Listening together · %1$d</string>
     <string name="listen_together_you">You</string>
+    <string name="keep_pitch">Keep pitch</string>
+    <string name="keep_pitch_subtitle">Off drops the voice with the tempo — slowed and sped-up versions</string>
     <string name="mixing">Mixing</string>
     <string name="lossless">Lossless</string>
     <string name="lyrics_already_in_language">These lyrics are already in %1$s</string>
@@ -107,6 +110,8 @@
     <string name="open_lyrics">Lyrics</string>
     <string name="pause">Pause</string>
     <string name="play">Play</string>
+    <string name="playback_speed">Playback speed</string>
+    <string name="playback_speed_subtitle">Holds for every track until you change it</string>
     <string name="played_by">Played by %1$s</string>
     <string name="playing_from">Playing from %1$s</string>
     <string name="playing_radio">Playing %1$s Radio</string>

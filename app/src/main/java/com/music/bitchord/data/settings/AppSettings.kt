@@ -38,11 +38,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 fun AudioQuality.permits(kind: SourceKind): Boolean = when (this) {
     AudioQuality.LOSSLESS -> true
     // No lossless answer is wanted here, and a source that can serve one is
-    // the slow half of the list: an addon fronting several catalogues walks
-    // all of them before it answers, which is seconds spent to land on a
-    // transcode JioSaavn already has at 320.
-    AudioQuality.HIGH -> !kind.canServeLossless
-    AudioQuality.MEDIUM, AudioQuality.LOW -> kind == SourceKind.YOUTUBE
+    // usually the slow half of the list: an addon or a module index fronting
+    // several catalogues walks all of them before it answers, which is seconds
+    // spent to land on a transcode JioSaavn already has at 320. The exception
+    // is a source marked [SourceKind.worthPrefetching] — FlashMusic is one
+    // host with a 320 tier of its own, so skipping it would send a listener
+    // past their own server on every track.
+    AudioQuality.HIGH -> !kind.canServeLossless || kind.worthPrefetching
+    AudioQuality.MEDIUM, AudioQuality.LOW -> kind == SourceKind.YOUTUBE || kind.worthPrefetching
 }
 
 /**
@@ -252,6 +255,18 @@ object AppSettings {
     val exportDownloads = MutableStateFlow(false)
 
     /**
+     * The folder new downloads are saved into, as a SAF tree uri the listener
+     * picked themselves; empty means wherever [exportDownloads] puts them.
+     *
+     * A grant rather than a path, for the reasons the picker exists: it can
+     * name an SD card, a USB stick or a cloud folder that no filesystem path
+     * reaches, and it needs no storage permission. Which means the uri is only
+     * good while the grant behind it lasts — [com.music.bitchord.download.DownloadFolder]
+     * verifies it on every use and clears the setting when it stops holding.
+     */
+    val downloadTreeUri = MutableStateFlow("")
+
+    /**
      * Check the playlists downloaded whole for newly added songs and download
      * them, in the background. Off by default: it spends data and storage
      * without being asked each time. See [com.music.bitchord.download.PlaylistSync].
@@ -438,6 +453,16 @@ object AppSettings {
     val equalizerPreset = MutableStateFlow(EqualizerPreset.FLAT)
 
     val playbackSpeed = MutableStateFlow(1.0f)
+
+    /**
+     * Whether [playbackSpeed] keeps the pitch where it is.
+     *
+     * Off is what makes a slower copy of a track sound slowed rather than
+     * stretched: the rate is applied to the samples themselves, so the voice
+     * drops with it. On is the podcast behaviour — the same track at a
+     * different tempo, in its original key.
+     */
+    val pitchCorrection = MutableStateFlow(true)
     val themeMode = MutableStateFlow(ThemeMode.DARK)
     val appFont = MutableStateFlow(AppFont.DEFAULT)
 
@@ -452,6 +477,17 @@ object AppSettings {
 
     /** Put the playing track's codec, bitrate and sample rate on the player. */
     val showNerdStats = MutableStateFlow(false)
+
+    /**
+     * Whether rows from other platforms are marked when the listener's own
+     * server holds the same recording.
+     *
+     * On by default, because that is what the mark is for: one search, and the
+     * tracks already on the shelf are visible in it. Off stops the one extra
+     * request per result list, which is worth having on a server reached over a
+     * slow link.
+     */
+    val flashMusicCrossMatch = MutableStateFlow(true)
 
     /** Show the output / Listen Together pill under the player's transport. */
     val showListenTogetherButton = MutableStateFlow(false)
@@ -1051,6 +1087,7 @@ object AppSettings {
         downloadQuality.value = readDownloadQuality()
         wifiOnlyDownloads.value = prefs.getBoolean(KEY_WIFI_ONLY_DOWNLOADS, true)
         exportDownloads.value = prefs.getBoolean(KEY_EXPORT_DOWNLOADS, false)
+        downloadTreeUri.value = prefs.getString(KEY_DOWNLOAD_TREE_URI, "").orEmpty()
         syncDownloadedPlaylists.value = prefs.getBoolean(KEY_SYNC_DOWNLOADED_PLAYLISTS, false)
         offlineMode.value = prefs.getBoolean(KEY_OFFLINE_MODE, false)
         betaUpdates.value = prefs.getBoolean(KEY_BETA_UPDATES, false)
@@ -1090,6 +1127,7 @@ object AppSettings {
         equalizerBands.value = readEqualizerBands()
         equalizerPreset.value = EqualizerPreset.matching(equalizerBands.value)
         playbackSpeed.value = prefs.getFloat(KEY_SPEED, 1.0f)
+        pitchCorrection.value = prefs.getBoolean(KEY_PITCH_CORRECTION, true)
         themeMode.value = runCatching {
             ThemeMode.valueOf(prefs.getString(KEY_THEME, null) ?: "DARK")
         }.getOrDefault(ThemeMode.DARK)
@@ -1100,6 +1138,7 @@ object AppSettings {
         shuffleEnabled.value = prefs.getBoolean(KEY_SHUFFLE_ENABLED, false)
         repeatMode.value = prefs.getInt(KEY_REPEAT_MODE, Player.REPEAT_MODE_OFF)
         showNerdStats.value = prefs.getBoolean(KEY_NERD_STATS, false)
+        flashMusicCrossMatch.value = prefs.getBoolean(KEY_FLASH_CROSS_MATCH, true)
         showListenTogetherButton.value = prefs.getBoolean(KEY_LISTEN_TOGETHER_BUTTON, false)
         reduceAnimation.value = prefs.getBoolean(KEY_REDUCE_ANIMATION, false)
         onboardingComplete.value = prefs.getBoolean(KEY_ONBOARDING_COMPLETE, false)
@@ -1494,6 +1533,16 @@ object AppSettings {
     fun setPlaybackSpeed(value: Float) {
         playbackSpeed.value = value
         prefs.edit().putFloat(KEY_SPEED, value).apply()
+    }
+
+    fun setFlashMusicCrossMatch(value: Boolean) {
+        flashMusicCrossMatch.value = value
+        prefs.edit().putBoolean(KEY_FLASH_CROSS_MATCH, value).apply()
+    }
+
+    fun setPitchCorrection(value: Boolean) {
+        pitchCorrection.value = value
+        prefs.edit().putBoolean(KEY_PITCH_CORRECTION, value).apply()
     }
 
     fun setShowNerdStats(value: Boolean) {
@@ -2050,6 +2099,11 @@ object AppSettings {
         prefs.edit().putBoolean(KEY_LOUDNESS_NORMALIZATION, value).apply()
     }
 
+    fun setDownloadTreeUri(value: String) {
+        downloadTreeUri.value = value
+        prefs.edit().putString(KEY_DOWNLOAD_TREE_URI, value).apply()
+    }
+
     fun setExportDownloads(value: Boolean) {
         exportDownloads.value = value
         prefs.edit().putBoolean(KEY_EXPORT_DOWNLOADS, value).apply()
@@ -2451,6 +2505,11 @@ object AppSettings {
         "downloaded_tracks_metadata",
         "downloaded_collections",
         KEY_LOCAL_MUSIC_FOLDER_URI,
+        // A tree uri is a grant held by this install of this app on this
+        // device: exported, it would point at a folder the other phone does not
+        // have, and imported, it would silently take downloads away from the
+        // one this phone picked.
+        KEY_DOWNLOAD_TREE_URI,
         KEY_GUEST_PROFILE_AVATAR,
         KEY_LAST_VERSION_CODE,
         KEY_ONBOARDING_COMPLETE,
@@ -2486,6 +2545,7 @@ object AppSettings {
     private const val KEY_OFFLINE_MODE = "offline_mode"
     private const val KEY_BETA_UPDATES = "beta_updates"
     private const val KEY_EXPORT_DOWNLOADS = "export_downloads"
+    private const val KEY_DOWNLOAD_TREE_URI = "download_tree_uri"
     private const val KEY_SYNC_DOWNLOADED_PLAYLISTS = "sync_downloaded_playlists"
     private const val KEY_CROSSFADE = "crossfade_seconds"
     private const val KEY_SMART_FADE = "smart_fade_enabled"
@@ -2509,12 +2569,14 @@ object AppSettings {
     private const val KEY_EQ_BALANCE = "equalizer_balance"
     private const val KEY_EQ_BANDS = "equalizer_bands"
     private const val KEY_SPEED = "playback_speed"
+    private const val KEY_PITCH_CORRECTION = "playback_pitch_correction"
     private const val KEY_THEME = "theme_mode"
     private const val KEY_APP_FONT = "app_font"
     private const val KEY_AUTOPLAY = "autoplay"
     private const val KEY_SHUFFLE_ENABLED = "shuffle_enabled"
     private const val KEY_REPEAT_MODE = "repeat_mode"
     private const val KEY_NERD_STATS = "show_nerd_stats"
+    private const val KEY_FLASH_CROSS_MATCH = "flash_music_cross_match"
     private const val KEY_LISTEN_TOGETHER_BUTTON = "show_listen_together_button"
     private const val KEY_CACHE_LIMIT = "audio_cache_limit_bytes"
     private const val KEY_REDUCE_ANIMATION = "reduce_animation"

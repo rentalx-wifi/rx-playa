@@ -14,6 +14,7 @@ import com.music.bitchord.data.soundcloud.SoundCloudAccountApi
 import com.music.bitchord.data.soundcloud.toSearchSong
 import com.music.bitchord.data.vk.VkMusicApi
 import com.music.bitchord.data.sources.AddonSource
+import com.music.bitchord.data.sources.FlashMusicSource
 import com.music.bitchord.data.sources.SourceRegistry
 import com.music.bitchord.data.sources.TrackMatcher
 import com.music.bitchord.data.spotify.SPOTIFY_PAGE_PREFIX
@@ -165,6 +166,16 @@ internal class PersonalizationProviders {
                 for (addon in SourceRegistry.active().filterIsInstance<AddonSource>()) {
                     currentCoroutineContext().ensureActive()
                     rows += addon.search(artist, 16, false, null)
+                }
+                rows
+            }
+            HomeSource.FLASHMUSIC -> {
+                // Recommendations from the listener's own catalogue, the same
+                // way addons contribute theirs.
+                val rows = mutableListOf<Song>()
+                for (server in SourceRegistry.active().filterIsInstance<FlashMusicSource>()) {
+                    currentCoroutineContext().ensureActive()
+                    rows += server.search(artist, 16, false, null)
                 }
                 rows
             }

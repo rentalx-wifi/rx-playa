@@ -46,6 +46,25 @@ internal data class SoundCloudSearchPage(
     val nextHref: String?,
 )
 
+/**
+ * The performer of a SoundCloud track, which is not always the account that
+ * uploaded it (issue #51).
+ *
+ * `publisher_metadata.artist` is the credit the release itself carries, so it
+ * wins. The uploader's name is the fallback — wrong for a set of someone
+ * else's album, but closer than nothing — and the permalink's first segment is
+ * the last resort.
+ */
+internal fun soundCloudArtistOf(track: JsonObject, permalink: String?): String? {
+    fun text(obj: JsonObject?, name: String): String? =
+        obj?.get(name)?.jsonPrimitive?.contentOrNull?.trim()?.takeIf(String::isNotEmpty)
+
+    text(track["publisher_metadata"] as? JsonObject, "artist")?.let { return it }
+    text(track["user"] as? JsonObject, "username")?.let { return it }
+    val path = permalink?.let { URI(it).path.orEmpty() } ?: return null
+    return path.split('/').firstOrNull(String::isNotBlank)?.replace('-', ' ')?.takeIf(String::isNotBlank)
+}
+
 /** Public SoundCloud sets through its mobile API; no account token or Go+ bypass. */
 object SoundCloudPlaylistImporter {
     private val redirectClient = Http.client.newBuilder()
@@ -241,10 +260,7 @@ object SoundCloudPlaylistImporter {
         val title = string("title")?.trim()?.takeIf(String::isNotEmpty) ?: return null
         val user = this["user"] as? JsonObject
         val sourceUrl = string("permalink_url")?.takeIf(String::isNotBlank) ?: return null
-        val artist = user?.string("username")?.trim()?.takeIf(String::isNotEmpty)
-            ?: URI(sourceUrl).path.orEmpty().split('/').firstOrNull(String::isNotBlank)
-                ?.replace('-', ' ')?.takeIf(String::isNotBlank)
-            ?: "SoundCloud"
+        val artist = soundCloudArtistOf(this, sourceUrl) ?: "SoundCloud"
         val artwork = string("artwork_url") ?: user?.string("avatar_url")
         return SoundCloudImportTrack(
             title = title,

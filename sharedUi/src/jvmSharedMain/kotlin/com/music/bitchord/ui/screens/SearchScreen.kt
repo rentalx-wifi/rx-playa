@@ -551,7 +551,19 @@ private fun LazyListScope.librarySearchResults(
                 val sourceBadge = when {
                     song.videoId.startsWith("spotify-track:") || song.playbackSource == "Spotify" -> HomeSource.SPOTIFY
                     song.videoId.startsWith("soundcloud:") || song.playbackSource == "SoundCloud" -> HomeSource.SOUNDCLOUD
+                    // Rows the listener's own server handed over. Marked on the
+                    // source's own name rather than on the id prefix, because
+                    // that prefix covers every configured source: an addon's
+                    // rows are not FlashMusic's.
+                    song.playbackSource == "FlashMusic" -> HomeSource.FLASHMUSIC
                     else -> null
+                }
+                // Where the row came from, plus wherever else the search found
+                // the same recording — the second is what puts an FM plaque on
+                // a YouTube row the listener also has at home.
+                val badges = buildSet {
+                    sourceBadge?.let(::add)
+                    addAll(song.availableIn)
                 }
                 SongRow(
                     song = song,
@@ -574,8 +586,8 @@ private fun LazyListScope.librarySearchResults(
                     isPlaying = isPlaying && isCurrentRow(song),
                     searchPlayingStyle = true,
                     showSourceQuality = addons,
-                    trailing = sourceBadge?.let { source ->
-                        { HomeSourceBadges(setOf(source)) }
+                    trailing = badges.takeIf { it.isNotEmpty() }?.let { set ->
+                        { HomeSourceBadges(set) }
                     },
                 )
                 if (index < tracks.lastIndex) {

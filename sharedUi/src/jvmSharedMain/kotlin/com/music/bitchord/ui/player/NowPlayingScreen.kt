@@ -835,6 +835,7 @@ fun NowPlayingScreen(
     var showAudioOutput by remember { mutableStateOf(false) }
     var showVideoQuality by remember { mutableStateOf(false) }
     var showLyricsProviders by remember { mutableStateOf(false) }
+    var showSpeed by remember { mutableStateOf(false) }
     // Gated on the Bluetooth permission the first time — see [rememberOutputPicker].
     val openAudioOutput = rememberOutputPicker { showAudioOutput = true }
     // Listening in a party whose host has taken the controls: the transport
@@ -1107,6 +1108,8 @@ fun NowPlayingScreen(
     // back has to close it first rather than taking the drawer out from
     // under it.
     PlayerBackHandler(enabled = showAudioOutput) { showAudioOutput = false }
+
+    PlayerBackHandler(enabled = showSpeed) { showSpeed = false }
 
     PlayerBackHandler(enabled = showVideoQuality) { showVideoQuality = false }
 
@@ -1621,7 +1624,11 @@ fun NowPlayingScreen(
                 onDismiss = { showAudioOutput = false },
                 onOpenPipeline = { showAudioPipeline = true },
                 onOpenCast = { showCast = true },
+                onOpenSpeed = { showSpeed = true },
             )
+        }
+        if (showSpeed) {
+            SpeedSheet(hazeState = playerHaze, onDismiss = { showSpeed = false })
         }
         if (showLyricsProviders) {
             LyricsProviderSheet(
@@ -1924,6 +1931,13 @@ fun NowPlayingScreen(
                                     .align(Alignment.Center)
                                     .padding(horizontal = 8.dp),
                             )
+                            // Only when the track is not at 1x — the chip is the way back to the drawer.
+                            PlaybackSpeedChip(
+                                onClick = { showSpeed = true },
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .padding(end = 8.dp),
+                            )
                         }
                     },
                     transport = {
@@ -2147,6 +2161,13 @@ fun NowPlayingScreen(
                                         modifier = Modifier
                                             .align(Alignment.Center)
                                             .padding(horizontal = 8.dp),
+                                    )
+                                    // Only when the track is not at 1x — the chip is the way back to the drawer.
+                                    PlaybackSpeedChip(
+                                        onClick = { showSpeed = true },
+                                        modifier = Modifier
+                                            .align(Alignment.CenterEnd)
+                                            .padding(end = 8.dp),
                                     )
                                 }
                             },
@@ -3963,6 +3984,13 @@ fun NowPlayingScreen(
                                 .align(Alignment.Center)
                                 .padding(horizontal = 8.dp),
                         )
+                        // Only when the track is not at 1x — the chip is the way back to the drawer.
+                        PlaybackSpeedChip(
+                            onClick = { showSpeed = true },
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 8.dp),
+                        )
                     }
 
                     // The transport rides midway between the two blocks it separates:
@@ -3970,7 +3998,13 @@ fun NowPlayingScreen(
                     // which sit close enough together to read as one. Both of its own
                     // gaps take half the spread, so on a tall screen it holds the
                     // centre rather than drifting up under the seek bar.
-                    Spacer(Modifier.height(8.dp + controlSpread / 2))
+                    //
+                    // With the volume bar hidden its height is split between both
+                    // gaps instead of being left as a void below the transport: the
+                    // deck keeps its geometry, and the controls stop hanging high
+                    // above an empty row (issue #36).
+                    val hiddenVolume = if (hideVolumeBar) VOLUME_ROW_HEIGHT else 0.dp
+                    Spacer(Modifier.height(8.dp + controlSpread / 2 + hiddenVolume / 2))
 
                     TransportRow(
                         isPlaying = isPlaying,
@@ -3987,7 +4021,7 @@ fun NowPlayingScreen(
                     // hidden. Removing the slot itself shortened the controls by 50dp
                     // and moved every control below it. A display preference should not
                     // change the half-player's geometry.
-                    Spacer(Modifier.height(12.dp + controlSpread / 2))
+                    Spacer(Modifier.height(12.dp + controlSpread / 2 + hiddenVolume / 2))
 
                     if (!hideVolumeBar) {
                         VolumeRow(
@@ -3995,8 +4029,6 @@ fun NowPlayingScreen(
                             onValueChange = onVolumeChange,
                             onValueChangeFinished = onVolumeChangeFinished,
                         )
-                    } else {
-                        Spacer(Modifier.height(VOLUME_ROW_HEIGHT))
                     }
 
                     // The volume slider already has 13dp below its drawn track.

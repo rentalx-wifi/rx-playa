@@ -31,6 +31,10 @@
     <string name="save">저장</string>
     <string name="close">닫기</string>
     <string name="back">뒤로</string>
+    <string name="flashmusic_address">서버 주소</string>
+    <string name="flashmusic_url_description">FlashMusic 서버 주소: 서버가 실행 중인 컴퓨터와 수신 포트입니다.</string>
+    <string name="flashmusic_cross_match">다른 플랫폼의 곡 표시</string>
+    <string name="flashmusic_cross_match_subtitle">서버에 이미 있는 행에 FM 배지를 붙입니다</string>
     <string name="settings">설정</string>
     <string name="search">검색</string>
     <string name="clear_search">검색 지우기</string>
@@ -315,6 +319,10 @@
     <string name="switch_to_list_view">목록 보기로 전환</string>
     <string name="audio_quality">오디오 품질</string>
     <string name="playback">재생</string>
+    <string name="playback_speed">재생 속도</string>
+    <string name="keep_pitch">음높이 유지</string>
+    <string name="keep_pitch_subtitle">끄면 목소리가 템포와 함께 낮아집니다 — 슬로우/스피드업 버전</string>
+    <string name="keep_pitch_off">음높이가 속도를 따릅니다</string>
     <string name="appearance">모양</string>
     <string name="storage">저장공간</string>
     <string name="your_data">내 데이터</string>
@@ -1463,6 +1471,9 @@
     <string name="update_beta_note">테스트 빌드입니다. 일부가 깨질 수 있습니다.</string>
     <string name="soundcloud_token_title">SoundCloud 토큰</string>
     <string name="soundcloud_token_hint">SoundCloud 클라이언트의 OAuth 액세스 토큰을 붙여넣으세요. 저장 전에 확인합니다.</string>
+    <string name="soundcloud_token_help">계정 없이도 공개 플레이리스트와 좋아요를 쓸 수 있습니다. 토큰(SoundCloud 클라이언트의 «Authorization: OAuth» 뒤에 오는 긴 영문·숫자·하이픈 문자열)이 있으면 비공개 세트도 열립니다.</string>
+    <string name="soundcloud_token_placeholder">2-123456-…</string>
+    <string name="soundcloud_token_not_a_token">액세스 토큰이 아닙니다. 링크, 쿠키 또는 JSON 조각으로 보입니다.</string>
     <string name="google_cookie_help_title">How to get the cookie</string>
     <string name="google_cookie_help_body">1. Open music.youtube.com in a browser on a computer and sign in.
 2. Press F12, open the Network tab and reload the page.
@@ -1476,4 +1487,14 @@
     <string name="search_sources_unavailable">No answer from: %1$s</string>
     <string name="search_source_vk" translatable="false">VK Music</string>
     <string name="google_open_browser_action">Open in browser</string>
+    <string name="playlist_local_only_note">YouTube 트랙이 아니므로 이 기기의 플레이리스트에 들어갑니다.</string>
+    <string name="show_less">접기</string>
+    <string name="download_folder">다운로드 폴더</string>
+    <string name="download_folder_usage">%1$s 사용 중</string>
+    <string name="download_folder_app_storage">이 앱의 저장 공간</string>
+    <string name="download_folder_unwritable">이 폴더에 쓸 수 없습니다. 다른 폴더를 선택하세요.</string>
+    <string name="download_folder_lost">폴더가 사라졌습니다 — 다운로드가 앱 저장 공간으로 돌아갑니다.</string>
+    <string name="download_folder_existing_note">이전에 받은 곡은 그대로 남습니다.</string>
+    <string name="download_folder_reset">기본 폴더 사용</string>
+    <string name="download_folder_reset_subtitle">이 앱의 저장 공간으로 돌아가기</string>
 </resources>

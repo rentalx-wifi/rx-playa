@@ -598,32 +598,38 @@ class SourcesTest {
     }
 
     @Test
-    fun `JioSaavn is off by default on a fresh install`() {
-        assertFalse(SourceConfig(kind = SourceKind.JIOSAAVN).enabled)
-        val sources = SourceRegistry.sourcesForInit(emptyList(), forceJioSaavnOff = true)
+    fun `FlashMusic is seeded in JioSaavn's place, switched on, with its own address`() {
+        val sources = SourceRegistry.sourcesForInit(emptyList())
 
-        assertFalse(sources.single { it.kind == SourceKind.JIOSAAVN }.enabled)
+        val flash = sources.single { it.kind == SourceKind.FLASHMUSIC }
+        assertTrue("the bundled server is on from the first launch", flash.enabled)
+        assertEquals(SourceRegistry.DEFAULT_FLASHMUSIC_URL, flash.baseUrl)
+        assertTrue("JioSaavn is what FlashMusic replaced", sources.none { it.kind == SourceKind.JIOSAAVN })
         assertTrue(sources.single { it.kind == SourceKind.YOUTUBE }.enabled)
     }
 
     @Test
-    fun `the opt-in migration disables JioSaavn once for existing installs`() {
-        val previouslyEnabled = SourceConfig(kind = SourceKind.JIOSAAVN, enabled = true)
-
-        val migrated = SourceRegistry.sourcesForInit(
-            listOf(previouslyEnabled),
-            forceJioSaavnOff = true,
+    fun `an install that still has JioSaavn stored loses it on upgrade`() {
+        val upgraded = SourceRegistry.sourcesForInit(
+            listOf(SourceConfig(kind = SourceKind.JIOSAAVN, enabled = true)),
         )
-        assertFalse(migrated.single { it.kind == SourceKind.JIOSAAVN }.enabled)
 
-        val userEnabledAgain = migrated.map {
-            if (it.kind == SourceKind.JIOSAAVN) it.copy(enabled = true) else it
-        }
-        val nextLaunch = SourceRegistry.sourcesForInit(
-            userEnabledAgain,
-            forceJioSaavnOff = false,
+        assertTrue(upgraded.none { it.kind == SourceKind.JIOSAAVN })
+        assertTrue(upgraded.any { it.kind == SourceKind.FLASHMUSIC })
+    }
+
+    @Test
+    fun `a server address the listener set is never overwritten`() {
+        val mine = SourceConfig(
+            kind = SourceKind.FLASHMUSIC,
+            baseUrl = "http://192.168.1.5:9000",
+            enabled = false,
         )
-        assertTrue(nextLaunch.single { it.kind == SourceKind.JIOSAAVN }.enabled)
+
+        val out = SourceRegistry.sourcesForInit(listOf(mine)).single { it.kind == SourceKind.FLASHMUSIC }
+
+        assertEquals("http://192.168.1.5:9000", out.baseUrl)
+        assertFalse("a server switched off stays off", out.enabled)
     }
 
     @Test

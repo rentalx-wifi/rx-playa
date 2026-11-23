@@ -33,6 +33,10 @@
     <string name="save">Сохранить</string>
     <string name="close">Закрыть</string>
     <string name="back">Назад</string>
+    <string name="flashmusic_address">Адрес сервера</string>
+    <string name="flashmusic_url_description">Адрес вашего сервера FlashMusic: машина, на которой он запущен, и порт, который он слушает.</string>
+    <string name="flashmusic_cross_match">Отмечать треки с других площадок</string>
+    <string name="flashmusic_cross_match_subtitle">Ставит плашку FM на строки, которые уже есть на вашем сервере</string>
     <string name="settings">Настройки</string>
     <string name="search">Поиск</string>
     <string name="clear_search">Очистить поиск</string>
@@ -271,6 +275,10 @@
     <string name="switch_to_list_view">Переключить на список</string>
     <string name="audio_quality">Качество звука</string>
     <string name="playback">Воспроизведение</string>
+    <string name="playback_speed">Скорость воспроизведения</string>
+    <string name="keep_pitch">Сохранять тон</string>
+    <string name="keep_pitch_subtitle">Выключено — голос опускается вместе с темпом: slowed и sped up</string>
+    <string name="keep_pitch_off">тон едет за скоростью</string>
     <string name="appearance">Внешний вид</string>
     <string name="storage">Хранилище</string>
     <string name="your_data">Ваши данные</string>
@@ -1647,6 +1655,9 @@
     <string name="update_beta_note">Тестовая сборка. Что-то может сломаться.</string>
     <string name="soundcloud_token_title">Токен SoundCloud</string>
     <string name="soundcloud_token_hint">Вставь OAuth access token из клиента SoundCloud. Он проверяется перед сохранением.</string>
+    <string name="soundcloud_token_help">Без аккаунта доступны публичные плейлисты и лайки. Токен — длинная строка из букв, цифр и дефисов после «Authorization: OAuth» в любом клиенте SoundCloud — открывает и ваши приватные подборки.</string>
+    <string name="soundcloud_token_placeholder">2-123456-…</string>
+    <string name="soundcloud_token_not_a_token">Это не токен доступа: похоже на ссылку, cookie или кусок JSON.</string>
     <string name="google_cookie_help_title">Как получить cookie</string>
     <string name="google_cookie_help_body">1. Откройте music.youtube.com в браузере на компьютере и войдите в аккаунт.
 2. Нажмите F12, откройте вкладку Network (Сеть) и обновите страницу.
@@ -1660,4 +1671,14 @@
     <string name="search_sources_unavailable">Не ответили: %1$s</string>
     <string name="search_source_vk" translatable="false">VK Music</string>
     <string name="google_open_browser_action">Открыть в браузере</string>
+    <string name="playlist_local_only_note">Трек не из YouTube, поэтому он попадёт в плейлист на этом устройстве.</string>
+    <string name="show_less">Свернуть</string>
+    <string name="download_folder">Папка для скачивания</string>
+    <string name="download_folder_usage">занято %1$s</string>
+    <string name="download_folder_app_storage">Собственное хранилище приложения</string>
+    <string name="download_folder_unwritable">В эту папку нельзя писать. Выберите другую.</string>
+    <string name="download_folder_lost">Папка пропала — загрузки возвращаются в хранилище приложения.</string>
+    <string name="download_folder_existing_note">Скачанное раньше остаётся на месте.</string>
+    <string name="download_folder_reset">Папка по умолчанию</string>
+    <string name="download_folder_reset_subtitle">Вернуться в хранилище приложения</string>
 </resources>

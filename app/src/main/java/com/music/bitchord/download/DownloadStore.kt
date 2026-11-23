@@ -154,7 +154,10 @@ object DownloadStore {
      * have one.
      */
     fun existing(context: Context, name: String): Uri? =
-        if (!AppSettings.exportDownloads.value) {
+        // Asked of the listener's own folder first: a download that went there
+        // is invisible to both branches below, which only know the destinations
+        // this app named itself.
+        DownloadFolder.existing(context, name) ?: if (!AppSettings.exportDownloads.value) {
             privateFile(context, name).takeIf { it.exists() }?.let(Uri::fromFile)
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             mediaStoreEntry(context, name)
@@ -205,6 +208,41 @@ object DownloadStore {
             context.contentResolver.delete(uri, null, null) > 0
         }
     }.onFailure { Log.w(TAG, "could not delete $uri: ${it.message}") }.getOrDefault(false)
+
+    /**
+     * How much the built-in destination holds, counted where it actually lives.
+     *
+     * Private downloads are plain files and are summed from the disk; an
+     * exported one is a row in the media store, and a walked path would miss
+     * anything Android renamed or the user moved. Read only by the settings row
+     * that shows what downloads occupy, so a stale answer is cosmetic.
+     */
+    fun usedBytes(context: Context): Long = runCatching {
+        when {
+            !AppSettings.exportDownloads.value -> directoryBytes(privateFolder(context))
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> mediaStoreBytes(context)
+            else -> directoryBytes(legacyFolder)
+        }
+    }.onFailure { Log.w(TAG, "could not measure the download folder: ${it.message}") }.getOrDefault(0L)
+
+    private fun directoryBytes(folder: File?): Long =
+        folder?.listFiles()?.sumOf { if (it.isDirectory) directoryBytes(it) else it.length() } ?: 0L
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun mediaStoreBytes(context: Context): Long = runCatching {
+        context.contentResolver.query(
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+            arrayOf(MediaStore.MediaColumns.SIZE),
+            "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
+            arrayOf("%$FOLDER%"),
+            null,
+        )?.use { cursor ->
+            var total = 0L
+            while (cursor.moveToNext()) total += cursor.getLong(0)
+            total
+        } ?: 0L
+    }.onFailure { Log.w(TAG, "media store would not size the download folder: ${it.message}") }
+        .getOrDefault(0L)
 
     // ---- Writing ------------------------------------------------------------
 
@@ -309,11 +347,12 @@ object DownloadStore {
     }
 
     @Suppress("DEPRECATION")
-    private fun legacyFile(name: String) = File(
-        File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), FOLDER),
-        name,
-    )
+    private val legacyFolder: File
+        get() = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), FOLDER)
 
-    private fun privateFile(context: Context, name: String) =
-        File(File(context.filesDir, "downloads"), name)
+    private fun legacyFile(name: String) = File(legacyFolder, name)
+
+    private fun privateFolder(context: Context) = File(context.filesDir, "downloads")
+
+    private fun privateFile(context: Context, name: String) = File(privateFolder(context), name)
 }
