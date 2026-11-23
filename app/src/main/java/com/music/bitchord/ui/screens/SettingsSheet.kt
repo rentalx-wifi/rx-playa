@@ -3065,7 +3065,9 @@ internal fun SettingsRow(
                     color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
+                    // Long subtitles used to run under the trailing switch (#60):
+                    // the column takes the room that is left and wraps.
+                    modifier = Modifier.weight(1f),
                 )
                 if (badge != null) {
                     Spacer(Modifier.width(8.dp))
@@ -3140,7 +3142,9 @@ internal fun SettingsSubRow(
                     color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
+                    // Long subtitles used to run under the trailing switch (#60):
+                    // the column takes the room that is left and wraps.
+                    modifier = Modifier.weight(1f),
                 )
                 if (badge != null) {
                     Spacer(Modifier.width(8.dp))
