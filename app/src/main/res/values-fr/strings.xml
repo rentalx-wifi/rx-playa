@@ -684,6 +684,7 @@
     <string name="rename">Renommer</string>
     <string name="downloading">Téléchargement</string>
     <string name="delete_playlist">Supprimer la playlist</string>
+    <string name="delete_from_device">Delete from device</string>
     <string name="delete_download">Supprimer le téléchargement</string>
     <string name="delete_playlist_confirmation">Supprimer « %1$s » ? Appuyez de nouveau pour confirmer.</string>
     <string name="delete_download_confirmation">Retirer « %1$s » de cet appareil ? Appuyez de nouveau pour confirmer.</string>

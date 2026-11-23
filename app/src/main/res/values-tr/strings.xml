@@ -713,6 +713,7 @@
     <string name="rename">Yeniden adlandır</string>
     <string name="downloading">İndiriliyor</string>
     <string name="delete_playlist">Çalma listesini sil</string>
+    <string name="delete_from_device">Delete from device</string>
     <string name="delete_download">İndirmeyi sil</string>
     <string name="delete_playlist_confirmation">“%1$s” silinsin mi? Onaylamak için tekrar dokun.</string>
     <string name="delete_download_confirmation">“%1$s” bu cihazdan kaldırılsın mı? Onaylamak için tekrar dokun.</string>

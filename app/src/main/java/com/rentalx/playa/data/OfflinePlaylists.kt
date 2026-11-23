@@ -155,6 +155,20 @@ object OfflinePlaylists {
         }
     }
 
+    /**
+     * Drops a track from every playlist, Liked included: the file it pointed at
+     * is gone from the device, and a row that plays nothing is worse than none.
+     */
+    fun forget(song: Song) {
+        val key = song.localUri ?: return
+        mutate { list ->
+            list.map { playlist ->
+                if (playlist.songs.none { it.localUri == key }) return@map playlist
+                playlist.copy(songs = playlist.songs.filterNot { it.localUri == key })
+            }
+        }
+    }
+
     /** Liked is the app's, not the user's: it can't be renamed or deleted. */
     fun rename(browseId: String, title: String) {
         val id = browseId.removePrefix(PREFIX)

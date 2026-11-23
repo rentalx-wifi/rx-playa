@@ -630,6 +630,7 @@
     <string name="rename">Renomear</string>
     <string name="downloading">Baixando</string>
     <string name="delete_playlist">Excluir playlist</string>
+    <string name="delete_from_device">Delete from device</string>
     <string name="delete_download">Excluir download</string>
     <string name="delete_playlist_confirmation">Excluir “%1$s”? Toque novamente para confirmar.</string>
     <string name="delete_download_confirmation">Remover “%1$s” deste dispositivo? Toque novamente para confirmar.</string>

@@ -224,6 +224,7 @@ import com.rentalx.playa.ui.screens.DiscordScreen
 import com.rentalx.playa.ui.screens.EqualizerScreen
 import com.rentalx.playa.ui.screens.HistoryScreen
 import com.rentalx.playa.ui.screens.LibraryReplayEntry
+import com.rentalx.playa.ui.screens.LOCAL_MUSIC_BROWSE_ID
 import com.rentalx.playa.ui.screens.libraryDeviceItems
 import com.rentalx.playa.ui.screens.SPOTIFY_BROWSE_ID
 import com.rentalx.playa.ui.screens.libraryLinks
@@ -5293,6 +5294,37 @@ private fun PlayaApp(
                         {
                             songActions = null
                             removeFromCache(listOf(song))
+                        }
+                    } else {
+                        null
+                    },
+                    // The file is gone already by the time this runs: the
+                    // system's own prompt did the deleting. What is left is the
+                    // app's copy of it — the local pages, the playlists it was
+                    // in, and the queue (issue #36).
+                    onDeleteFromDevice = if (song.localUri != null) {
+                        {
+                            songActions = null
+                            OfflinePlaylists.forget(song)
+                            viewModel.reloadLocalDetail(LOCAL_MUSIC_BROWSE_ID)
+                            val key = song.localUri
+                            controller?.let { player ->
+                                // One at a time: the queue can carry the same
+                                // file twice, and removing by index shifts
+                                // every one after it.
+                                while (true) {
+                                    var found = -1
+                                    for (i in 0 until player.mediaItemCount) {
+                                        val mediaId = player.getMediaItemAt(i).mediaId
+                                        if (mediaId == song.videoId || mediaId == key) {
+                                            found = i
+                                            break
+                                        }
+                                    }
+                                    if (found < 0) break
+                                    player.removeMediaItem(found)
+                                }
+                            }
                         }
                     } else {
                         null

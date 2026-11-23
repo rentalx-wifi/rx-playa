@@ -683,6 +683,7 @@
     <string name="rename">नाम बदलें</string>
     <string name="downloading">डाउनलोड हो रहा है</string>
     <string name="delete_playlist">प्लेलिस्ट मिटाएं</string>
+    <string name="delete_from_device">Delete from device</string>
     <string name="delete_download">डाउनलोड मिटाएं</string>
     <string name="delete_playlist_confirmation">“%1$s” मिटाएं? पुष्टि के लिए फिर से टैप करें।</string>
     <string name="delete_download_confirmation">“%1$s” को इस डिवाइस से हटाएं? पुष्टि के लिए फिर से टैप करें।</string>

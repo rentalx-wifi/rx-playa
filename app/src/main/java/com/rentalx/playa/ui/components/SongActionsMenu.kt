@@ -1,12 +1,17 @@
 package com.rentalx.playa.ui.components
 
+import com.rentalx.playa.data.DeviceFileDelete
 import com.rentalx.playa.ui.icons.BrokenHeart
 import com.rentalx.playa.ui.icons.SfIcons
 import com.rentalx.playa.ui.components.trackArtSize
 import androidx.compose.ui.layout.ContentScale
 import com.rentalx.playa.R
 
+import android.app.Activity
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -128,6 +133,11 @@ fun SongActionsMenu(
      * passes one only while the cache actually holds some of it.
      */
     onRemoveFromCache: (() -> Unit)? = null,
+    /**
+     * Deletes this track's file from the device, after a second tap confirms.
+     * Null hides the row — a stream has no file on this device to delete.
+     */
+    onDeleteFromDevice: (() -> Unit)? = null,
     /**
      * Removes this track from the account's listening history. Null hides the
      * row — the History screen passes one only when the menu is opened there.
@@ -335,6 +345,9 @@ fun SongActionsMenu(
             onClick = onAddToQueue,
         )
         DownloadRow(song, palette, isOffline, onDownload)
+        onDeleteFromDevice?.let { onDeleted ->
+            DeleteFromDeviceRow(song, palette, onDeleted)
+        }
         onRemoveFromCache?.let {
             ActionRow(
                 icon = SfIcons.Trash,
@@ -570,6 +583,50 @@ private fun DownloadRow(song: Song, palette: ArtworkPalette, isOffline: Boolean,
                 accent = palette.accent,
                 onClick = onDownload,
             )
+        }
+    }
+}
+
+/**
+ * The file itself, not the download record: the one action that takes a local
+ * track off the device. A second tap confirms, the way every other deletion in
+ * these menus asks; on Android 11+ the system gets the last word and its own
+ * prompt is the confirmation that counts.
+ *
+ * The caller does the forgetting — the library, the playlists, the queue —
+ * because only it knows what the track was open on.
+ */
+@Composable
+private fun DeleteFromDeviceRow(song: Song, palette: ArtworkPalette, onDeleted: () -> Unit) {
+    val uri = song.localUri?.let(Uri::parse) ?: return
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var confirming by remember(song.localUri) { mutableStateOf(false) }
+    val systemDelete = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) onDeleted()
+        confirming = false
+    }
+    if (!confirming) {
+        ActionRow(
+            icon = SfIcons.Trash,
+            label = stringResource(R.string.delete_from_device),
+            accent = palette.accent,
+        ) { confirming = true }
+        return
+    }
+    ActionRow(
+        icon = SfIcons.Trash,
+        label = stringResource(R.string.delete_download_confirmation, song.title),
+        tint = MaterialTheme.colorScheme.error,
+    ) {
+        confirming = false
+        val sender = DeviceFileDelete.requestSender(context, uri)
+        if (sender != null) {
+            runCatching { systemDelete.launch(IntentSenderRequest.Builder(sender).build()) }
+        } else {
+            scope.launch { if (DeviceFileDelete.delete(context, uri)) onDeleted() }
         }
     }
 }

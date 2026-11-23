@@ -629,6 +629,7 @@
     <string name="rename">שנה שם</string>
     <string name="downloading">מוריד</string>
     <string name="delete_playlist">מחק רשימת השמעה</string>
+    <string name="delete_from_device">Delete from device</string>
     <string name="delete_download">מחק הורדה</string>
     <string name="delete_playlist_confirmation">למחוק את “%1$s”? הקש שוב לאישור.</string>
     <string name="delete_download_confirmation">להסיר את “%1$s” מהמכשיר? הקש שוב לאישור.</string>

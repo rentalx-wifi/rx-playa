@@ -707,6 +707,7 @@
     <string name="rename">Đổi tên</string>
     <string name="downloading">Đang tải xuống</string>
     <string name="delete_playlist">Xóa danh sách phát</string>
+    <string name="delete_from_device">Delete from device</string>
     <string name="delete_download">Xóa bản tải xuống</string>
     <string name="delete_playlist_confirmation">Xóa “%1$s”? Nhấn lần nữa để xác nhận.</string>
     <string name="delete_download_confirmation">Xóa “%1$s” khỏi thiết bị này? Nhấn lần nữa để xác nhận.</string>

@@ -986,6 +986,7 @@
     <string name="rename">Rename</string>
     <string name="downloading">Downloading</string>
     <string name="delete_playlist">Delete playlist</string>
+    <string name="delete_from_device">Delete from device</string>
     <string name="delete_download">Delete download</string>
     <string name="delete_playlist_confirmation">Delete “%1$s”? Tap again to confirm.</string>
     <string name="delete_download_confirmation">Remove “%1$s” from this device? Tap again to confirm.</string>

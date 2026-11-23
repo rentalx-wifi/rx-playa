@@ -664,6 +664,7 @@
     <string name="rename">名前を変更</string>
     <string name="downloading">ダウンロード中</string>
     <string name="delete_playlist">プレイリストを削除</string>
+    <string name="delete_from_device">Delete from device</string>
     <string name="delete_download">ダウンロードを削除</string>
     <string name="delete_playlist_confirmation">「%1$s」を削除しますか？もう一度タップして確定します。</string>
     <string name="delete_download_confirmation">「%1$s」をこのデバイスから削除しますか？もう一度タップして確定します。</string>

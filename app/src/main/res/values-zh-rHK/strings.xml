@@ -656,6 +656,7 @@
     <string name="rename">重新命名</string>
     <string name="downloading">正在下載</string>
     <string name="delete_playlist">刪除播放列表</string>
+    <string name="delete_from_device">Delete from device</string>
     <string name="delete_download">刪除下載內容</string>
     <string name="delete_playlist_confirmation">刪除“%1$s”？再次點按以確認。</string>
     <string name="delete_download_confirmation">從此裝置中移除“%1$s”？再次點按以確認。</string>

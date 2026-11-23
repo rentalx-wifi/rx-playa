@@ -693,6 +693,7 @@
     <string name="rename">เปลี่ยนชื่อ</string>
     <string name="downloading">กำลังดาวน์โหลด</string>
     <string name="delete_playlist">ลบเพลย์ลิสต์</string>
+    <string name="delete_from_device">Delete from device</string>
     <string name="delete_download">ลบไฟล์ที่ดาวน์โหลด</string>
     <string name="delete_playlist_confirmation">ลบ “%1$s” หรือไม่ แตะอีกครั้งเพื่อยืนยัน</string>
     <string name="delete_download_confirmation">นำ “%1$s” ออกจากอุปกรณ์นี้หรือไม่ แตะอีกครั้งเพื่อยืนยัน</string>

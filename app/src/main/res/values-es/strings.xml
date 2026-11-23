@@ -695,6 +695,7 @@
     <string name="rename">Cambiar nombre</string>
     <string name="downloading">Descargando</string>
     <string name="delete_playlist">Eliminar playlist</string>
+    <string name="delete_from_device">Delete from device</string>
     <string name="delete_download">Eliminar descarga</string>
     <string name="delete_playlist_confirmation">¿Eliminar “%1$s”? Toca de nuevo para confirmar.</string>
     <string name="delete_download_confirmation">¿Quitar “%1$s” de este dispositivo? Toca de nuevo para confirmar.</string>

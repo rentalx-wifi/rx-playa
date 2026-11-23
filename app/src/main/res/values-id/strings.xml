@@ -664,6 +664,7 @@
     <string name="rename">Ganti nama</string>
     <string name="downloading">Mengunduh</string>
     <string name="delete_playlist">Hapus playlist</string>
+    <string name="delete_from_device">Delete from device</string>
     <string name="delete_download">Hapus unduhan</string>
     <string name="delete_playlist_confirmation">Hapus “%1$s”? Ketuk lagi untuk konfirmasi.</string>
     <string name="delete_download_confirmation">Hapus “%1$s” dari perangkat ini? Ketuk lagi untuk konfirmasi.</string>

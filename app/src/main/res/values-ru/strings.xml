@@ -759,6 +759,7 @@
     <string name="rename">Переименовать</string>
     <string name="downloading">Загрузка</string>
     <string name="delete_playlist">Удалить плейлист</string>
+    <string name="delete_from_device">Удалить с устройства</string>
     <string name="delete_download">Удалить загрузку</string>
     <string name="delete_playlist_confirmation">Удалить «%1$s»? Нажмите ещё раз для подтверждения.</string>
     <string name="delete_download_confirmation">Удалить «%1$s» с этого устройства? Нажмите ещё раз для подтверждения.</string>

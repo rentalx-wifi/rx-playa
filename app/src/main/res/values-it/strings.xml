@@ -732,6 +732,7 @@
     <string name="rename">Rinomina</string>
     <string name="downloading">Download in corso</string>
     <string name="delete_playlist">Elimina playlist</string>
+    <string name="delete_from_device">Delete from device</string>
     <string name="delete_download">Elimina download</string>
     <string name="delete_playlist_confirmation">Eliminare “%1$s”? Tocca di nuovo per confermare.</string>
     <string name="delete_download_confirmation">Rimuovere “%1$s” da questo dispositivo? Tocca di nuovo per confermare.</string>
