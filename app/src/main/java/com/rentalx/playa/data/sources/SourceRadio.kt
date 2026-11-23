@@ -47,6 +47,18 @@ object SourceRadio {
 
     private val cache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Song>>>()
 
+    /**
+     * Sources that answered too slowly to be worth asking again for a while.
+     *
+     * A station asks a radio per seed, and one catalogue that takes two seconds
+     * per question sets the pace for the whole station — the first wave measures
+     * that, and the next five minutes go to the catalogues that answer.
+     */
+    private val slowSources = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    private const val SLOW_SOURCE_NANOS = 1_200_000_000L
+    private const val SLOW_SOURCE_REST_MS = 5 * 60 * 1000L
+
     /** How long one rotor batch is reused before asking for the next one. */
     private const val WAVE_CACHE_MS = 4 * 60 * 1000L
 
@@ -106,16 +118,25 @@ object SourceRadio {
             SourceRegistry.active()
                 .filter { it.kind != SourceKind.YOUTUBE }
                 .sortedBy { it.kind.rank }
+                .filter { source ->
+                    val until = slowSources[source.configId] ?: 0L
+                    now >= until
+                }
                 .take(SOURCES_PER_SEED)
                 .map { source ->
                     async {
-                        withTimeoutOrNull(PER_SOURCE_TIMEOUT_MS) {
+                        val startedAt = System.nanoTime()
+                        val rows = withTimeoutOrNull(PER_SOURCE_TIMEOUT_MS) {
                             runCatching { source.search(query, limit) }
                                 .onFailure {
                                     TrackLog.d("Playa", "wave radio: ${source.displayName} failed: ${it.message}")
                                 }
                                 .getOrDefault(emptyList())
                         }.orEmpty()
+                        if (System.nanoTime() - startedAt > SLOW_SOURCE_NANOS) {
+                            slowSources[source.configId] = now + SLOW_SOURCE_REST_MS
+                        }
+                        rows
                     }
                 }
                 .awaitAll()
