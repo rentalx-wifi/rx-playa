@@ -627,12 +627,19 @@ object StreamResolver {
         val downloadExtension: String
             get() = when {
                 "mp4" in mimeType || "m4a" in mimeType -> "m4a"
+                // An addon that serves MP3 (see SourceResolver) is written as
+                // it came: no re-encoding anywhere in this app.
+                "mpeg" in mimeType || "mp3" in mimeType -> "mp3"
                 else -> "webm"
             }
 
         /** What the media store should be told this file is. */
         val downloadMimeType: String
-            get() = if (downloadExtension == "m4a") "audio/mp4" else "audio/webm"
+            get() = when (downloadExtension) {
+                "m4a" -> "audio/mp4"
+                "mp3" -> "audio/mpeg"
+                else -> "audio/webm"
+            }
     }
 
     /**

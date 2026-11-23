@@ -66,7 +66,7 @@ object MediaTagger {
      * a half-written one: a WAV's metadata lives in RIFF chunks that a good
      * number of players ignore outright.
      */
-    private val TAGGABLE = setOf("m4a", "webm", "flac")
+    private val TAGGABLE = setOf("m4a", "webm", "flac", "mp3")
 
     /**
      * Whether a file of [extension] gets tags at all.
@@ -237,6 +237,18 @@ object MediaTagger {
                     wordLyrics = words,
                 )
                 "flac" -> FlacTagger.tag(
+                    original,
+                    track.title,
+                    track.artist,
+                    track.albumName,
+                    plain,
+                    artwork?.bytes,
+                    artwork?.mime ?: "image/jpeg",
+                    wordLyrics = words,
+                )
+                // Only a source that serves MP3 itself gets here — the app
+                // never re-encodes, so this file's audio is what was sent.
+                "mp3" -> Id3v2Tagger.tag(
                     original,
                     track.title,
                     track.artist,
