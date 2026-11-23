@@ -1209,7 +1209,20 @@ object AppSettings {
         customAccent.value = prefs.getLong(KEY_CUSTOM_ACCENT, 0L).takeIf { it != 0L }
         accentFollowsIcon.value = prefs.getBoolean(KEY_ACCENT_FROM_ICON, true)
         iconAccent.value = prefs.getLong(KEY_ICON_ACCENT, 0L).takeIf { it != 0L }
-        liquidGlassEnabled.value = prefs.getBoolean(KEY_LIQUID_GLASS_ENABLED, true)
+        // A preference written before the glass was the default says false, and
+        // reading it as-is would keep glass off for everyone who ever touched the
+        // switch while it still defaulted to off. The first run after that change
+        // turns it on and records that it has: a choice made from here on is the
+        // listener's own and stays as they left it.
+        if (!prefs.getBoolean(KEY_LIQUID_GLASS_DEFAULTED, false)) {
+            prefs.edit()
+                .putBoolean(KEY_LIQUID_GLASS_DEFAULTED, true)
+                .putBoolean(KEY_LIQUID_GLASS_ENABLED, true)
+                .apply()
+            liquidGlassEnabled.value = true
+        } else {
+            liquidGlassEnabled.value = prefs.getBoolean(KEY_LIQUID_GLASS_ENABLED, true)
+        }
         zapretPath.value = prefs.getString(KEY_ZAPRET_PATH, "").orEmpty()
         zapretStrategy.value = prefs.getString(KEY_ZAPRET_STRATEGY, "fake_split").orEmpty()
         zapretArgs.value = prefs.getString(KEY_ZAPRET_ARGS, "").orEmpty()
@@ -2669,6 +2682,9 @@ object AppSettings {
     private const val KEY_MATERIAL_YOU = "material_you"
     private const val KEY_CUSTOM_ACCENT = "custom_accent"
     private const val KEY_LIQUID_GLASS_ENABLED = "liquid_glass_enabled"
+
+    /** Set once, when the glass became the default rather than an opt-in. */
+    private const val KEY_LIQUID_GLASS_DEFAULTED = "liquid_glass_defaulted_on"
     private const val KEY_ZAPRET_ARGS = "zapret_args"
     private const val KEY_ZAPRET_AUTOSTART = "zapret_autostart"
     /** Read only for one-time migration; never written by current builds. */

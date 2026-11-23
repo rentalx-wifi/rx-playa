@@ -230,11 +230,16 @@ fun Modifier.liquidGlass(
             colorControls(saturation = 1f + 0.5f * VIBRANCY)
             blur(blurPx)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                // No chromatic aberration: it is a second sampling of every
+                // pixel under the lens, on every glass surface, every frame,
+                // and what it buys is a colour fringe a couple of pixels wide
+                // along one edge. The refraction and the depth are what read as
+                // glass; the fringe is what costs the frame.
                 lens(
                     refractionHeight = lensHeightPx,
                     refractionAmount = lensAmountPx,
                     depthEffect = true,
-                    chromaticAberration = true,
+                    chromaticAberration = false,
                 )
             }
         },

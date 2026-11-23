@@ -990,12 +990,16 @@ private fun RecentShelf(
                 items(columns) { column ->
                     Column(Modifier.width(columnWidth)) {
                         column.forEach { item ->
+                            // One lookup per row: the matcher walks the whole
+                            // shelf, and it was being asked the same question
+                            // twice for every row drawn.
+                            val current = isCurrentItem(item)
                             RecentTrackRow(
                                 item = item,
                                 onClick = { onItemClick(item) },
                                 onLongPress = onItemLongPress?.let { { it(item) } },
-                                isCurrent = isCurrentItem(item),
-                                isPlaying = isCurrentItem(item) && isPlaying,
+                                isCurrent = current,
+                                isPlaying = current && isPlaying,
                             )
                         }
                     }

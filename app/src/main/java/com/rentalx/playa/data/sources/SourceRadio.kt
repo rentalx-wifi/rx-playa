@@ -31,7 +31,21 @@ import kotlinx.coroutines.withTimeoutOrNull
 object SourceRadio {
 
     /** How long one source is given before the station moves on without it. */
-    private const val PER_SOURCE_TIMEOUT_MS = 5_000L
+    private const val PER_SOURCE_TIMEOUT_MS = 3_000L
+
+    /**
+     * Sources asked for one seed.
+     *
+     * The planner asks a radio per seed, so every source in this list is a
+     * request on the way to the first track: the three the listener's own order
+     * puts first answer for a station, and the rest are not worth the wait.
+     */
+    private const val SOURCES_PER_SEED = 3
+
+    /** How long an artist's answer is reused: seeds repeat across one wave. */
+    private const val RESULT_CACHE_MS = 2 * 60 * 1000L
+
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Song>>>()
 
     /** How long one rotor batch is reused before asking for the next one. */
     private const val WAVE_CACHE_MS = 4 * 60 * 1000L
@@ -82,12 +96,17 @@ object SourceRadio {
     suspend fun related(seed: Song, limit: Int): List<Song> {
         val artist = normalizedArtistName(seed.artist)
         val query = artist.ifBlank { seed.title }.ifBlank { return emptyList() }
+        val cacheKey = "$query|$limit"
+        val now = System.currentTimeMillis()
+        cache[cacheKey]?.let { (at, rows) -> if (now - at < RESULT_CACHE_MS) return rows }
         val seedKey = seed.durationMillis()
             .let { if (it <= 0) "" else (it / 1000 / 2).toString() }
 
         val rows = coroutineScope {
             SourceRegistry.active()
                 .filter { it.kind != SourceKind.YOUTUBE }
+                .sortedBy { it.kind.rank }
+                .take(SOURCES_PER_SEED)
                 .map { source ->
                     async {
                         withTimeoutOrNull(PER_SOURCE_TIMEOUT_MS) {
@@ -112,6 +131,8 @@ object SourceRadio {
             .distinctBy { it.videoId }
 
         TrackLog.d("Playa", "wave radio: \"$query\" → ${rows.size} tracks from non-YouTube sources")
+        if (cache.size > 32) cache.clear()
+        cache[cacheKey] = now to rows
         return rows
     }
 }

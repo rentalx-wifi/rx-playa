@@ -17,6 +17,7 @@ import com.rentalx.playa.data.sources.TrackMatcher
 import com.rentalx.playa.playback.TrackText
 import com.rentalx.playa.playback.QueueCoordinator.asQueueEntry
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.random.Random
 
 /** Most AutoPlay-suggested tracks kept queued ahead of the current one at once. */
@@ -24,6 +25,9 @@ const val MAX_QUEUED_AUTOPLAY = 10
 
 /** Most liked artists whose radios one wave asks, before it gives up. */
 private const val MAX_PERSONAL_WAVE_SEEDS = 24
+
+/** How long a seed is given to find a YouTube twin before the station moves on. */
+private const val SEED_MATCH_TIMEOUT_MS = 1_500L
 
 /** How many kin one source is asked for per wave seed. */
 private const val WAVE_RADIO_PER_SOURCE = 12
@@ -161,17 +165,26 @@ internal fun isYouTubeVideoId(id: String): Boolean = YOUTUBE_VIDEO_ID.matches(id
  */
 suspend fun youtubeSeedFor(song: Song): String? {
     if (isYouTubeVideoId(song.videoId)) return song.videoId
-    return ExternalPlaylistImporter.match(
-        BasicExternalPlaylistTrack(
-            title = song.title,
-            artist = song.artist,
-            album = song.albumName,
-            durationMs = song.durationMillis(),
-            coverUrl = song.thumbnailUrl,
-        ),
-    )?.videoId
+    // Asking YouTube to match a seed costs a round trip, and once the network
+    // has refused it every one of them waits out its timeout — a station of a
+    // dozen seeds then took minutes to start, or never did. While YouTube is
+    // refused the sources are the answer, and no seed is matched.
+    if (System.currentTimeMillis() < youTubeRadioRefusedUntilMs) return null
+    // Bounded: a match that has not answered by now is a match the station
+    // cannot wait for. On a blocked network this used to be the five-second
+    // timeout in front of every seed before the wave could even begin.
+    return withTimeoutOrNull(SEED_MATCH_TIMEOUT_MS) {
+        ExternalPlaylistImporter.match(
+            BasicExternalPlaylistTrack(
+                title = song.title,
+                artist = song.artist,
+                album = song.albumName,
+                durationMs = song.durationMillis(),
+                coverUrl = song.thumbnailUrl,
+            ),
+        )?.videoId
+    }
 }
-
 /**
  * Loads, de-duplicates and resolves one AutoPlay batch. The playback service is
  * the only caller for the AutoPlay toggle; the player UI's explicit radio start

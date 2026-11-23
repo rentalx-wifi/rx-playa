@@ -600,7 +600,7 @@ class MainActivity : AppCompatActivity() {
                 val appBackdrop = rememberLayerBackdrop(onDraw = paintBackdrop)
                 CompositionLocalProvider(
                     LocalOverscrollFactory provides iosOverscrollFactory,
-                    LocalLiquidGlassEnabled provides (liquidGlass && !LocalMaterial3StyleEnabled.current),
+                    LocalLiquidGlassEnabled provides liquidGlass,
                     LocalAppBackdrop provides appBackdrop,
                 ) {
                     NothingStyleTransitionHost(
