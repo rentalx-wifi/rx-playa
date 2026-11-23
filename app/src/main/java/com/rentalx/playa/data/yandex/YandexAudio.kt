@@ -37,15 +37,6 @@ object YandexAudio {
     /** Transports this app can play: an encrypted raw stream, decrypted here. */
     private const val TRANSPORT = "encraw"
 
-    /**
-     * The plain transport, asked for by the source when it has no decrypting
-     * reader to put in front of the audio.
-     *
-     * Not every account is offered one — a refusal is a miss, not an error, and
-     * the tracks fall through to the next source.
-     */
-    const val TRANSPORT_DIRECT = "direct"
-
     /** Codecs asked for, best first. */
     val CODECS = listOf("flac", "flac-mp4", "mp3", "aac", "he-aac", "aac-mp4", "he-aac-mp4")
 
@@ -67,14 +58,11 @@ object YandexAudio {
         trackId: String,
         quality: String,
         codecs: List<String> = CODECS,
-        transport: String = TRANSPORT,
     ): String {
         val mac = Mac.getInstance("HmacSHA256").apply {
             init(SecretKeySpec(SIGN_KEY.toByteArray(Charsets.UTF_8), "HmacSHA256"))
         }
-        val digest = mac.doFinal(
-            signedMessage(timestampSec, trackId, quality, codecs, transport).toByteArray(Charsets.UTF_8),
-        )
+        val digest = mac.doFinal(signedMessage(timestampSec, trackId, quality, codecs).toByteArray(Charsets.UTF_8))
         return Base64.getEncoder().encodeToString(digest).trimEnd('=')
     }
 
@@ -84,13 +72,12 @@ object YandexAudio {
         trackId: String,
         quality: String,
         codecs: List<String> = CODECS,
-        transport: String = TRANSPORT,
     ): String = buildString {
         append(timestampSec)
         append(trackId)
         append(quality)
         append(codecs.joinToString(","))
-        append(transport)
+        append(TRANSPORT)
     }.replace(",", "")
 
     /** Whether an HTTP status from the Yandex API means "this network is not allowed". */

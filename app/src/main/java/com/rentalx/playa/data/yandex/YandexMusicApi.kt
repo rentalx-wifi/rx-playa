@@ -26,6 +26,9 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.io.IOException
+import java.security.MessageDigest
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -61,6 +64,52 @@ data class YandexMusicPlaylistTrack(
 data class YandexLikedTrack(val track: YandexMusicPlaylistTrack, val likedAtMs: Long?)
 data class YandexLikedArtist(val name: String, val likedAtMs: Long?)
 data class YandexHistoryTrack(val track: YandexMusicPlaylistTrack, val listenedDayMs: Long?)
+
+/** One rendition of a track, as `/tracks/{id}/download-info` describes it. */
+data class YandexDownloadInfo(
+    val codec: String,
+    val bitrateKbps: Int,
+    val preview: Boolean,
+    val downloadInfoUrl: String?,
+)
+
+/** A playable lossless link, and the codec the server actually agreed to send. */
+data class YandexLossless(val url: String, val codec: String)
+
+/**
+ * The audio address inside a `downloadInfoUrl` response.
+ *
+ * The document is a flat XML record — `host`, `path`, `ts`, `s` — and the
+ * address it describes is signed: MD5 over a fixed salt, the path without its
+ * leading slash, and `s`. The route after the host names the codec, and the
+ * file itself has no extension.
+ */
+fun parseYandexDownloadInfo(xml: String, codec: String): String? {
+    fun tag(name: String): String? =
+        Regex("<$name>([^<]*)</$name>")
+            .find(xml)?.groupValues?.get(1)?.trim()?.takeIf(String::isNotEmpty)
+    val host = tag("host") ?: return null
+    val path = tag("path") ?: return null
+    val timestamp = tag("ts") ?: return null
+    val signature = tag("s") ?: return null
+    val sign = md5Hex(YANDEX_SIGN_SALT + path.removePrefix("/") + signature)
+    val route = if (codec.startsWith("aac")) "get-aac" else "get-mp3"
+    return "https://$host/$route/$sign/$timestamp$path"
+}
+
+private const val YANDEX_SIGN_SALT = "XGRlBW9FXlekgbPrRHuSiA"
+
+fun md5Hex(value: String): String = MessageDigest.getInstance("MD5")
+    .digest(value.toByteArray(Charsets.UTF_8))
+    .joinToString("") { "%02x".format(it) }
+
+/** Base64 HMAC without the trailing padding, which is how `/get-file-info` signs. */
+private fun hmacSha256Base64(key: String, message: String): String {
+    val mac = Mac.getInstance("HmacSHA256")
+    mac.init(SecretKeySpec(key.toByteArray(Charsets.UTF_8), "HmacSHA256"))
+    return java.util.Base64.getEncoder().encodeToString(mac.doFinal(message.toByteArray(Charsets.UTF_8)))
+        .trimEnd('=')
+}
 
 sealed interface YandexPlaylistReference {
     data class UserPlaylist(val userId: String, val kind: String) : YandexPlaylistReference
@@ -415,22 +464,7 @@ class YandexMusicApi internal constructor(
      *   account cannot have this track at this tier (a free account asking for
      *   lossless gets nothing, which is an answer, not an error).
      */
-    suspend fun fileInfo(token: String, trackId: String, quality: String): List<YandexStream> =
-        fileInfo(token, trackId, quality, "encraw")
-
-    /**
-     * The same ask, but for a transport named by the caller.
-     *
-     * [YandexAudio.TRANSPORT_DIRECT] asks for a URL that can be opened as it
-     * is; the signature covers the transport name, so it has to be the same
-     * string the request carries.
-     */
-    suspend fun fileInfo(
-        token: String,
-        trackId: String,
-        quality: String,
-        transport: String,
-    ): List<YandexStream> {
+    suspend fun fileInfo(token: String, trackId: String, quality: String): List<YandexStream> {
         val timestamp = System.currentTimeMillis() / 1000
         val url = baseUrl.newBuilder()
             .addPathSegment("get-file-info")
@@ -438,8 +472,8 @@ class YandexMusicApi internal constructor(
             .addQueryParameter("trackId", trackId)
             .addQueryParameter("quality", quality)
             .addQueryParameter("codecs", YandexAudio.CODECS.joinToString(","))
-            .addQueryParameter("transports", transport)
-            .addQueryParameter("sign", YandexAudio.sign(timestamp, trackId, quality, transport = transport))
+            .addQueryParameter("transports", "encraw")
+            .addQueryParameter("sign", YandexAudio.sign(timestamp, trackId, quality))
             .build()
         val request = Request.Builder()
             .url(url)
@@ -562,6 +596,90 @@ class YandexMusicApi internal constructor(
         }
     }
 
+    /**
+     * Every rendition `/tracks/{id}/download-info` describes, unencrypted.
+     *
+     * A list rather than one entry because the same master is stored at several
+     * tiers, and which of them the account may have depends on its subscription.
+     * Each entry carries a URL that has to be exchanged for the file — see
+     * [resolveDownloadLink]. This endpoint does not carry FLAC at all; that one
+     * comes from [losslessLink].
+     */
+    suspend fun downloadInfo(token: String, trackId: String): List<YandexDownloadInfo> {
+        val request = requestBuilder(listOf("tracks", trackId, "download-info"), token).get().build()
+        return execute(request).resultArray().mapNotNull { element ->
+            val info = element as? JsonObject ?: return@mapNotNull null
+            val codec = info.stringAt("codec")?.lowercase()?.takeIf(String::isNotBlank)
+                ?: return@mapNotNull null
+            YandexDownloadInfo(
+                codec = codec,
+                bitrateKbps = info.longAt("bitrateInKbps", "bitrate_in_kbps", "bitrate")?.toInt() ?: 0,
+                preview = info.booleanAt("preview") == true,
+                downloadInfoUrl = info.stringAt("downloadInfoUrl", "download_info_url")
+                    ?.takeIf(String::isNotBlank),
+            )
+        }
+    }
+
+    /**
+     * The address the audio is actually fetched from.
+     *
+     * A `downloadInfoUrl` answer is only good for about a minute, so this is
+     * resolved when a track starts and never cached.
+     */
+    suspend fun resolveDownloadLink(downloadInfoUrl: String, codec: String): String? =
+        withContext(Dispatchers.IO) {
+            val request = Request.Builder().url(downloadInfoUrl).get().build()
+            val body = runCatching {
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) response.body?.string() else null
+                }
+            }.getOrNull() ?: return@withContext null
+            parseYandexDownloadInfo(body, codec)
+        }
+
+    /**
+     * A lossless rendition, which `download-info` does not carry at all.
+     *
+     * `/get-file-info` signs the request with an HMAC over the desktop client's
+     * key and only answers a client that names itself as that desktop build.
+     * The codec asked for is `flac-mp4` — the server downgrades a plain `flac`
+     * request to mp3 — and only the `raw` transport is accepted: `encraw` is the
+     * same bytes encrypted with AES-CTR, which is a different piece of work from
+     * asking for a link, so an encrypted answer is reported as no answer.
+     */
+    suspend fun losslessLink(token: String, trackId: String): YandexLossless? = withContext(Dispatchers.IO) {
+        val timestamp = System.currentTimeMillis() / 1_000
+        val numericId = trackId.substringBefore(':')
+        val quality = "lossless"
+        val codecs = "flac-mp4"
+        val transport = "raw"
+        val sign = hmacSha256Base64(YANDEX_DESKTOP_SIGN_KEY, "$timestamp$numericId$quality$codecs$transport")
+        val url = baseUrl.newBuilder()
+            .addPathSegment("get-file-info")
+            .addQueryParameter("ts", timestamp.toString())
+            .addQueryParameter("trackId", numericId)
+            .addQueryParameter("quality", quality)
+            .addQueryParameter("codecs", codecs)
+            .addQueryParameter("transports", transport)
+            .addQueryParameter("sign", sign)
+            .build()
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", "OAuth $token")
+            .header("X-Yandex-Music-Client", YANDEX_DESKTOP_CLIENT)
+            .header("Accept", "application/json")
+            .get()
+            .build()
+        val info = runCatching { execute(request).resultObject().objectAt("downloadInfo") }
+            .getOrNull() ?: return@withContext null
+        if (info.stringAt("transport") != "raw") return@withContext null
+        YandexLossless(
+            url = info.stringAt("url")?.takeIf(String::isNotBlank) ?: return@withContext null,
+            codec = info.stringAt("codec") ?: return@withContext null,
+        )
+    }
+
     private fun parse(response: Response): JsonObject {
         when (response.code) {
             401 -> throw YandexMusicApiException.Unauthorized()
@@ -586,6 +704,10 @@ class YandexMusicApi internal constructor(
     private companion object {
         const val BASE_URL = "https://api.music.yandex.net/"
         const val CLIENT_HEADER = "YandexMusicAndroid/24023621"
+
+        /** The desktop build's key and name: the only pair `/get-file-info` answers in `raw`. */
+        const val YANDEX_DESKTOP_SIGN_KEY = "kzqU4XhfCaY6B6JTHODeq5"
+        const val YANDEX_DESKTOP_CLIENT = "YandexMusicDesktopAppWindows/5.95.0"
         val JSON = Json { ignoreUnknownKeys = true }
 
         /**

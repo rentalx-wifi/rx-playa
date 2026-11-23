@@ -3,109 +3,155 @@ package com.rentalx.playa.data.sources
 import com.rentalx.playa.data.TrackLog
 import com.rentalx.playa.data.model.Song
 import com.rentalx.playa.data.settings.AppSettings
-import com.rentalx.playa.data.yandex.YandexAudio
+import com.rentalx.playa.data.yandex.YandexDownloadInfo
 import com.rentalx.playa.data.yandex.YandexMusicApi
+import com.rentalx.playa.data.yandex.YandexMusicApiException
 import com.rentalx.playa.data.yandex.YandexMusicPlaylistTrack
 
 private const val TAG = "Playa"
 
 /**
- * Yandex Music as a catalogue and a stream.
+ * Yandex Music as one of the sources rather than as an integration beside them.
  *
- * The account, the API and the signature were already here — [YandexMusicApi]
- * has been importing playlists and metadata for a while — so this is the part
- * that makes it a source the player can walk: a search, and a track id turned
- * into something openable.
+ * The walk in [SourceResolver] asks this source before YouTube, so a track both
+ * catalogues hold plays from Yandex — at FLAC when the connected account has
+ * Plus — and anything Yandex cannot supply falls through to YouTube exactly as
+ * before.
  *
- * **What it plays is what the API hands over unencrypted.** The Android
- * rendition arrives encrypted end to end (`encraw`, AES-256-CTR under a key
- * from the same answer) and this app has no reader for it yet, so the stream is
- * asked for as [YandexAudio.TRANSPORT_DIRECT]. When the account is not offered
- * one, this returns null and the walk moves on to the next source — a fallback
- * to a playable copy beats a URL that would decode as noise.
+ * **How the audio is fetched.** Two endpoints, both answering unencrypted.
+ * `/tracks/{id}/download-info` lists the lossy tiers and a one-minute
+ * `downloadInfoUrl` that is exchanged for a signed storage address; `/get-file-info`
+ * carries the FLAC, which that endpoint never has, and answers `raw` only to the
+ * desktop client's key and name (see [YandexMusicApi.losslessLink]). The
+ * encrypted `encraw` transport is not asked for at all: nothing here could read
+ * those bytes.
  *
- * Search does not need an account: the public `/search` answers anyone, which
- * keeps Yandex rows in the results for a listener who has not signed in. Their
- * streams then fall through, as they should.
+ * It reads its token from settings on every call rather than holding one, so
+ * connecting, reconnecting or signing out takes effect on the next track
+ * instead of on the next launch.
  */
 class YandexMusicSource(
     override val config: SourceConfig,
 ) : MusicSource, SourceRegistry.ConfigBacked {
 
+    private val api = YandexMusicApi()
+
     override val configId: String get() = config.id
     override val kind: SourceKind get() = SourceKind.YANDEX_MUSIC
     override val displayName: String get() = config.label.ifBlank { SourceKind.YANDEX_MUSIC.label }
 
+    private fun token(): String? = AppSettings.yandexMusicToken.value.trim().takeIf { it.isNotBlank() }
+
     /**
-     * Ok with or without a token: the catalogue answers anonymously, and a
-     * source that reported itself broken here would be skipped entirely —
-     * taking its browsable rows with it.
+     * One `/account/status` call, which is both the cheapest way to prove the
+     * token still works and the only way to know whether the answer will be
+     * lossless. [SourceHealth.Rejected] rather than unreachable when there is no
+     * token at all: nothing is wrong with the network, and the sources screen
+     * should point at the account instead of at the connection.
      */
-    override suspend fun health(): SourceHealth = SourceHealth.Ok(
-        detail = if (token().isBlank()) "Anonymous — sign in to play" else null,
-    )
+    override suspend fun health(): SourceHealth {
+        val token = token()
+            ?: return SourceHealth.Rejected("Sign in to Yandex Music in Account & integrations")
+        return try {
+            val account = api.account(token)
+            SourceHealth.Ok(
+                if (account.hasPlus) "${account.displayName} · Plus" else account.displayName,
+            )
+        } catch (_: YandexMusicApiException.Unauthorized) {
+            SourceHealth.Rejected("Yandex Music rejected the token")
+        } catch (_: YandexMusicApiException.AccessDenied) {
+            SourceHealth.Rejected("Yandex Music denied access to this account")
+        } catch (failure: Throwable) {
+            SourceHealth.Unreachable(failure.message ?: "Yandex Music is unreachable")
+        }
+    }
 
-    private val api = YandexMusicApi()
-
+    /**
+     * [waitForAll] and [request] are both moot here: one endpoint answers, and
+     * the catalogue publishes its rows without a tier — the rendition is chosen
+     * per stream, when the account is actually asked what it may have.
+     */
     override suspend fun search(
         query: String,
         limit: Int,
         waitForAll: Boolean,
         request: StreamRequest?,
     ): List<Song> {
-        if (query.isBlank()) return emptyList()
-        val token = token()
-        val rows = if (token.isBlank()) {
-            YandexMusicApi().searchTracksAnonymous(query, limit)
-        } else {
-            YandexMusicApi().searchTracks(token, query, limit)
-        }
-        TrackLog.d(TAG, "▶ Yandex Music search \"$query\" → ${rows.size} tracks")
-        val losslessWanted = request is StreamRequest.Lossless
-        return rows.take(limit).map { row -> row.toSong(losslessWanted) }
+        val token = token() ?: return emptyList()
+        val rows = api.searchTracks(token, query, limit)
+        TrackLog.d(TAG, "▶ Yandex Music \"$query\" → ${rows.size} tracks")
+        return rows.map { it.toSourceSong(configId) }
     }
 
     override suspend fun stream(trackId: String, request: StreamRequest): SourceStream? {
-        val token = token()
-        if (token.isBlank()) return null
-        val quality = YandexAudio.qualityFor(
-            lossless = request is StreamRequest.Lossless,
-            cappedKbps = (request as? StreamRequest.Capped)?.maxKbps,
-        )
-        val rendition = api
-            .fileInfo(token, trackId, quality, transport = YandexAudio.TRANSPORT_DIRECT)
-            // The encrypted transport answers with a key; nothing here could
-            // read those bytes, so they are not a stream this app has.
-            .firstOrNull { it.keyHex == null && it.url.startsWith("https://") }
-        if (rendition == null) {
-            TrackLog.d(TAG, "  · Yandex Music had no plain rendition for $trackId at $quality")
-            return null
+        val token = token() ?: return null
+        if (request is StreamRequest.Lossless) {
+            // `download-info` never carries FLAC; the signed file endpoint does,
+            // and answers `flac-mp4` — FLAC in an MP4 container, which the
+            // player reads as FLAC.
+            api.losslessLink(token, trackId)?.let { lossless ->
+                val isFlac = lossless.codec.startsWith("flac")
+                TrackLog.d(TAG, "  ✓ Yandex Music lossless ${lossless.codec}")
+                return SourceStream(
+                    url = lossless.url,
+                    format = StreamFormat(codec = if (isFlac) "flac" else lossless.codec),
+                    belowRequest = !isFlac,
+                )
+            }
         }
-        TrackLog.d(TAG, "  ✓ Yandex Music ${rendition.codec} ${rendition.bitrateKbps ?: "?"}kbps")
+        val renditions = api.downloadInfo(token, trackId).ifEmpty { return null }
+        val chosen = selectRendition(renditions.filterNot { it.preview }, request)
+            ?: selectRendition(renditions, request)
+            ?: return null
+        val url = chosen.downloadInfoUrl?.let { api.resolveDownloadLink(it, chosen.codec) }
+            ?: return null
+        TrackLog.d(TAG, "  ✓ Yandex Music ${chosen.codec} ${chosen.bitrateKbps}kbps")
         return SourceStream(
-            url = rendition.url,
-            format = StreamFormat(codec = rendition.codec, kbps = rendition.bitrateKbps),
+            url = url,
+            format = StreamFormat(codec = chosen.codec, kbps = chosen.bitrateKbps.takeIf { it > 0 }),
+            // A lossless request that only the lossy tiers could answer is a
+            // degraded stream, and saying so is what lets QualityUpgrade look
+            // again once playback has started.
+            belowRequest = request is StreamRequest.Lossless && chosen.codec != "flac",
         )
     }
 
-    private fun token(): String = AppSettings.yandexMusicToken.value.trim()
+    /**
+     * The rendition to open for [request].
+     *
+     * Lossless asks for FLAC and, when the account cannot have it, falls back to
+     * the best lossy tier rather than failing — a track that plays at 320kbps
+     * beats a track that does not play, which is the same rule
+     * [SourceStream.belowRequest] exists to record.
+     */
+    private fun selectRendition(
+        renditions: List<YandexDownloadInfo>,
+        request: StreamRequest,
+    ): YandexDownloadInfo? = when (request) {
+        StreamRequest.Lossless ->
+            renditions.filter { it.codec == "flac" }.maxByOrNull { it.bitrateKbps }
+                ?: renditions.maxByOrNull { it.bitrateKbps }
+        is StreamRequest.Capped ->
+            renditions.filter { it.bitrateKbps <= request.maxKbps }.maxByOrNull { it.bitrateKbps }
+                ?: renditions.minByOrNull { it.bitrateKbps }
+        StreamRequest.Best -> renditions.maxByOrNull { it.bitrateKbps }
+    }
 
-    private fun YandexMusicPlaylistTrack.toSong(losslessWanted: Boolean) = Song(
-        videoId = SourceRegistry.trackKey(config.id, id),
+    /**
+     * A catalogue row as a song this app can play.
+     *
+     * The id is the source key rather than a YouTube video id: playback goes
+     * back through [stream] for it, so the audio is Yandex's own and no YouTube
+     * copy stands in.
+     */
+    private fun YandexMusicPlaylistTrack.toSourceSong(configId: String): Song = Song(
+        videoId = SourceRegistry.trackKey(configId, id),
         title = title,
         artist = artist,
         albumName = album,
         thumbnailUrl = coverUrl,
-        durationText = durationText(durationMs),
-        // What the catalogue holds, not what this account may have: the stream
-        // answer is the one that decides, and a Plus-less account simply falls
-        // through to the next source.
-        sourceQuality = if (losslessWanted) "FLAC" else "HIGH",
+        durationText = durationMs.takeIf { it > 0L }?.let { ms ->
+            String.format(java.util.Locale.ROOT, "%d:%02d", ms / 60_000, (ms / 1_000) % 60)
+        },
     )
-
-    private fun durationText(ms: Long): String? {
-        val seconds = ms / 1000
-        if (seconds <= 0) return null
-        return String.format("%d:%02d", seconds / 60, seconds % 60)
-    }
 }

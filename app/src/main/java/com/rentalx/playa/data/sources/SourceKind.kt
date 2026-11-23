@@ -168,12 +168,11 @@ enum class SourceKind(
      */
     YANDEX_MUSIC(
         label = "Yandex Music",
-        detail = "Your own Yandex Music account. Search works signed out; playback needs the " +
-            "account, and FLAC arrives only when the API hands it over unencrypted.",
-        labels = listOf("FLAC", "Hi-Fi", "Account"),
+        detail = "Your own Yandex Music account: catalogue search and, with Plus, lossless streams.",
+        labels = listOf("Plus", "Lossless", "FLAC"),
         needsServer = false,
         canServeLossless = true,
-        worthPrefetching = false,
+        worthPrefetching = true,
         rank = 3,
     ),
 
