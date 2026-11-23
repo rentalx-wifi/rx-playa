@@ -2,6 +2,9 @@ package com.rentalx.playa.ui.screens
 
 import com.rentalx.playa.ui.components.trackArtSize
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import com.rentalx.playa.R
 
 import androidx.compose.animation.AnimatedContent
@@ -17,6 +20,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import com.rentalx.playa.ui.components.liquidGlassRim
 import com.rentalx.playa.ui.components.continuous
@@ -77,6 +81,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -104,6 +109,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -126,6 +132,7 @@ import coil3.request.ImageRequest
 import coil3.request.transformations
 import androidx.compose.runtime.mutableIntStateOf
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
@@ -164,6 +171,7 @@ import com.rentalx.playa.data.model.artworkAt
 import com.rentalx.playa.data.model.durationMillis
 import com.rentalx.playa.data.model.playingRowMatcher
 import com.rentalx.playa.data.settings.AppSettings
+import com.rentalx.playa.data.settings.LocalMusicCoverStore
 import com.rentalx.playa.ui.components.DownloadedBadge
 import com.rentalx.playa.ui.components.ExplicitSongTitle
 import com.rentalx.playa.ui.components.LIBRARY_GRID_SPACING
@@ -430,6 +438,22 @@ fun DetailScreen(
         keyColors = appleArt?.keyColors(),
     )
 
+    // The Local Music page's own face: not a release's sleeve, one picture for
+    // the whole section, kept in the app's storage so it survives a restart
+    // (issue #36). Tapping the sleeve picks another, holding it takes the
+    // folder glyph back.
+    val isLocalMusic = page.browseId == LOCAL_MUSIC_BROWSE_ID
+    val localMusicCover by AppSettings.localMusicCover.collectAsStateWithLifecycle()
+    val coverScope = rememberCoroutineScope()
+    val coverContext = LocalContext.current
+    val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { picked ->
+        if (picked == null) return@rememberLauncherForActivityResult
+        coverScope.launch {
+            runCatching { LocalMusicCoverStore.importCover(coverContext, picked) }
+                .onSuccess(AppSettings::setLocalMusicCover)
+        }
+    }
+
     // Narrowing the running order in place — the release equivalent of the
     // filter box on the Local Music tab, and the one thing a long track list
     // needs that scrolling can't give it. [searching] says whether it is open;
@@ -592,6 +616,24 @@ fun DetailScreen(
                         onArtistClick = onArtistClick.takeIf { folder == null },
                         onToggleLibrary = onToggleLibrary,
                         onDownloadAll = folder?.onDownload?.let { download -> { download(songs) } },
+                        coverUri = localMusicCover.takeIf { isLocalMusic },
+                        onPickCover = if (isLocalMusic) {
+                            {
+                                coverPicker.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                )
+                            }
+                        } else {
+                            null
+                        },
+                        onClearCover = if (isLocalMusic) {
+                            {
+                                LocalMusicCoverStore.clearCover(coverContext)
+                                AppSettings.setLocalMusicCover(null)
+                            }
+                        } else {
+                            null
+                        },
                     )
                 }
             }
@@ -965,6 +1007,12 @@ private fun ReleaseHeader(
     onToggleLibrary: (() -> Unit)?,
     /** The Cached songs folder's: saves every track on it to Downloads. Null hides it. */
     onDownloadAll: (() -> Unit)? = null,
+    /** The Local Music page's own picture, when one has been chosen. */
+    coverUri: String? = null,
+    /** A tap on the sleeve: pick another picture. Null for anything but that page. */
+    onPickCover: (() -> Unit)? = null,
+    /** A hold on the sleeve: back to the folder glyph. */
+    onClearCover: (() -> Unit)? = null,
 ) {
     val (credit, meta) = page.headerLines(songs.size, songs.playtime())
     // Every row on a release carries the same credit — see [pageCredit] — so
@@ -1007,6 +1055,27 @@ private fun ReleaseHeader(
                 onState = { artFailed = it is AsyncImagePainter.State.Error },
                 modifier = Modifier.matchParentSize(),
             )
+            // The Local Music page's own picture, over the folder glyph it
+            // replaces and instead of the sleeve a folder never had. A tap
+            // picks another, a hold takes the glyph back — the two gestures the
+            // empty sleeve was missing (issue #36).
+            var coverFailed by remember(coverUri) { mutableStateOf(false) }
+            coverUri?.takeIf { !coverFailed }?.let { cover ->
+                AsyncImage(
+                    model = cover,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    onState = { coverFailed = it is AsyncImagePainter.State.Error },
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
+            if (onPickCover != null) {
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .combinedClickable(onClick = onPickCover, onLongClick = onClearCover),
+                )
+            }
             // Animated cover art, inside the same frame. Always running:
             // unlike the player's sleeve there is no transport here to follow,
             // and the page is only up while it's being read.

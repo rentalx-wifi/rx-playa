@@ -321,6 +321,15 @@ object AppSettings {
      */
     val lastWhatsNewVersion = MutableStateFlow<String?>(null)
 
+    /**
+     * The picture the Local Music page wears instead of its folder glyph, as a
+     * file URI into this app's own storage, or null for the glyph.
+     *
+     * Written by [LocalMusicCoverStore], which copies the picked image and
+     * deletes the one it replaces; this only remembers which file that is.
+     */
+    val localMusicCover = MutableStateFlow<String?>(null)
+
     // `losslessAudio` used to live here, behind a "Prefer lossless" switch on
     // the Sources screen. It is gone: sources are asked for their best and each
     // degrades on its own terms, so the switch's only real effect was to ask a
@@ -1127,6 +1136,7 @@ object AppSettings {
         offlineMode.value = prefs.getBoolean(KEY_OFFLINE_MODE, false)
         betaUpdates.value = prefs.getBoolean(KEY_BETA_UPDATES, betaChannelByDefault)
         lastWhatsNewVersion.value = prefs.getString(KEY_LAST_WHATS_NEW, null)
+        localMusicCover.value = prefs.getString(KEY_LOCAL_MUSIC_COVER, null)
         crossfadeSeconds.value = prefs.getInt(KEY_CROSSFADE, 0)
         smartFadeEnabled.value = prefs.getBoolean(KEY_SMART_FADE, false)
         automixPerformanceMode.value = runCatching {
@@ -1471,6 +1481,13 @@ object AppSettings {
     fun setLastWhatsNewVersion(value: String) {
         lastWhatsNewVersion.value = value
         prefs.edit().putString(KEY_LAST_WHATS_NEW, value).apply()
+    }
+
+    fun setLocalMusicCover(value: String?) {
+        localMusicCover.value = value
+        prefs.edit().apply {
+            if (value == null) remove(KEY_LOCAL_MUSIC_COVER) else putString(KEY_LOCAL_MUSIC_COVER, value)
+        }.apply()
     }
 
     fun setCrossfadeSeconds(value: Int) {
@@ -2592,6 +2609,7 @@ object AppSettings {
     private const val KEY_OFFLINE_MODE = "offline_mode"
     private const val KEY_BETA_UPDATES = "beta_updates"
     private const val KEY_LAST_WHATS_NEW = "last_whats_new_version"
+    private const val KEY_LOCAL_MUSIC_COVER = "local_music_cover"
     private const val KEY_EXPORT_DOWNLOADS = "export_downloads"
     private const val KEY_DOWNLOAD_TREE_URI = "download_tree_uri"
     private const val KEY_SYNC_DOWNLOADED_PLAYLISTS = "sync_downloaded_playlists"

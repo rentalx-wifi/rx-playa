@@ -125,7 +125,7 @@ fun libraryDeviceItems(downloadedReleases: List<SavedCollection>): List<ShelfIte
  */
 fun deviceFolderIcon(browseId: String): ImageVector? = when (browseId) {
     "local:downloads" -> Icons.Rounded.Download
-    "local:all" -> Icons.Rounded.Folder
+    LOCAL_MUSIC_BROWSE_ID -> Icons.Rounded.Folder
     CACHE_FOLDER_BROWSE_ID -> Icons.Rounded.Storage
     com.rentalx.playa.data.webdav.WebDavConfig.BROWSE_ID -> Icons.Rounded.Cloud
     com.rentalx.playa.data.smb.SmbConfig.BROWSE_ID -> Icons.Rounded.Lan
@@ -134,6 +134,9 @@ fun deviceFolderIcon(browseId: String): ImageVector? = when (browseId) {
 
 /** The Library row that opens the connected Spotify account; handled by the app, not a browse page. */
 const val SPOTIFY_BROWSE_ID = "app:spotify"
+
+/** The Local Music section: every sound file the device holds. */
+const val LOCAL_MUSIC_BROWSE_ID = "local:all"
 
 /** The Cached songs folder's page id — one of the `local:` device folders. */
 const val CACHE_FOLDER_BROWSE_ID = "local:cache"
