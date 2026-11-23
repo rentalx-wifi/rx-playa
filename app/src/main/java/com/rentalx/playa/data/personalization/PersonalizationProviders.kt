@@ -1,5 +1,6 @@
 package com.rentalx.playa.data.personalization
 
+import com.rentalx.playa.data.TrackLog
 import com.rentalx.playa.data.YtMusicRepository
 import com.rentalx.playa.data.importing.ExternalPlaylistTrack
 import com.rentalx.playa.data.model.ArtistRef
@@ -23,6 +24,7 @@ import com.rentalx.playa.data.spotify.SpotifyPlaylist
 import com.rentalx.playa.data.spotify.SpotifyTrack
 import com.rentalx.playa.data.spotify.toSourceSong
 import com.rentalx.playa.data.yandex.YandexMusicApi
+import com.rentalx.playa.data.yandex.YandexMusicApiException
 import com.rentalx.playa.data.yandex.YandexMusicPlaylistTrack
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -59,9 +61,9 @@ internal class PersonalizationProviders {
     suspend fun yandex(account: String, token: String): ProviderTasteSnapshot {
         val api = YandexMusicApi()
         val uid = api.account(token).uid
-        val liked = part { api.likedTracks(token, uid) }
-        val artists = part { api.likedArtists(token, uid) }
-        val history = part { api.historyTracks(token) }
+        val liked = part { yandexList { api.likedTracks(token, uid) } }
+        val artists = part { yandexList { api.likedArtists(token, uid) } }
+        val history = part { yandexList { api.historyTracks(token) } }
         if (liked.isFailure && artists.isFailure && history.isFailure) throw IOException("Yandex taste data is unavailable")
         val signals = liked.getOrDefault(emptyList()).mapIndexed { index, like ->
             val song = like.track.song()
@@ -270,12 +272,30 @@ private fun SpotifyTrack.song() = toSourceSong().copy(artists = artists.map { Ar
 internal fun tasteDigest(value: String): String = MessageDigest.getInstance("SHA-256")
     .digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
-private suspend fun <T> part(block: suspend () -> T): Result<T> = try {
-    Result.success(block())
+/**
+ * A Yandex list that came back empty, which that API expresses as "no result"
+ * rather than as an empty array — an account with nothing liked yet, or a
+ * history that has not synced, is not a broken account, and it must not put
+ * "Yandex Music is unavailable" on the home page.
+ */
+private suspend fun <T> yandexList(block: suspend () -> List<T>): List<T> = try {
+    block()
+} catch (_: YandexMusicApiException.EmptyResult) {
+    emptyList()
+}
+
+private suspend fun <T> part(block: suspend () -> T): Result<T> = try {    Result.success(block())
 } catch (cancelled: CancellationException) {
     throw cancelled
-} catch (_: Exception) {
-    Result.failure(IOException("Provider data is unavailable"))
+} catch (failure: Exception) {
+    // The caller turns a failed part into "some data is unavailable", which on
+    // its own says nothing about why — the answer is almost always a status
+    // code from the provider, and the log is the only place it survives.
+    TrackLog.w(
+        "Playa",
+        "taste part failed: ${failure::class.simpleName}: ${failure.message}",
+    )
+    Result.failure(IOException("Provider data is unavailable", failure))
 }
 
 private const val SPOTIFY_PLAYLIST_PARALLELISM = 2

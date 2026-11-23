@@ -3960,7 +3960,14 @@ private fun PlayaApp(
                                 state = homeState,
                                 listState = homeListState,
                                 currentSong = player.song,
-                                isPlaying = player.isPlaying,
+                                // The pill is RX Wave's own button, not a second
+                                // play/pause for the whole app: it reads as playing
+                                // only while the wave is what is playing, so an
+                                // album left running no longer makes the station
+                                // look like it is on.
+                                isPlaying = player.isPlaying &&
+                                    player.song?.radioName == bitWaveLabel &&
+                                    player.song?.playbackSource == bitWaveLabel,
                                 title = stringResource(R.string.listen_now),
                                 signedIn = signedIn,
                                 onSignIn = null,
@@ -4039,7 +4046,7 @@ private fun PlayaApp(
                                 // frame loop, not collected: a flow here would
                                 // wake this composable sixty times a second.
                                 waveEnergy = { AudioEnergy.currentBass() },
-                                onWaveToggle = togglePlayPause,
+                                onWaveToggle = startPersonalWave,
                                 onWaveClick = startPersonalWave,
                                 listenerName = account?.name,
                                 leadHero = false,

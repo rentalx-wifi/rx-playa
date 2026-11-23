@@ -12,6 +12,7 @@ import com.rentalx.playa.data.model.durationMillis
 import com.rentalx.playa.data.model.normalizedArtistName
 import com.rentalx.playa.data.personalization.TasteProfile
 import com.rentalx.playa.data.personalization.WaveMemory
+import com.rentalx.playa.data.sources.SourceRadio
 import com.rentalx.playa.data.sources.TrackMatcher
 import com.rentalx.playa.playback.TrackText
 import com.rentalx.playa.playback.QueueCoordinator.asQueueEntry
@@ -23,6 +24,38 @@ const val MAX_QUEUED_AUTOPLAY = 10
 
 /** Most liked artists whose radios one wave asks, before it gives up. */
 private const val MAX_PERSONAL_WAVE_SEEDS = 24
+
+/** How many kin one source is asked for per wave seed. */
+private const val WAVE_RADIO_PER_SOURCE = 12
+
+/**
+ * How long YouTube's radio is left alone after a refusal.
+ *
+ * A network Google blocks answers 403 to every call, and without this each
+ * autoplay round paid for that round trip before reaching the sources that do
+ * answer — several seconds per track, forever. Long enough to be worth it, short
+ * enough that a network change picks it up again.
+ */
+private const val YOUTUBE_RADIO_BACKOFF_MS = 10 * 60 * 1000L
+
+@Volatile
+private var youTubeRadioRefusedUntilMs = 0L
+
+/**
+ * YouTube's related queue, or nothing — and nothing for the next ten minutes
+ * once it has said the network itself is refused.
+ */
+private suspend fun youTubeRadio(videoId: String, preferVideo: Boolean): List<Song> {
+    if (System.currentTimeMillis() < youTubeRadioRefusedUntilMs) return emptyList()
+    return YtMusicRepository.radio(videoId, preferVideo = preferVideo).getOrElse { failure ->
+        val message = failure.message.orEmpty()
+        if (message.contains("403") || message.contains("451")) {
+            youTubeRadioRefusedUntilMs = System.currentTimeMillis() + YOUTUBE_RADIO_BACKOFF_MS
+            TrackLog.d("Playa", "wave radio: YouTube refused this network, using the sources")
+        }
+        emptyList()
+    }
+}
 
 /** How many tracks the RX Wave station is built from before the queue trims it. */
 private const val PERSONAL_WAVE_TRACKS = 40
@@ -149,10 +182,17 @@ suspend fun loadAutoplayTracks(
     seedSong: Song,
     limit: Int = MAX_QUEUED_AUTOPLAY,
 ): Result<List<Song>> {
-    val seed = youtubeSeedFor(seedSong) ?: return Result.success(emptyList())
+    val seed = youtubeSeedFor(seedSong)
     // A music video plays on with music videos, as YouTube Music does.
     val videos = seedSong.isVideo && seed == seedSong.videoId
-    val related = YtMusicRepository.radio(seed, preferVideo = videos).getOrElse { return Result.failure(it) }
+    val fromYouTube = seed
+        ?.let { youTubeRadio(it, preferVideo = videos) }
+        .orEmpty()
+    // A station is not a YouTube feature. When that call is refused — a network
+    // Google blocks answers 403 and nothing else — or the track has no YouTube
+    // twin at all, the other catalogues are asked instead of the queue simply
+    // ending.
+    val related = fromYouTube.ifEmpty { SourceRadio.related(seedSong, limit) }
         .filterNot { isStrangerEdit(it, seedSong) }
         .let { QueueBuilder.rankRelated(seedSong, it) }
     val extra = QueueBuilder.extend(
@@ -253,6 +293,8 @@ suspend fun loadPersonalWave(
         exclude.forEach { add(PersonalWavePlanner.recordingKey(it)) }
     }
 
+    // Asked once per pass: the rotor's answer is a queue, not a per-seed query.
+    var personalWaveAsked = false
     val plan = PersonalWavePlanner.plan(
         input = PersonalWavePlanner.Input(
             seeds = seeds.map { PersonalWavePlanner.Seed(it, liked = true) },
@@ -276,8 +318,23 @@ suspend fun loadPersonalWave(
             random = random,
         ),
         radio = { seed ->
-            val videoId = youtubeSeedFor(seed) ?: return@plan emptyList()
-            YtMusicRepository.radio(videoId, preferVideo = seed.isVideo).getOrNull().orEmpty()
+            val personal = if (personalWaveAsked) {
+                emptyList()
+            } else {
+                personalWaveAsked = true
+                SourceRadio.yandexPersonalWave(WAVE_RADIO_PER_SOURCE)
+            }
+            if (personal.isNotEmpty()) {
+                personal
+            } else {
+                val videoId = youtubeSeedFor(seed)
+                val fromYouTube = videoId
+                    ?.let { youTubeRadio(it, preferVideo = seed.isVideo) }
+                    .orEmpty()
+                // Same rule as the queue's autoplay: a station that can only
+                // come from YouTube is a station a blocked network does not have.
+                fromYouTube.ifEmpty { SourceRadio.related(seed, WAVE_RADIO_PER_SOURCE) }
+            }
         },
     )
     WaveMemory.remember(plan.picks.map { it.song }, nowMs)

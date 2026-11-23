@@ -680,6 +680,42 @@ class YandexMusicApi internal constructor(
         )
     }
 
+    /**
+     * One batch of the account's own «Моя волна» station — the rotor's answer to
+     * "what should this account hear next".
+     *
+     * The station is Yandex's, not this app's: it carries the whole weight of the
+     * account's listening, in every genre it has ever played, which is the one
+     * thing a per-seed artist search cannot reproduce.
+     *
+     * [queue] is the id the previous batch ended on — the rotor remembers its
+     * session only through it. Null asks for a fresh one.
+     */
+    suspend fun waveTracks(
+        token: String,
+        limit: Int = 30,
+        station: String = WAVE_STATION,
+        queue: String? = null,
+    ): List<YandexMusicPlaylistTrack> {
+        val url = baseUrl.newBuilder()
+            .addPathSegments("rotor/station/$station/tracks")
+            .addQueryParameter("settings2", "true")
+            .apply { queue?.takeIf(String::isNotBlank)?.let { addQueryParameter("queue", it) } }
+            .build()
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", "OAuth $token")
+            .header("X-Yandex-Music-Client", CLIENT_HEADER)
+            .header("Accept-Language", "ru")
+            .header("Accept", "application/json")
+            .get()
+            .build()
+        val sequence = execute(request).resultObject().arrayAt("sequence").orEmpty()
+        return sequence
+            .mapNotNull { (it as? JsonObject)?.objectAt("track")?.toImportTrack() }
+            .take(limit.coerceAtLeast(1))
+    }
+
     private fun parse(response: Response): JsonObject {
         when (response.code) {
             401 -> throw YandexMusicApiException.Unauthorized()
@@ -704,6 +740,9 @@ class YandexMusicApi internal constructor(
     private companion object {
         const val BASE_URL = "https://api.music.yandex.net/"
         const val CLIENT_HEADER = "YandexMusicAndroid/24023621"
+
+        /** «Моя волна» as the rotor names it. */
+        const val WAVE_STATION = "user:onyourwave"
 
         /** The desktop build's key and name: the only pair `/get-file-info` answers in `raw`. */
         const val YANDEX_DESKTOP_SIGN_KEY = "kzqU4XhfCaY6B6JTHODeq5"
