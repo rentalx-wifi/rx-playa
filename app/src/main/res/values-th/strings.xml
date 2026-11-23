@@ -141,6 +141,16 @@
     <string name="try_again">ลองอีกครั้ง</string>
     <string name="open_releases_page">เปิดหน้าเวอร์ชันที่เผยแพร่</string>
     <string name="whats_new">มีอะไรใหม่</string>
+    <string name="whats_new_title">มีอะไรใหม่ใน %1$s</string>
+    <string name="update_channel_change_title">สลับช่องทางการอัปเดต</string>
+    <string name="update_channel_update_line">อัปเดต: %1$s → %2$s</string>
+    <string name="update_channel_rollback_line">ย้อนกลับ: %1$s → %2$s</string>
+    <string name="update_channel_rollback_warning">บิลด์นี้เก่ากว่าที่ติดตั้งอยู่ ฟีเจอร์และการตั้งค่าที่เพิ่มมาหลังจากนั้นอาจหายไปเมื่อติดตั้ง</string>
+    <string name="update_channel_target">ช่องทางหลังการสลับ: %1$s</string>
+    <string name="update_channel_stable">ช่องทางเสถียร</string>
+    <string name="update_channel_beta">ช่องทางเบต้า</string>
+    <string name="update_channel_version">เวอร์ชันที่ติดตั้ง: %1$s</string>
+    <string name="update_channel_switch">สลับ</string>
     <string name="log_copied">คัดลอกล็อกแล้ว · %1$d บรรทัด</string>
     <string name="sign_in_youtube_music">ลงชื่อเข้าใช้ YouTube Music</string>
     <string name="choose_a_channel">เลือกช่อง</string>

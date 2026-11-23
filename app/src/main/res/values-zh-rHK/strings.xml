@@ -133,6 +133,16 @@
     <string name="try_again">重試</string>
     <string name="open_releases_page">開啟發布頁面</string>
     <string name="whats_new">新版本說明</string>
+    <string name="whats_new_title">%1$s 新功能</string>
+    <string name="update_channel_change_title">切換更新頻道</string>
+    <string name="update_channel_update_line">更新：%1$s → %2$s</string>
+    <string name="update_channel_rollback_line">回退：%1$s → %2$s</string>
+    <string name="update_channel_rollback_warning">此版本比已安裝的更舊。安裝之後，其後新增的功能和設定可能會消失。</string>
+    <string name="update_channel_target">切換後的頻道：%1$s</string>
+    <string name="update_channel_stable">穩定頻道</string>
+    <string name="update_channel_beta">測試頻道</string>
+    <string name="update_channel_version">已安裝版本：%1$s</string>
+    <string name="update_channel_switch">切換</string>
     <string name="log_copied">日誌已複製 · %1$d 行</string>
     <string name="sign_in_youtube_music">登入 YouTube Music</string>
     <string name="sign_in_discord">登入 Discord</string>

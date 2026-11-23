@@ -137,6 +137,16 @@
     <string name="try_again">Coba Lagi</string>
     <string name="open_releases_page">Buka Halaman Rilis</string>
     <string name="whats_new">Yang baru</string>
+    <string name="whats_new_title">Yang baru di %1$s</string>
+    <string name="update_channel_change_title">Ganti saluran pembaruan</string>
+    <string name="update_channel_update_line">Pembaruan: %1$s → %2$s</string>
+    <string name="update_channel_rollback_line">Penurunan versi: %1$s → %2$s</string>
+    <string name="update_channel_rollback_warning">Build ini lebih lama daripada yang terpasang. Fitur dan pengaturan yang ditambahkan setelahnya bisa hilang setelah dipasang.</string>
+    <string name="update_channel_target">Saluran setelah pergantian: %1$s</string>
+    <string name="update_channel_stable">Saluran stabil</string>
+    <string name="update_channel_beta">Saluran beta</string>
+    <string name="update_channel_version">Versi terpasang: %1$s</string>
+    <string name="update_channel_switch">Ganti</string>
     <string name="log_copied">Log disalin · %1$d baris</string>
     <string name="sign_in_youtube_music">Masuk ke YouTube Music</string>
     <string name="sign_in_discord">Masuk ke Discord</string>

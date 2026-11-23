@@ -144,6 +144,16 @@
     <string name="try_again">נסה שוב</string>
     <string name="open_releases_page">פתיחת דף הגרסאות</string>
     <string name="whats_new">מה חדש</string>
+    <string name="whats_new_title">מה חדש ב-%1$s</string>
+    <string name="update_channel_change_title">החלפת ערוץ עדכונים</string>
+    <string name="update_channel_update_line">עדכון: %1$s → %2$s</string>
+    <string name="update_channel_rollback_line">שדרוג לאחור: %1$s → %2$s</string>
+    <string name="update_channel_rollback_warning">הגרסה הזו ישנה מזו המותקנת. תכונות והגדרות שנוספו אחריה עלולות להיעלם לאחר ההתקנה.</string>
+    <string name="update_channel_target">ערוץ לאחר ההחלפה: %1$s</string>
+    <string name="update_channel_stable">ערוץ יציב</string>
+    <string name="update_channel_beta">ערוץ בטא</string>
+    <string name="update_channel_version">גרסה מותקנת: %1$s</string>
+    <string name="update_channel_switch">החלפה</string>
     <string name="log_copied">היומן הועתק · %1$d שורות</string>
     <string name="sign_in_youtube_music">התחברות ל-YouTube Music</string>
     <string name="sign_in_discord">התחברות ל-Discord</string>

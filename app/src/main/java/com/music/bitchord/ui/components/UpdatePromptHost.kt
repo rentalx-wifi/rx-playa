@@ -33,6 +33,7 @@ fun UpdatePromptHost(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val update by AppUpdateChecker.available.collectAsStateWithLifecycle()
+    val whatsNew by AppUpdateChecker.whatsNew.collectAsStateWithLifecycle()
 
     update?.let { info ->
         UpdateAvailableDialog(
@@ -59,7 +60,11 @@ fun UpdatePromptHost(
                 // to open (a ROM without one, a revoked unknown-sources grant),
                 // and without this it looks like a dead button.
                 val started = ready != null && AppUpdateChecker.installApk(context, ready.file)
-                if (!started) {
+                if (started) {
+                    // These notes were on screen a moment ago: the "what's new"
+                    // card after the install would be the same text a second time.
+                    AppUpdateChecker.markNotesShown(info.version)
+                } else {
                     Toast.makeText(
                         context,
                         context.getString(R.string.something_went_wrong),
@@ -73,6 +78,21 @@ fun UpdatePromptHost(
             },
             modifier = modifier,
         )
+    }
+
+    // Never at the same time as an offer — one is a build to install, the other
+    // the changelog of the build already installed — but the offer wins if a
+    // check somehow leaves both, because installing is the more pressing thing.
+    if (update == null) {
+        whatsNew?.let { notes ->
+            WhatsNewDialog(
+                version = notes.version,
+                notes = notes.notes,
+                hazeState = hazeState,
+                onDismiss = { AppUpdateChecker.dismissWhatsNew() },
+                modifier = modifier,
+            )
+        }
     }
 }
 

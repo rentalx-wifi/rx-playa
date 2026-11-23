@@ -142,6 +142,16 @@
     <string name="try_again">फिर से कोशिश करें</string>
     <string name="open_releases_page">रिलीज़ पेज खोलें</string>
     <string name="whats_new">नया क्या है</string>
+    <string name="whats_new_title">%1$s में नया</string>
+    <string name="update_channel_change_title">अपडेट चैनल बदलें</string>
+    <string name="update_channel_update_line">अपडेट: %1$s → %2$s</string>
+    <string name="update_channel_rollback_line">डाउनग्रेड: %1$s → %2$s</string>
+    <string name="update_channel_rollback_warning">यह बिल्ड इंस्टॉल किए गए बिल्ड से पुराना है. इसके बाद जोड़ी गई सुविधाएँ और सेटिंग्स इंस्टॉल के बाद गायब हो सकती हैं.</string>
+    <string name="update_channel_target">बदलने के बाद चैनल: %1$s</string>
+    <string name="update_channel_stable">स्थिर चैनल</string>
+    <string name="update_channel_beta">बीटा चैनल</string>
+    <string name="update_channel_version">इंस्टॉल किया गया संस्करण: %1$s</string>
+    <string name="update_channel_switch">बदलें</string>
     <string name="log_copied">लॉग कॉपी किया गया · %1$d लाइनें</string>
     <string name="sign_in_youtube_music">YouTube Music में साइन इन करें</string>
     <string name="sign_in_discord">Discord में साइन इन करें</string>

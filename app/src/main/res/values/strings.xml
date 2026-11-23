@@ -241,6 +241,16 @@
     <string name="try_again">Try Again</string>
     <string name="open_releases_page">Open Releases Page</string>
     <string name="whats_new">What’s new</string>
+    <string name="whats_new_title">What’s new in %1$s</string>
+    <string name="update_channel_change_title">Switch update channel</string>
+    <string name="update_channel_update_line">Update: %1$s → %2$s</string>
+    <string name="update_channel_rollback_line">Rollback: %1$s → %2$s</string>
+    <string name="update_channel_rollback_warning">This build is older than the one installed. Features and settings added after it may be gone once it is installed.</string>
+    <string name="update_channel_target">Channel after the switch: %1$s</string>
+    <string name="update_channel_stable">Stable channel</string>
+    <string name="update_channel_beta">Beta channel</string>
+    <string name="update_channel_version">Installed version: %1$s</string>
+    <string name="update_channel_switch">Switch</string>
     <string name="log_copied">Log copied · %1$d lines</string>
     <string name="sign_in_youtube_music">Sign in to YouTube Music</string>
     <string name="choose_a_channel">Choose a channel</string>

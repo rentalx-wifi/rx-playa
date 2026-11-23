@@ -203,6 +203,16 @@
     <string name="try_again">Повторить попытку</string>
     <string name="open_releases_page">Открыть страницу релизов</string>
     <string name="whats_new">Что нового</string>
+    <string name="whats_new_title">Что нового в %1$s</string>
+    <string name="update_channel_change_title">Сменить канал обновлений</string>
+    <string name="update_channel_update_line">Обновление: %1$s → %2$s</string>
+    <string name="update_channel_rollback_line">Откат: %1$s → %2$s</string>
+    <string name="update_channel_rollback_warning">Эта сборка старее установленной. Возможности и настройки, появившиеся после неё, могут исчезнуть.</string>
+    <string name="update_channel_target">Канал после переключения: %1$s</string>
+    <string name="update_channel_stable">Стабильный канал</string>
+    <string name="update_channel_beta">Бета-канал</string>
+    <string name="update_channel_version">Установленная версия: %1$s</string>
+    <string name="update_channel_switch">Переключить</string>
     <string name="log_copied">Журнал скопирован · %1$d строк</string>
     <string name="sign_in_youtube_music">Войти в YouTube Music</string>
     <string name="sign_in_discord">Войти в Discord</string>

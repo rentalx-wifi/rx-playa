@@ -15,9 +15,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -250,23 +252,7 @@ fun UpdateAvailableDialog(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         textAlign = TextAlign.Start,
                     )
-                    Box(
-                        modifier = Modifier
-                            .padding(top = 4.dp)
-                            .heightIn(max = NOTES_MAX_HEIGHT)
-                            .verticalScroll(rememberScrollState()),
-                    ) {
-                        // RichText's Material3 Text leans on LocalContentColor,
-                        // which nothing here provides — this card is a plain
-                        // Column.background(...), not a Surface, so without
-                        // this the notes render at LocalContentColor's black
-                        // default regardless of theme.
-                        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-                            RichText(style = RichTextStyle.Default) {
-                                Markdown(notes)
-                            }
-                        }
-                    }
+                    ReleaseNotesBody(notes)
                 }
             }
 
@@ -293,6 +279,180 @@ fun UpdateAvailableDialog(
             }
         }
     }
+}
+
+/**
+ * The release body as Markdown, under a "what's new" heading.
+ *
+ * Shared by the two cards that show a changelog — the one offering an install
+ * and the one reporting what the installed build brought — so the notes look
+ * the same whichever way the listener arrived at them.
+ */
+@Composable
+internal fun ReleaseNotesBody(notes: String) {
+    Box(
+        modifier = Modifier
+            .padding(top = 4.dp)
+            .heightIn(max = NOTES_MAX_HEIGHT)
+            .verticalScroll(rememberScrollState()),
+    ) {
+        // RichText's Material3 Text leans on LocalContentColor, which nothing
+        // here provides — the card is a plain Column.background(...), not a
+        // Surface, so without this the notes render at LocalContentColor's black
+        // default regardless of theme.
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            RichText(style = RichTextStyle.Default) {
+                Markdown(notes)
+            }
+        }
+    }
+}
+
+/**
+ * What the build this phone is running brought, once.
+ *
+ * The update card's notes are for people who have not installed the release
+ * yet; this one is for the install that already happened and was never
+ * announced — an APK taken straight from the releases page, or an update
+ * installed while the app was closed. It arrives at most once per version: the
+ * version is written down as soon as the card is dismissed, and nothing older
+ * or equal is offered again.
+ */
+@OptIn(ExperimentalHazeMaterialsApi::class)
+@Composable
+fun WhatsNewDialog(
+    version: String,
+    notes: String,
+    hazeState: HazeState,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val shape = RoundedCornerShape(alertCorner())
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(SCRIM_COLOR)
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .width(alertWidth())
+                .clip(shape)
+                .then(
+                    if (reduceDynamicBlur) {
+                        Modifier.background(MaterialTheme.colorScheme.surface)
+                    } else {
+                        Modifier.optimizedHazeEffect(
+                            state = hazeState,
+                            style = HazeMaterials.regular(MaterialTheme.colorScheme.surface),
+                        )
+                    },
+                )
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                    onClick = {},
+                ),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 19.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = stringResource(R.string.whats_new_title, version),
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.W600,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+                ReleaseNotesBody(notes)
+            }
+            AlertRule()
+            AlertAction(label = stringResource(R.string.close), emphasised = true, onClick = onDismiss)
+        }
+    }
+}
+
+/**
+ * The card that stands between the update-channel switch and the switch.
+ *
+ * Turning beta builds on or off changes which release the phone is measured
+ * against, and that can move it backwards: the newest beta may be older than
+ * the stable build installed, and the newest stable older than a beta. So the
+ * comparison is made first and stated in one line — "Update" or "Rollback" —
+ * with the versions either side, and a rollback says what it costs, because
+ * features and the settings that go with them do not survive it.
+ *
+ * Drawn as a Material dialog rather than the glass card above: the switch it
+ * belongs to lives on the settings screen, which speaks this language already.
+ */
+@Composable
+fun ChannelChangeDialog(
+    currentVersion: String,
+    targetVersion: String,
+    /** The channel the phone is being moved to, named on the second line. */
+    toBeta: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val rollback = AppUpdateChecker.channelChange(currentVersion, targetVersion) ==
+        AppUpdateChecker.ChannelChange.Rollback
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.update_channel_change_title)) },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(
+                        if (rollback) R.string.update_channel_rollback_line
+                        else R.string.update_channel_update_line,
+                        currentVersion,
+                        targetVersion,
+                    ),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = stringResource(
+                        R.string.update_channel_target,
+                        stringResource(
+                            if (toBeta) R.string.update_channel_beta else R.string.update_channel_stable,
+                        ),
+                    ),
+                    modifier = Modifier.padding(top = 8.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (rollback) {
+                    Text(
+                        text = stringResource(R.string.update_channel_rollback_warning),
+                        modifier = Modifier.padding(top = 8.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.update_channel_switch))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
 }
 
 /**

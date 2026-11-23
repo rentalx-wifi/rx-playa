@@ -298,6 +298,17 @@ object AppSettings {
      */
     val betaUpdates = MutableStateFlow(false)
 
+    /**
+     * The version whose release notes the listener has already been shown.
+     *
+     * "What's new" is announced once per version, and this is what "once"
+     * means: a release body is shown only when its version is newer than this
+     * one. Null until the app has seen a build at all, so a fresh install
+     * records its own version rather than announcing it — there was no earlier
+     * version for it to be an update from.
+     */
+    val lastWhatsNewVersion = MutableStateFlow<String?>(null)
+
     // `losslessAudio` used to live here, behind a "Prefer lossless" switch on
     // the Sources screen. It is gone: sources are asked for their best and each
     // degrades on its own terms, so the switch's only real effect was to ask a
@@ -1103,6 +1114,7 @@ object AppSettings {
         syncDownloadedPlaylists.value = prefs.getBoolean(KEY_SYNC_DOWNLOADED_PLAYLISTS, false)
         offlineMode.value = prefs.getBoolean(KEY_OFFLINE_MODE, false)
         betaUpdates.value = prefs.getBoolean(KEY_BETA_UPDATES, false)
+        lastWhatsNewVersion.value = prefs.getString(KEY_LAST_WHATS_NEW, null)
         crossfadeSeconds.value = prefs.getInt(KEY_CROSSFADE, 0)
         smartFadeEnabled.value = prefs.getBoolean(KEY_SMART_FADE, false)
         automixPerformanceMode.value = runCatching {
@@ -1442,6 +1454,11 @@ object AppSettings {
     fun setBetaUpdates(value: Boolean) {
         betaUpdates.value = value
         prefs.edit().putBoolean(KEY_BETA_UPDATES, value).apply()
+    }
+
+    fun setLastWhatsNewVersion(value: String) {
+        lastWhatsNewVersion.value = value
+        prefs.edit().putString(KEY_LAST_WHATS_NEW, value).apply()
     }
 
     fun setCrossfadeSeconds(value: Int) {
@@ -2562,6 +2579,7 @@ object AppSettings {
     private const val KEY_WIFI_ONLY_DOWNLOADS = "wifi_only_downloads"
     private const val KEY_OFFLINE_MODE = "offline_mode"
     private const val KEY_BETA_UPDATES = "beta_updates"
+    private const val KEY_LAST_WHATS_NEW = "last_whats_new_version"
     private const val KEY_EXPORT_DOWNLOADS = "export_downloads"
     private const val KEY_DOWNLOAD_TREE_URI = "download_tree_uri"
     private const val KEY_SYNC_DOWNLOADED_PLAYLISTS = "sync_downloaded_playlists"

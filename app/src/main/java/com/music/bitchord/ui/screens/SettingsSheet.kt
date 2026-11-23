@@ -102,6 +102,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.FilterChip
+import com.music.bitchord.ui.components.ChannelChangeDialog
 import com.music.bitchord.ui.components.IosSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -1671,6 +1672,36 @@ fun SettingsScreen(
             // them, and it re-checks at once so the effect is visible.
             val betaUpdates by AppSettings.betaUpdates.collectAsStateWithLifecycle()
             val updateScope = rememberCoroutineScope()
+            // A switch waiting for its card to be confirmed: the target channel
+            // and the newest version that channel is offering.
+            var channelSwitch by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
+            /** Switches channels, but says which way the version moves first. */
+            fun switchChannel(toBeta: Boolean) {
+                updateScope.launch {
+                    // Without a version to compare there is nothing for the card
+                    // to say, so the switch happens as it did before and the
+                    // check reports whatever the channel turns out to hold.
+                    val target = runCatching { AppUpdateChecker.newestVersion(beta = toBeta) }.getOrNull()
+                    if (target == null) {
+                        AppSettings.setBetaUpdates(toBeta)
+                        runCatching { AppUpdateChecker.check(context, force = true, beta = toBeta) }
+                    } else {
+                        channelSwitch = toBeta to target
+                    }
+                }
+            }
+            // Which channel this phone is on, and what it is running, stated as
+            // a row rather than left to be inferred from the switch below.
+            val channelTitle = stringResource(
+                if (betaUpdates) R.string.update_channel_beta else R.string.update_channel_stable,
+            )
+            row(channelTitle, "channel", "update", "version") {
+                SettingsRow(
+                    icon = SfIcons.LocalOffer,
+                    title = channelTitle,
+                    subtitle = stringResource(R.string.update_channel_version, version),
+                )
+            }
             val betaUpdatesTitle = stringResource(R.string.beta_updates)
             row(betaUpdatesTitle, "beta", "updates", "test") {
                 SettingsRow(
@@ -1680,16 +1711,25 @@ fun SettingsScreen(
                     trailing = {
                         IosSwitch(
                             checked = betaUpdates,
-                            onCheckedChange = { AppSettings.setBetaUpdates(it) },
+                            onCheckedChange = { switchChannel(it) },
                         )
                     },
-                    onClick = {
-                        val next = !betaUpdates
-                        AppSettings.setBetaUpdates(next)
+                    onClick = { switchChannel(!betaUpdates) },
+                )
+            }
+            channelSwitch?.let { (toBeta, target) ->
+                ChannelChangeDialog(
+                    currentVersion = version,
+                    targetVersion = target,
+                    toBeta = toBeta,
+                    onConfirm = {
+                        channelSwitch = null
+                        AppSettings.setBetaUpdates(toBeta)
                         updateScope.launch {
-                            runCatching { AppUpdateChecker.check(context, force = true, beta = next) }
+                            runCatching { AppUpdateChecker.check(context, force = true, beta = toBeta) }
                         }
                     },
+                    onDismiss = { channelSwitch = null },
                 )
             }
             val playNextOnSwipeTitle = stringResource(R.string.play_next_on_swipe)

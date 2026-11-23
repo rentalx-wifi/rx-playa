@@ -232,6 +232,16 @@
     <string name="try_again">다시 시도</string>
     <string name="open_releases_page">릴리스 페이지 열기</string>
     <string name="whats_new">새로운 기능</string>
+    <string name="whats_new_title">%1$s의 새로운 기능</string>
+    <string name="update_channel_change_title">업데이트 채널 전환</string>
+    <string name="update_channel_update_line">업데이트: %1$s → %2$s</string>
+    <string name="update_channel_rollback_line">다운그레이드: %1$s → %2$s</string>
+    <string name="update_channel_rollback_warning">이 빌드는 설치된 빌드보다 오래되었습니다. 이후에 추가된 기능과 설정은 설치 후 사라질 수 있습니다.</string>
+    <string name="update_channel_target">전환 후 채널: %1$s</string>
+    <string name="update_channel_stable">안정 채널</string>
+    <string name="update_channel_beta">베타 채널</string>
+    <string name="update_channel_version">설치된 버전: %1$s</string>
+    <string name="update_channel_switch">전환</string>
     <string name="log_copied">로그 복사함 · %1$d줄</string>
     <string name="sign_in_youtube_music">YouTube Music에 로그인</string>
     <string name="choose_a_channel">채널 선택</string>

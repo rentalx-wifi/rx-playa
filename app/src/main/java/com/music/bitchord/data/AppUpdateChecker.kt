@@ -64,6 +64,20 @@ object AppUpdateChecker {
     private var downloadCancelled = false
 
     /**
+     * The notes of the release this phone is already running, offered once.
+     *
+     * Separate from [available]: that one is a build to install, this one is
+     * the changelog of the build already installed, and the two never stand
+     * at the same time (a newer release is the first case, the running one the
+     * second). The version is the one written down here, so dismissing it is
+     * what makes the card "once".
+     */
+    data class WhatsNew(val version: String, val notes: String)
+
+    private val _whatsNew = MutableStateFlow<WhatsNew?>(null)
+    val whatsNew = _whatsNew.asStateFlow()
+
+    /**
      * The two channels.
      *
      * Stable reads GitHub's `latest`, which by GitHub's own rule never points
@@ -89,6 +103,66 @@ object AppUpdateChecker {
     private const val LIST_PATH = "/releases?per_page=20"
 
     /**
+     * The release [beta]'s channel is offering right now, or null when GitHub
+     * did not answer.
+     *
+     * Both [check] and [newestVersion] ask this question; only what they do
+     * with the answer differs — one offers the build, the other compares it.
+     * Stable asks for `latest`; beta asks for the list and takes its first
+     * non-draft, so a pre-release is visible there while a published one is
+     * invisible to the stable channel.
+     */
+    private suspend fun releaseFrom(beta: Boolean): JSONObject? {
+        val json = runCatching {
+            withContext(Dispatchers.IO) {
+                val path = if (beta) LIST_PATH else LATEST_PATH
+                RELEASE_HOSTS.firstNotNullOfOrNull { host ->
+                    val request = Request.Builder()
+                        .url(host + path)
+                        .header("Accept", "application/vnd.github+json")
+                        .build()
+                    Http.client.newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) null else response.body?.string()
+                    }
+                }
+            }
+        }.getOrNull() ?: return null
+        return runCatching {
+            if (beta) {
+                val list = JSONArray(json)
+                (0 until list.length())
+                    .mapNotNull { list.optJSONObject(it) }
+                    .firstOrNull { !it.optBoolean("draft", false) }
+            } else {
+                JSONObject(json)
+            }
+        }.getOrNull()
+    }
+
+    /** The file names a release carries, which can be the only place its version is written. */
+    private fun assetNames(release: JSONObject): List<String> {
+        val assets = release.optJSONArray("assets") ?: return emptyList()
+        return (0 until assets.length()).mapNotNull { assets.optJSONObject(it)?.optString("name") }
+    }
+
+    /**
+     * The newest version the [beta] channel offers, without offering it.
+     *
+     * Asked before a channel switch, because that switch's confirmation has to
+     * say which way the version moves and only the target channel knows where
+     * it ends. Null when the channel cannot be reached or its newest release
+     * carries no version at all: there is then nothing to compare.
+     */
+    suspend fun newestVersion(beta: Boolean): String? {
+        val release = releaseFrom(beta) ?: return null
+        return releaseVersion(
+            title = release.optString("name"),
+            tag = release.optString("tag_name"),
+            assetNames = assetNames(release),
+        )
+    }
+
+    /**
      * Asks GitHub for the latest release of this fork and offers it when its
      * version is newer than the one running.
      *
@@ -110,37 +184,12 @@ object AppUpdateChecker {
         val now = System.currentTimeMillis()
         val last = prefs?.getLong(KEY_LAST_CHECK, 0L) ?: 0L
         if (!force && now - last < CHECK_INTERVAL_MS) return
-        val json = runCatching {
-            withContext(Dispatchers.IO) {
-                val path = if (beta) LIST_PATH else LATEST_PATH
-                RELEASE_HOSTS.firstNotNullOfOrNull { host ->
-                    val request = Request.Builder()
-                        .url(host + path)
-                        .header("Accept", "application/vnd.github+json")
-                        .build()
-                    Http.client.newCall(request).execute().use { response ->
-                        if (!response.isSuccessful) null else response.body?.string()
-                    }
-                }
-            }
-        }.getOrNull() ?: return
-
-        val release = runCatching {
-            if (beta) {
-                val list = JSONArray(json)
-                (0 until list.length())
-                    .mapNotNull { list.optJSONObject(it) }
-                    .firstOrNull { !it.optBoolean("draft", false) }
-            } else {
-                JSONObject(json)
-            }
-        }.getOrNull() ?: return
+        val release = releaseFrom(beta) ?: return
         // Only a successful answer counts as a check. Recording the attempt made
         // a launch without a connection look like an up-to-date phone, and the
         // next attempt was an hour away.
         prefs?.edit()?.putLong(KEY_LAST_CHECK, now)?.apply()
         val tag = release.optString("tag_name").ifBlank { return }
-        if (tag == dismissedTag) return
         // Rolling releases are named for their channel, not for a version:
         // "beta" and "stable" say nothing about which build is inside. The
         // version is the first real one among the title, the tag and the asset
@@ -148,20 +197,28 @@ object AppUpdateChecker {
         val version = releaseVersion(
             title = release.optString("name"),
             tag = tag,
-            assetNames = release.optJSONArray("assets").let { assets ->
-                (0 until (assets?.length() ?: 0)).mapNotNull { assets?.optJSONObject(it)?.optString("name") }
-            },
+            assetNames = assetNames(release),
         )
+        val notes = release.optString("body").takeIf { it.isNotBlank() }
         // A release may state the versionCode it was built with, which is the
         // only number that decides whether Android will install it. Two betas
         // of one feature share an ordinal (v46b1, v46b2), so the tag alone is
         // not enough to tell them apart.
         val publishedCode = versionCodeIn(release.optString("body"))
-        if (publishedCode != null) {
-            if (publishedCode <= BuildConfig.VERSION_CODE) return
-        } else if (version == null || compareVersions(version, BuildConfig.VERSION_NAME) <= 0) {
+        val newer = if (publishedCode != null) {
+            publishedCode > BuildConfig.VERSION_CODE
+        } else {
+            version != null && compareVersions(version, BuildConfig.VERSION_NAME) > 0
+        }
+        if (!newer) {
+            // Nothing to install — but the release may be the build the phone is
+            // already running, and then its body is what "what's new" shows.
+            offerWhatsNew(version, notes)
+            forgetOfferFromOtherChannel(beta)
             return
         }
+        // "Remind me later" silences this prompt, not the notes above it.
+        if (tag == dismissedTag) return
 
         val assets = release.optJSONArray("assets")
         val candidates = buildList {
@@ -189,14 +246,83 @@ object AppUpdateChecker {
             ?.optLong("size")
             ?.takeIf { it > 0 }
         _available.value = UpdateInfo(
-            version = tag,
+            // The version, not the tag: a rolling release calls itself "beta",
+            // and that is not a number anybody can compare or recognise.
+            version = version ?: tag,
             releaseUrl = release.optString("html_url"),
             apkUrl = apkUrl,
-            notes = release.optString("body").takeIf { it.isNotBlank() },
+            notes = notes,
             isBeta = release.optBoolean("prerelease", false),
             apkBytes = apkBytes,
             versionCode = publishedCode,
         )
+        offeredChannel = beta
+        offeredTag = tag
+    }
+
+    /** Which channel the current offer came from, so the other one can take it back. */
+    @Volatile
+    private var offeredChannel: Boolean? = null
+
+    /**
+     * The release tag behind the current offer.
+     *
+     * Kept apart from [UpdateInfo.version]: that one is the number the dialog
+     * shows, this is the name GitHub knows the release by, and "Remind me
+     * later" has to silence the tag the next check will look up.
+     */
+    @Volatile
+    private var offeredTag: String? = null
+
+    /**
+     * Offers the notes of the build the phone is already running, once.
+     *
+     * The caller has already established that this release is nothing to
+     * install; the only thing left it can be is the version in the caller's
+     * hands. Whether it is worth showing is decided by the version written down
+     * for the last notes the listener read: newer than that means this install
+     * brought changes nobody has been told about (an APK taken straight from
+     * the releases page, say), and the same or older means they have been.
+     */
+    private fun offerWhatsNew(version: String?, notes: String?) {
+        if (version == null || notes == null) return
+        if (compareVersions(version, BuildConfig.VERSION_NAME) != 0) return
+        val seen = AppSettings.lastWhatsNewVersion.value
+        if (seen == null) {
+            // A fresh install has no earlier version to be newer than: recording
+            // it here keeps the very first launch from announcing the app itself.
+            AppSettings.setLastWhatsNewVersion(version)
+            return
+        }
+        if (compareVersions(version, seen) <= 0) return
+        _whatsNew.value = WhatsNew(version = version, notes = notes)
+    }
+
+    /** The notes for [version] are on screen now, so the card above never repeats them. */
+    fun markNotesShown(version: String) {
+        AppSettings.setLastWhatsNewVersion(version)
+    }
+
+    fun dismissWhatsNew() {
+        _whatsNew.value?.let { markNotesShown(it.version) }
+        _whatsNew.value = null
+    }
+
+    /**
+     * Drops a prompt that the channel just switched away from.
+     *
+     * A beta build offered under the beta channel is not an answer the stable
+     * one gave, and leaving it on screen after the switch would offer the very
+     * thing the switch was made to avoid. A download in flight is left alone:
+     * the file is already being written and the prompt is its only way to an
+     * install.
+     */
+    private fun forgetOfferFromOtherChannel(beta: Boolean) {
+        if (offeredChannel == null || offeredChannel == beta) return
+        if (_download.value !is DownloadState.Idle) return
+        _available.value = null
+        offeredChannel = null
+        offeredTag = null
     }
 
     /**
@@ -228,8 +354,10 @@ object AppUpdateChecker {
 
     /** "Remind me later", or the release page has been opened instead. */
     fun dismiss() {
-        val tag = _available.value?.version
+        val tag = offeredTag
         _available.value = null
+        offeredChannel = null
+        offeredTag = null
         if (tag != null) {
             dismissedTag = tag
             runCatching { prefs?.edit()?.putString(KEY_DISMISSED_UPDATE, tag)?.apply() }
@@ -322,6 +450,27 @@ object AppUpdateChecker {
         }
         return versionOrdinal(left).compareTo(versionOrdinal(right))
     }
+
+    /**
+     * Which way a channel switch moves this phone's version.
+     *
+     * [Rollback] is not a failure — a beta line folded back into stable is a
+     * legitimate reason to move to it — it is only the case that needs saying
+     * out loud, because what the newer build added may not be there after.
+     */
+    enum class ChannelChange { Update, Rollback }
+
+    /**
+     * Whether going from [current] to [target] is an update or a rollback.
+     *
+     * The two versions decide it and nothing else: switching to beta can move
+     * the phone backwards (the beta line ended below stable) and switching to
+     * stable can move it forwards (stable has just overtaken the running beta).
+     * Reading the direction off the switch itself would therefore state the
+     * opposite of what the install does.
+     */
+    internal fun channelChange(current: String, target: String): ChannelChange =
+        if (compareVersions(target, current) < 0) ChannelChange.Rollback else ChannelChange.Update
 
     /** "v1.9.4"/"1.9.4" as numbers, or null when the string is not dotted. */
     private fun dottedParts(version: String): List<Int>? {

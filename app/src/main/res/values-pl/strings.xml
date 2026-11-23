@@ -145,6 +145,16 @@
     <string name="try_again">Spróbuj ponownie</string>
     <string name="open_releases_page">Otwórz stronę wydań</string>
     <string name="whats_new">Co nowego</string>
+    <string name="whats_new_title">Co nowego w %1$s</string>
+    <string name="update_channel_change_title">Zmień kanał aktualizacji</string>
+    <string name="update_channel_update_line">Aktualizacja: %1$s → %2$s</string>
+    <string name="update_channel_rollback_line">Wycofanie: %1$s → %2$s</string>
+    <string name="update_channel_rollback_warning">Ta kompilacja jest starsza od zainstalowanej. Funkcje i ustawienia dodane później mogą po jej instalacji zniknąć.</string>
+    <string name="update_channel_target">Kanał po zmianie: %1$s</string>
+    <string name="update_channel_stable">Kanał stabilny</string>
+    <string name="update_channel_beta">Kanał beta</string>
+    <string name="update_channel_version">Zainstalowana wersja: %1$s</string>
+    <string name="update_channel_switch">Zmień</string>
     <string name="log_copied">Logi zostały skopiowane · %1$d lines</string>
     <string name="sign_in_youtube_music">Zaloguj się do YouTube Music</string>
     <string name="sign_in_discord">Zaloguj się do Discorda</string>

@@ -147,6 +147,16 @@
     <string name="try_again">Tekrar Dene</string>
     <string name="open_releases_page">Sürümler Sayfasını Aç</string>
     <string name="whats_new">Yenilikler</string>
+    <string name="whats_new_title">%1$s sürümündeki yenilikler</string>
+    <string name="update_channel_change_title">Güncelleme kanalını değiştir</string>
+    <string name="update_channel_update_line">Güncelleme: %1$s → %2$s</string>
+    <string name="update_channel_rollback_line">Sürüm düşürme: %1$s → %2$s</string>
+    <string name="update_channel_rollback_warning">Bu derleme kurulu olandan daha eski. Sonradan eklenen özellikler ve ayarlar kurulduktan sonra kaybolabilir.</string>
+    <string name="update_channel_target">Değişimden sonraki kanal: %1$s</string>
+    <string name="update_channel_stable">Kararlı kanal</string>
+    <string name="update_channel_beta">Beta kanalı</string>
+    <string name="update_channel_version">Kurulu sürüm: %1$s</string>
+    <string name="update_channel_switch">Değiştir</string>
     <string name="log_copied">Günlük kopyalandı · %1$d satır</string>
     <string name="sign_in_youtube_music">YouTube Music\'e giriş yap</string>
     <string name="choose_a_channel">Bir kanal seç</string>

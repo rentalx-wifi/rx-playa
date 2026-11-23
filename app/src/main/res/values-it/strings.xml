@@ -166,6 +166,16 @@
     <string name="try_again">Riprova</string>
     <string name="open_releases_page">Apri la pagina delle release</string>
     <string name="whats_new">Novità</string>
+    <string name="whats_new_title">Novità in %1$s</string>
+    <string name="update_channel_change_title">Cambia canale di aggiornamento</string>
+    <string name="update_channel_update_line">Aggiornamento: %1$s → %2$s</string>
+    <string name="update_channel_rollback_line">Downgrade: %1$s → %2$s</string>
+    <string name="update_channel_rollback_warning">Questa build è più vecchia di quella installata. Funzioni e impostazioni aggiunte dopo potrebbero sparire una volta installata.</string>
+    <string name="update_channel_target">Canale dopo il cambio: %1$s</string>
+    <string name="update_channel_stable">Canale stabile</string>
+    <string name="update_channel_beta">Canale beta</string>
+    <string name="update_channel_version">Versione installata: %1$s</string>
+    <string name="update_channel_switch">Cambia</string>
     <string name="log_copied">Log copiato · %1$d righe</string>
     <string name="sign_in_youtube_music">Accedi a YouTube Music</string>
     <string name="choose_a_channel">Scegli un canale</string>

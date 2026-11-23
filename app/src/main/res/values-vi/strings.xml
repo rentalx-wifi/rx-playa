@@ -144,6 +144,16 @@
     <string name="try_again">Thử lại</string>
     <string name="open_releases_page">Mở trang Bản phát hành</string>
     <string name="whats_new">Có gì mới</string>
+    <string name="whats_new_title">Có gì mới trong %1$s</string>
+    <string name="update_channel_change_title">Chuyển kênh cập nhật</string>
+    <string name="update_channel_update_line">Cập nhật: %1$s → %2$s</string>
+    <string name="update_channel_rollback_line">Hạ cấp: %1$s → %2$s</string>
+    <string name="update_channel_rollback_warning">Bản dựng này cũ hơn bản đang cài. Các tính năng và cài đặt được thêm sau đó có thể biến mất sau khi cài.</string>
+    <string name="update_channel_target">Kênh sau khi chuyển: %1$s</string>
+    <string name="update_channel_stable">Kênh ổn định</string>
+    <string name="update_channel_beta">Kênh beta</string>
+    <string name="update_channel_version">Phiên bản đã cài: %1$s</string>
+    <string name="update_channel_switch">Chuyển</string>
     <string name="log_copied">Đã sao chép nhật ký · %1$d dòng</string>
     <string name="sign_in_youtube_music">Đăng nhập vào YouTube Music</string>
     <string name="choose_a_channel">Chọn một kênh</string>

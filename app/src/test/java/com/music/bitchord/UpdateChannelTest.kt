@@ -43,4 +43,41 @@ class UpdateChannelTest {
     fun `a release nobody labelled has no version`() {
         assertNull(AppUpdateChecker.releaseVersion("Rolling", "latest", listOf("app-universal.apk")))
     }
+
+    @Test
+    fun `a newer target is an update and an older one a rollback`() {
+        assertEquals(
+            AppUpdateChecker.ChannelChange.Update,
+            AppUpdateChecker.channelChange("v1.9.3", "v1.9.4"),
+        )
+        assertEquals(
+            AppUpdateChecker.ChannelChange.Rollback,
+            AppUpdateChecker.channelChange("v1.9.4", "v1.9.3"),
+        )
+    }
+
+    @Test
+    fun `the channel being switched to does not decide the wording`() {
+        // And both moving backwards: in this fork the beta line is numbered
+        // 46xx, above the dotted 1.9.x line, so leaving it for stable is a real
+        // downgrade and the card has to say so rather than call it an update
+        // because the switch points at the stable channel.
+        assertEquals(
+            AppUpdateChecker.ChannelChange.Rollback,
+            AppUpdateChecker.channelChange("v46b1", "v1.9.5"),
+        )
+        assertEquals(
+            AppUpdateChecker.ChannelChange.Rollback,
+            AppUpdateChecker.channelChange("v46b1", "v45"),
+        )
+    }
+
+    @Test
+    fun `the version already installed is not a rollback`() {
+        // Two spellings of one version: the switch changes the channel, not it.
+        assertEquals(
+            AppUpdateChecker.ChannelChange.Update,
+            AppUpdateChecker.channelChange("v1.9.4", "1.9.4"),
+        )
+    }
 }

@@ -142,6 +142,16 @@
     <string name="try_again">Erneut versuchen</string>
     <string name="open_releases_page">Release-Seite öffnen</string>
     <string name="whats_new">Neuerungen</string>
+    <string name="whats_new_title">Neu in %1$s</string>
+    <string name="update_channel_change_title">Update-Kanal wechseln</string>
+    <string name="update_channel_update_line">Update: %1$s → %2$s</string>
+    <string name="update_channel_rollback_line">Downgrade: %1$s → %2$s</string>
+    <string name="update_channel_rollback_warning">Dieser Build ist älter als der installierte. Funktionen und Einstellungen, die danach dazukamen, können nach der Installation fehlen.</string>
+    <string name="update_channel_target">Kanal nach dem Wechsel: %1$s</string>
+    <string name="update_channel_stable">Stabiler Kanal</string>
+    <string name="update_channel_beta">Beta-Kanal</string>
+    <string name="update_channel_version">Installierte Version: %1$s</string>
+    <string name="update_channel_switch">Wechseln</string>
     <string name="log_copied">Protokoll kopiert · %1$d Zeilen</string>
     <string name="sign_in_youtube_music">Bei YouTube Music anmelden</string>
     <string name="sign_in_discord">Bei Discord anmelden</string>
