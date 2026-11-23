@@ -94,6 +94,7 @@
     <string name="recent_searches">Letzte Suchanfragen</string>
     <string name="clear">Löschen</string>
     <string name="search_hint">Künstler, Songs, Songtexte und mehr</string>
+    <string name="search_lyrics_section">Nach einer Liedzeile</string>
     <string name="recent_search_edit">„%1$s“ bearbeiten</string>
     <string name="recent_search_remove">„%1$s“ aus letzten Suchanfragen entfernen</string>
     <string name="storage_required_save">Speicherzugriff ist erforderlich, um Songs zu speichern</string>
@@ -247,6 +248,15 @@
     <string name="synced_lyrics">Synchronisierte Songtexte</string>
     <string name="synced_lyrics_subtitle">Hebt die Wörter im Player passend zum Gesang hervor</string>
     <string name="lyrics_sources">Songtext-Quellen</string>
+    <string name="lyrics_prefer_user">Eigene Liedtexte bevorzugen</string>
+    <string name="lyrics_prefer_user_subtitle">Zeigt deinen Text vor allem, was eine Textquelle findet</string>
+    <string name="user_lyrics_add">Liedtext manuell hinzufügen</string>
+    <string name="user_lyrics_edit">Liedtext bearbeiten</string>
+    <string name="user_lyrics_reset">Liedtext zurücksetzen</string>
+    <string name="user_lyrics_dialog_title">Dein Text für diesen Titel</string>
+    <string name="user_lyrics_dialog_hint">Tippe oder füge den Text ein. Zeilen, die mit einem Zeitstempel wie [01:23.45] beginnen, leuchten beim Singen mit.</string>
+    <string name="user_lyrics_paste">Aus der Zwischenablage einfügen</string>
+    <string name="user_lyrics_clipboard_empty">Die Zwischenablage enthält keinen Text</string>
     <string name="song_cache_limit">Song-Cache-Limit</string>
     <string name="clear_song_cache">Song-Cache leeren</string>
     <string name="clear_song_cache_subtitle">Gibt den von heruntergeladenem Audio belegten Speicher frei</string>

@@ -50,6 +50,7 @@
     <string name="lyrics_already_in_language">歌詞已經是%1$s</string>
     <string name="lyrics_already_romanized">這些歌詞已經是拉丁字母</string>
     <string name="lyrics_by">歌詞來自 %1$s</string>
+    <string name="lyrics_by_you">你自己的歌詞</string>
     <string-array name="lyrics_intro_lines">
         <item>節奏落地啦</item>
         <item>歌曲開始啦</item>

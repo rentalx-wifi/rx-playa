@@ -1122,6 +1122,7 @@ private fun BitChordApp(
     val lyricsProviderStates by viewModel.lyricsProviderStates.collectAsStateWithLifecycle()
     val searchHistory by viewModel.searchHistory.collectAsStateWithLifecycle()
     val searchSuggestions by viewModel.suggestions.collectAsStateWithLifecycle()
+    val lyricHits by viewModel.lyricHits.collectAsStateWithLifecycle()
     val searchLoadingMore by viewModel.searchLoadingMore.collectAsStateWithLifecycle()
     val searchScrollReset by viewModel.searchScrollReset.collectAsStateWithLifecycle()
     val releaseLibrary by viewModel.releaseLibrary.collectAsStateWithLifecycle()
@@ -4246,6 +4247,13 @@ private fun BitChordApp(
                                 history = searchHistory,
                                 suggestions = searchSuggestions,
                                 typeaheadResults = viewModel.typeaheadResults.collectAsStateWithLifecycle().value,
+                                lyricHits = lyricHits,
+                                lyricsSectionTitle = stringResource(R.string.search_lyrics_section),
+                                // A line of a song is a search like any other once it
+                                // has been resolved to a real track: filling the field
+                                // with "artist - title" is exactly what searching it
+                                // by hand would do, and it keeps its own history entry.
+                                onLyricsHitClick = viewModel::searchFor,
                                 onSubmit = viewModel::submitSearch,
                                 // Suggestions land in search history via searchFor → recordSearch.
                                 // History items (onHistoryClick) navigate/play without re-logging.

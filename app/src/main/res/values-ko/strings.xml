@@ -122,6 +122,7 @@
     <string name="recent_searches">최근 검색</string>
     <string name="clear">지우기</string>
     <string name="search_hint">아티스트, 음악, 가사 등</string>
+    <string name="search_lyrics_section">가사의 한 구절에서</string>
     <string name="settings_search_hint">검색 설정</string>
     <string name="settings_search_empty">“%1$s”에 맞는 설정 없음</string>
     <string name="recent_search_edit">“%1$s” 편집</string>
@@ -437,6 +438,15 @@
     <string name="synced_lyrics">싱크 가사</string>
     <string name="synced_lyrics_subtitle">지금 불리는 가사를 밝게 표시합니다</string>
     <string name="lyrics_sources">가사 소스</string>
+    <string name="lyrics_prefer_user">내 가사를 우선</string>
+    <string name="lyrics_prefer_user_subtitle">가사 소스가 찾은 것보다 내가 쓴 가사를 먼저 보여 줍니다</string>
+    <string name="user_lyrics_add">가사 직접 추가</string>
+    <string name="user_lyrics_edit">가사 편집</string>
+    <string name="user_lyrics_reset">가사 초기화</string>
+    <string name="user_lyrics_dialog_title">이 곡의 내 가사</string>
+    <string name="user_lyrics_dialog_hint">가사를 입력하거나 붙여넣으세요. [01:23.45] 같은 타임코드로 시작하는 줄은 노래에 맞춰 밝아집니다.</string>
+    <string name="user_lyrics_paste">클립보드에서 붙여넣기</string>
+    <string name="user_lyrics_clipboard_empty">클립보드에 붙여넣을 텍스트가 없습니다</string>
     <string name="song_cache_limit">음악 캐시 제한</string>
     <string name="clear_song_cache">음악 캐시 지우기</string>
     <string name="clear_song_cache_subtitle">다운로드한 오디오가 차지한 공간을 확보합니다</string>

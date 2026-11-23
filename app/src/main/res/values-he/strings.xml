@@ -96,6 +96,7 @@
     <string name="recent_searches">חיפושים אחרונים</string>
     <string name="clear">ניקוי</string>
     <string name="search_hint">אמנים, שירים, מילות שיר ועוד</string>
+    <string name="search_lyrics_section">לפי שורה מהשיר</string>
     <string name="recent_search_edit">עריכת “%1$s”</string>
     <string name="recent_search_remove">הסרת “%1$s” מהחיפושים האחרונים</string>
     <string name="storage_required_save">נדרשת גישה לאחסון כדי לשמור שירים</string>
@@ -248,6 +249,15 @@
     <string name="synced_lyrics">מילות שיר מסונכרנות</string>
     <string name="synced_lyrics_subtitle">מדגיש את המילים בנגן בזמן שהן מושרות</string>
     <string name="lyrics_sources">מקורות מילות שיר</string>
+    <string name="lyrics_prefer_user">להעדיף את המילים שלך</string>
+    <string name="lyrics_prefer_user_subtitle">להציג את הטקסט שכתבת לפני כל מה שמקור מילים מוצא</string>
+    <string name="user_lyrics_add">הוספת מילים ידנית</string>
+    <string name="user_lyrics_edit">עריכת מילים</string>
+    <string name="user_lyrics_reset">איפוס מילים</string>
+    <string name="user_lyrics_dialog_title">המילים שלך לשיר הזה</string>
+    <string name="user_lyrics_dialog_hint">כתוב או הדבק את המילים. שורות שמתחילות בחותם זמן כמו [01:23.45] נדלקות בזמן השירה.</string>
+    <string name="user_lyrics_paste">הדבקה מהלוח</string>
+    <string name="user_lyrics_clipboard_empty">אין טקסט בלוח להדביק</string>
     <string name="song_cache_limit">מגבלת מטמון שירים</string>
     <string name="clear_song_cache">ניקוי מטמון שירים</string>
     <string name="clear_song_cache_subtitle">משחרר שטח שתפוס על ידי אודיו שהורד</string>

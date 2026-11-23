@@ -52,6 +52,7 @@
     <string name="lyrics_already_in_language">이 가사는 이미 %1$s입니다</string>
     <string name="lyrics_already_romanized">이 가사는 이미 로마자를 사용하고 있습니다</string>
     <string name="lyrics_by">가사: %1$s</string>
+    <string name="lyrics_by_you">내 가사</string>
     <string-array name="lyrics_intro_lines">
         <item>비트가 깔리는 중</item>
         <item>노래가 시작하는 중</item>

@@ -50,6 +50,7 @@
     <string name="lyrics_already_in_language">Bu sözler zaten %1$s dilinde</string>
     <string name="lyrics_already_romanized">Bu sözler zaten Latin harfleri kullanıyor</string>
     <string name="lyrics_by">Sözler: %1$s</string>
+    <string name="lyrics_by_you">Kendi sözlerin</string>
     <string-array name="lyrics_intro_lines">
         <item>Ritim geliyor</item>
         <item>Şarkı başlıyor</item>

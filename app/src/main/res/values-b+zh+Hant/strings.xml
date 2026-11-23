@@ -86,6 +86,7 @@
     <string name="recent_searches">最近搜尋</string>
     <string name="clear">清除</string>
     <string name="search_hint">藝人、歌曲、歌詞等</string>
+    <string name="search_lyrics_section">根據歌詞中的一句</string>
     <string name="recent_search_edit">編輯“%1$s”</string>
     <string name="recent_search_remove">從最近搜尋中移除“%1$s”</string>
     <string name="storage_required_save">需要儲存訪問許可權才能儲存歌曲</string>
@@ -233,6 +234,15 @@
     <string name="synced_lyrics">同步歌詞</string>
     <string name="synced_lyrics_subtitle">隨著演唱在播放器上高亮顯示歌詞</string>
     <string name="lyrics_sources">歌詞來源</string>
+    <string name="lyrics_prefer_user">優先使用自己的歌詞</string>
+    <string name="lyrics_prefer_user_subtitle">在歌詞來源找到的內容之前顯示你寫的歌詞</string>
+    <string name="user_lyrics_add">手動加入歌詞</string>
+    <string name="user_lyrics_edit">編輯歌詞</string>
+    <string name="user_lyrics_reset">重設歌詞</string>
+    <string name="user_lyrics_dialog_title">這首歌你自己的歌詞</string>
+    <string name="user_lyrics_dialog_hint">輸入或貼上歌詞。以 [01:23.45] 這類時間戳開頭的行會隨著歌聲亮起。</string>
+    <string name="user_lyrics_paste">從剪貼簿貼上</string>
+    <string name="user_lyrics_clipboard_empty">剪貼簿裡沒有可貼上的文字</string>
     <string name="song_cache_limit">歌曲快取上限</string>
     <string name="clear_song_cache">清除歌曲快取</string>
     <string name="clear_song_cache_subtitle">釋放已下載音訊佔用的空間</string>

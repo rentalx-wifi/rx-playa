@@ -94,6 +94,7 @@
     <string name="recent_searches">हाल की खोजें</string>
     <string name="clear">साफ़ करें</string>
     <string name="search_hint">कलाकार, गाने, लिरिक्स और बहुत कुछ</string>
+    <string name="search_lyrics_section">गाने की एक पंक्ति से</string>
     <string name="recent_search_edit">“%1$s” संपादित करें</string>
     <string name="recent_search_remove">हाल की खोजों से “%1$s” हटाएं</string>
     <string name="storage_required_save">गाने सेव करने के लिए स्टोरेज एक्सेस ज़रूरी है</string>
@@ -247,6 +248,15 @@
     <string name="synced_lyrics">सिंक किए गए लिरिक्स</string>
     <string name="synced_lyrics_subtitle">गाए जाने के साथ प्लेयर पर शब्दों को हाइलाइट करता है</string>
     <string name="lyrics_sources">लिरिक्स के स्रोत</string>
+    <string name="lyrics_prefer_user">अपने बोल पहले दिखाएँ</string>
+    <string name="lyrics_prefer_user_subtitle">किसी भी स्रोत से मिले बोल से पहले अपने लिखे बोल दिखाएँ</string>
+    <string name="user_lyrics_add">बोल खुद जोड़ें</string>
+    <string name="user_lyrics_edit">बोल बदलें</string>
+    <string name="user_lyrics_reset">बोल हटाएँ</string>
+    <string name="user_lyrics_dialog_title">इस गाने के आपके बोल</string>
+    <string name="user_lyrics_dialog_hint">बोल लिखें या चिपकाएँ। [01:23.45] जैसे टाइमकोड से शुरू होने वाली पंक्तियाँ गाते समय चमकती हैं।</string>
+    <string name="user_lyrics_paste">क्लिपबोर्ड से चिपकाएँ</string>
+    <string name="user_lyrics_clipboard_empty">क्लिपबोर्ड में चिपकाने के लिए कोई पाठ नहीं है</string>
     <string name="song_cache_limit">गाना कैश सीमा</string>
     <string name="clear_song_cache">गाना कैश साफ़ करें</string>
     <string name="clear_song_cache_subtitle">डाउनलोड किए गए ऑडियो द्वारा इस्तेमाल की गई जगह खाली करता है</string>

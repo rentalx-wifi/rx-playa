@@ -1022,13 +1022,27 @@ fun NowPlayingScreen(
     }
     val lyricsLoadingLines = stringArrayResource(Res.array.lyrics_loading_lines)
     val lyricsLoadingText = remember(song.videoId) { lyricsLoadingLines.random() }
+    // The words the listener wrote for this track themselves, where there are
+    // any, and whether they are to be shown ahead of a source's answer. Read
+    // here and used through [shownLyrics] below, so the strip, the panel, the
+    // share card and the two translate buttons all work on the same lines — a
+    // screen where the panel showed one set of words and the strip another is
+    // the kind of half-state this file works hard to avoid.
+    val userLyrics = PlayerPlatform.host.rememberUserLyrics(song)
+    val preferUserLyrics by PlayerSettings.lyricsPreferUser.collectAsStateWithLifecycle()
+    val ownLyricsShown = preferUserLyrics && userLyrics.isNotEmpty()
+    val shownLyrics: List<LyricLine>? = if (ownLyricsShown) userLyrics else lyrics
+    // Not asked for while there is something to read in front of it: what these
+    // lines came from is not a question, and there is no source to answer it.
+    val shownUnavailable = lyricsUnavailable && shownLyrics.isNullOrEmpty()
     val lyricsTranslation = rememberLyricsTranslation(
         trackId = song.videoId,
-        lyrics = lyrics,
+        lyrics = shownLyrics,
         lyricsSource = lyricsSource,
-        lyricsUnavailable = lyricsUnavailable,
+        lyricsUnavailable = shownUnavailable,
         loadingText = lyricsLoadingText,
         haptics = haptics,
+        userLyrics = ownLyricsShown,
     )
     // The drawer holding the finished card, set the moment Share is confirmed.
     // Nothing is drawn here: the picture is a bitmap and a canvas, which is the
@@ -1053,7 +1067,7 @@ fun NowPlayingScreen(
     val lyricsShareEnabled = lyricsShareAvailable
     val lyricPicker = rememberLyricsPicker(
         song = song,
-        lines = lyrics,
+        lines = shownLyrics,
         subLines = lyricsTranslation.subLines,
         artworkUrl = remoteArt,
         haptics = haptics,
@@ -1633,7 +1647,10 @@ fun NowPlayingScreen(
         if (showLyricsProviders) {
             LyricsProviderSheet(
                 hazeState = playerHaze,
-                currentSource = lyricsSource,
+                // Nothing is marked as the words on screen when those words are
+                // the listener's own: no provider produced them, and a tick beside
+                // one would say it did.
+                currentSource = lyricsSource.takeUnless { ownLyricsShown },
                 states = lyricsProviderStates,
                 onSelect = onSelectLyricsProvider,
                 onDismiss = { showLyricsProviders = false },
@@ -2135,7 +2152,7 @@ fun NowPlayingScreen(
                                         playhead = lyricsPlayhead,
                                         isPlaying = isPlaying && position.advancing,
                                         durationMs = durationMs,
-                                        lyricsUnavailable = lyricsUnavailable,
+                                        lyricsUnavailable = shownUnavailable,
                                         loadingText = lyricsLoadingText,
                                         onClick = openLyrics,
                                     )
@@ -2220,7 +2237,7 @@ fun NowPlayingScreen(
                                 RomanizationToggleButton(
                                     state = lyricsTranslation.romanizationState,
                                     showingRomanization = lyricsTranslation.showingRomanization,
-                                    enabled = !lyrics.isNullOrEmpty(),
+                                    enabled = !shownLyrics.isNullOrEmpty(),
                                     onClick = lyricsTranslation.toggleRomanization,
                                 )
                             },
@@ -2228,7 +2245,7 @@ fun NowPlayingScreen(
                                 TranslationToggleButton(
                                     state = lyricsTranslation.translationState,
                                     showingTranslation = lyricsTranslation.showingTranslation,
-                                    enabled = !lyrics.isNullOrEmpty(),
+                                    enabled = !shownLyrics.isNullOrEmpty(),
                                     onClick = lyricsTranslation.toggleTranslation,
                                 )
                             },
@@ -2245,11 +2262,11 @@ fun NowPlayingScreen(
                                 // a tap to reveal, and leaving the reveal gesture
                                 // armed would only eat taps meant for the lines.
                                 LyricsPanel(
-                                    lines = lyrics.orEmpty(),
+                                    lines = shownLyrics.orEmpty(),
                                     subLines = lyricsTranslation.subLines,
                                     trackKey = song.videoId,
                                     playhead = lyricsPlayhead,
-                                    looking = !lyricsUnavailable,
+                                    looking = !shownUnavailable,
                                     isPlaying = isPlaying && position.advancing,
                                     onSeekToLine = seekToLyric,
                                     controlsOpen = true,
@@ -3677,7 +3694,7 @@ fun NowPlayingScreen(
                             // glyph is its menu. A pick in progress keeps its Close
                             // whichever way the controls are.
                             val lyricsShareGlyphVisible = lyricsOpen && collapseDone && lyricsShareEnabled &&
-                                !lyrics.isNullOrEmpty() && (!lyricsControlsOpen || lyricPicker.picking)
+                                !shownLyrics.isNullOrEmpty() && (!lyricsControlsOpen || lyricPicker.picking)
                             CircleGlyph(
                                 icon = when {
                                     showRevertCue -> Icons.AutoMirrored.Rounded.Undo
@@ -3733,11 +3750,11 @@ fun NowPlayingScreen(
                                         .graphicsLayer { alpha = if (lyricsPanelVisible) panelFade.value else 0f },
                                 ) { particleProgress ->
                                     LyricsPanel(
-                                        lines = lyrics.orEmpty(),
+                                        lines = shownLyrics.orEmpty(),
                                         subLines = lyricsTranslation.subLines,
                                         trackKey = song.videoId,
                                         playhead = lyricsPlayhead,
-                                        looking = !lyricsUnavailable,
+                                        looking = !shownUnavailable,
                                         isPlaying = isPlaying && position.advancing,
                                         active = lyricsPanelVisible,
                                         onSeekToLine = seekToLyric,
@@ -3782,7 +3799,7 @@ fun NowPlayingScreen(
                                     RomanizationToggleButton(
                                         state = lyricsTranslation.romanizationState,
                                         showingRomanization = lyricsTranslation.showingRomanization,
-                                        enabled = translateShown && !lyrics.isNullOrEmpty(),
+                                        enabled = translateShown && !shownLyrics.isNullOrEmpty(),
                                         onClick = lyricsTranslation.toggleRomanization,
                                     )
                                 }
@@ -3796,7 +3813,7 @@ fun NowPlayingScreen(
                                         showingTranslation = lyricsTranslation.showingTranslation,
                                         // Not tappable on the way out: a disc at 20%
                                         // opacity is on its way to gone, not a target.
-                                        enabled = translateShown && !lyrics.isNullOrEmpty(),
+                                        enabled = translateShown && !shownLyrics.isNullOrEmpty(),
                                         onClick = lyricsTranslation.toggleTranslation,
                                     )
                                 }
@@ -3931,7 +3948,7 @@ fun NowPlayingScreen(
                             playhead = lyricsPlayhead,
                             isPlaying = isPlaying && position.advancing,
                             durationMs = durationMs,
-                            lyricsUnavailable = lyricsUnavailable,
+                            lyricsUnavailable = shownUnavailable,
                             loadingText = lyricsLoadingText,
                             // Still visible over the queue, so still a valid way in:
                             // opens the same full lyrics panel it always has, closing

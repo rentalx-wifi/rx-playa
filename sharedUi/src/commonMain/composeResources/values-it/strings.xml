@@ -50,6 +50,7 @@
     <string name="lyrics_already_in_language">Questo testo è già in %1$s</string>
     <string name="lyrics_already_romanized">Questo testo usa già caratteri latini</string>
     <string name="lyrics_by">Testi di %1$s</string>
+    <string name="lyrics_by_you">Il tuo testo</string>
     <string-array name="lyrics_intro_lines">
         <item>Il ritmo sta arrivando</item>
         <item>Il brano sta iniziando</item>

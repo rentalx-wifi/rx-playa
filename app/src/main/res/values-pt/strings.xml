@@ -96,6 +96,7 @@
     <string name="recent_searches">Pesquisas recentes</string>
     <string name="clear">Limpar</string>
     <string name="search_hint">Artistas, músicas, letras e mais</string>
+    <string name="search_lyrics_section">Por um verso da canção</string>
     <string name="recent_search_edit">Editar “%1$s”</string>
     <string name="recent_search_remove">Remover “%1$s” das pesquisas recentes</string>
     <string name="storage_required_save">É necessário acesso ao armazenamento para salvar músicas</string>
@@ -249,6 +250,15 @@
     <string name="synced_lyrics">Letras sincronizadas</string>
     <string name="synced_lyrics_subtitle">Destaca as palavras no player conforme são cantadas</string>
     <string name="lyrics_sources">Fontes de letras</string>
+    <string name="lyrics_prefer_user">Preferir as suas letras</string>
+    <string name="lyrics_prefer_user_subtitle">Mostra o texto que escreveu antes de tudo o que uma fonte de letras encontrar</string>
+    <string name="user_lyrics_add">Adicionar letra manualmente</string>
+    <string name="user_lyrics_edit">Editar letra</string>
+    <string name="user_lyrics_reset">Repor letra</string>
+    <string name="user_lyrics_dialog_title">A sua letra para esta faixa</string>
+    <string name="user_lyrics_dialog_hint">Escreva ou cole a letra. As linhas que começam com um marcador temporal como [01:23.45] acendem-se à medida que são cantadas.</string>
+    <string name="user_lyrics_paste">Colar da área de transferência</string>
+    <string name="user_lyrics_clipboard_empty">Não há texto na área de transferência</string>
     <string name="song_cache_limit">Limite de cache de músicas</string>
     <string name="clear_song_cache">Limpar cache de músicas</string>
     <string name="clear_song_cache_subtitle">Libera espaço usado pelo áudio baixado</string>

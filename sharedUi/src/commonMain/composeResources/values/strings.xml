@@ -55,6 +55,7 @@
     <string name="lyrics_already_in_language">These lyrics are already in %1$s</string>
     <string name="lyrics_already_romanized">These lyrics already use Latin characters</string>
     <string name="lyrics_by">Lyrics by %1$s</string>
+    <string name="lyrics_by_you">Your own lyrics</string>
     <string-array name="lyrics_intro_lines">
         <item>The beat is landing</item>
         <item>The song is starting</item>

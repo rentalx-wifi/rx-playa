@@ -95,6 +95,7 @@
     <string name="recent_searches">Recherches récentes</string>
     <string name="clear">Effacer</string>
     <string name="search_hint">Artistes, chansons, paroles et plus</string>
+    <string name="search_lyrics_section">D’après un vers de la chanson</string>
     <string name="recent_search_edit">Modifier « %1$s »</string>
     <string name="recent_search_remove">Retirer « %1$s » des recherches récentes</string>
     <string name="storage_required_save">L\'accès au stockage est nécessaire pour enregistrer les chansons</string>
@@ -248,6 +249,15 @@
     <string name="synced_lyrics">Paroles synchronisées</string>
     <string name="synced_lyrics_subtitle">Met en surbrillance les mots au fil de la chanson</string>
     <string name="lyrics_sources">Sources des paroles</string>
+    <string name="lyrics_prefer_user">Préférer vos propres paroles</string>
+    <string name="lyrics_prefer_user_subtitle">Afficher votre texte avant tout ce que trouve une source de paroles</string>
+    <string name="user_lyrics_add">Ajouter les paroles à la main</string>
+    <string name="user_lyrics_edit">Modifier les paroles</string>
+    <string name="user_lyrics_reset">Réinitialiser les paroles</string>
+    <string name="user_lyrics_dialog_title">Vos paroles pour ce titre</string>
+    <string name="user_lyrics_dialog_hint">Saisissez ou collez le texte. Les lignes qui commencent par un horodatage comme [01:23.45] s’éclairent au fil du chant.</string>
+    <string name="user_lyrics_paste">Coller depuis le presse-papiers</string>
+    <string name="user_lyrics_clipboard_empty">Le presse-papiers ne contient aucun texte</string>
     <string name="song_cache_limit">Limite du cache des chansons</string>
     <string name="clear_song_cache">Vider le cache des chansons</string>
     <string name="clear_song_cache_subtitle">Libère l\'espace utilisé par l\'audio téléchargé</string>

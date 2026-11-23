@@ -3075,6 +3075,14 @@ internal fun rememberLyricsTranslation(
     /** What the status line says while the lyrics are still being looked up. */
     loadingText: String,
     haptics: Haptics,
+    /**
+     * True while the lines on screen are the listener's own writing.
+     *
+     * The status line names where the words came from, and naming a provider
+     * over words that provider never wrote would be a false statement about the
+     * one thing that line exists to say.
+     */
+    userLyrics: Boolean = false,
 ): LyricsTranslationUi {
     val reduceTranslationMotion by PlayerSettings.reduceAnimation.collectAsStateWithLifecycle()
     val configuredLocale = appLanguageTag()
@@ -3266,6 +3274,9 @@ internal fun rememberLyricsTranslation(
             stringResource(Res.string.lyrics_already_in_language, translationLanguageName)
         romanizationState is LyricsTranslationUiState.SameLanguage ->
             stringResource(Res.string.lyrics_already_romanized)
+        // Ahead of the source: the words below are the listener's own, whatever
+        // a provider would otherwise be credited with.
+        userLyrics -> stringResource(Res.string.lyrics_by_you)
         lyricsSource != null -> stringResource(Res.string.lyrics_by, lyricsSource.label)
         lyricsUnavailable -> stringResource(Res.string.no_lyrics_found)
         lyrics.isNullOrEmpty() -> loadingText

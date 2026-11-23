@@ -63,6 +63,7 @@ import com.music.bitchord.data.model.LikeStatus
 import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.artworkAt
+import com.music.bitchord.data.lyrics.UserLyricsStore
 import com.music.bitchord.data.webdav.WebDavUploads
 import com.music.bitchord.download.DownloadState
 import com.music.bitchord.download.Downloads
@@ -182,8 +183,10 @@ fun SongActionsMenu(
 ) {
     var showingSongInfo by remember(song.videoId) { mutableStateOf(false) }
     var pickingSleepTimer by remember { mutableStateOf(false) }
+    var editingUserLyrics by remember(song.videoId) { mutableStateOf(false) }
     // A menu has no pages to swap, so Song Info opens as a dialog.
     if (showingSongInfo) SongInfoDialog(song) { showingSongInfo = false }
+    if (editingUserLyrics) UserLyricsDialog(song) { editingUserLyrics = false }
     // Neutral rather than the sleeve's colours: the panel floats over the page
     // or the player, and an accent pitched against the artwork's tint is not
     // guaranteed to read against the panel.
@@ -193,6 +196,13 @@ fun SongActionsMenu(
     // A local file or a finished download has no YouTube identity behind it to
     // rate, save, queue into a playlist, fetch again, or share a link for.
     val isOffline = song.localUri != null
+    // Whether this track already has words of its own — the difference between
+    // offering to write them and offering to fix or drop them.
+    val context = LocalContext.current
+    val lyricsRevision by UserLyricsStore.revision.collectAsStateWithLifecycle()
+    val hasOwnLyrics = remember(song.videoId, song.localUri, lyricsRevision) {
+        UserLyricsStore.entry(context, song) != null
+    }
 
     val rows: @Composable ColumnScope.() -> Unit = {
         // Groups are drawn as they turn out to have something in them, and the
@@ -341,6 +351,31 @@ fun SongActionsMenu(
                 accent = palette.accent,
                 onClick = it,
             )
+        }
+
+        // The words written for this track by hand, and what can be done with
+        // them. Read where the menu is drawn rather than passed in, as the
+        // download row does: writing them happens *in* this menu, and a row
+        // that had to be told the result would show the old answer until
+        // something else closed and reopened it.
+        if (startsGroup()) IosMenuSeparator()
+        if (hasOwnLyrics) {
+            ActionRow(
+                icon = SfIcons.Notes,
+                label = stringResource(R.string.user_lyrics_edit),
+                accent = palette.accent,
+            ) { editingUserLyrics = true }
+            ActionRow(
+                icon = SfIcons.Trash,
+                label = stringResource(R.string.user_lyrics_reset),
+                accent = palette.accent,
+            ) { UserLyricsStore.clear(context, song) }
+        } else {
+            ActionRow(
+                icon = SfIcons.Notes,
+                label = stringResource(R.string.user_lyrics_add),
+                accent = palette.accent,
+            ) { editingUserLyrics = true }
         }
 
         if (startsGroup()) IosMenuSeparator()

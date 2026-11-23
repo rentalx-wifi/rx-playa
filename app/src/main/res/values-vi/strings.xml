@@ -96,6 +96,7 @@
     <string name="recent_searches">Tìm kiếm gần đây</string>
     <string name="clear">Xóa</string>
     <string name="search_hint">Nghệ sĩ, bài hát, lời bài hát và hơn thế nữa</string>
+    <string name="search_lyrics_section">Từ một câu hát</string>
     <string name="recent_search_edit">Chỉnh sửa “%1$s”</string>
     <string name="recent_search_remove">Xóa “%1$s” khỏi tìm kiếm gần đây</string>
     <string name="storage_required_save">Cần quyền truy cập bộ nhớ để lưu bài hát</string>
@@ -277,6 +278,15 @@
     <string name="synced_lyrics">Lời bài hát đồng bộ</string>
     <string name="synced_lyrics_subtitle">Làm sáng các từ trên trình phát khi đang được hát</string>
     <string name="lyrics_sources">Nguồn lời bài hát</string>
+    <string name="lyrics_prefer_user">Ưu tiên lời bạn tự viết</string>
+    <string name="lyrics_prefer_user_subtitle">Hiện phần lời bạn viết trước mọi thứ mà nguồn lời bài hát tìm được</string>
+    <string name="user_lyrics_add">Tự thêm lời bài hát</string>
+    <string name="user_lyrics_edit">Sửa lời bài hát</string>
+    <string name="user_lyrics_reset">Đặt lại lời bài hát</string>
+    <string name="user_lyrics_dialog_title">Lời bạn viết cho bài hát này</string>
+    <string name="user_lyrics_dialog_hint">Nhập hoặc dán lời bài hát. Các dòng mở đầu bằng mốc thời gian như [01:23.45] sẽ sáng lên theo tiếng hát.</string>
+    <string name="user_lyrics_paste">Dán từ bộ nhớ tạm</string>
+    <string name="user_lyrics_clipboard_empty">Bộ nhớ tạm không có văn bản để dán</string>
     <string name="song_cache_limit">Giới hạn bộ nhớ đệm bài hát</string>
     <string name="clear_song_cache">Xóa bộ nhớ đệm bài hát</string>
     <string name="clear_song_cache_subtitle">Giải phóng dung lượng do âm thanh đã tải sử dụng</string>

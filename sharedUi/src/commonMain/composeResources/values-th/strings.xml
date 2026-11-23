@@ -50,6 +50,7 @@
     <string name="lyrics_already_in_language">เนื้อเพลงนี้เป็นภาษา %1$s อยู่แล้ว</string>
     <string name="lyrics_already_romanized">เนื้อเพลงนี้ใช้อักษรละตินอยู่แล้ว</string>
     <string name="lyrics_by">เนื้อเพลงโดย %1$s</string>
+    <string name="lyrics_by_you">เนื้อเพลงของคุณเอง</string>
     <string-array name="lyrics_intro_lines">
         <item>จังหวะกำลังจะมา</item>
         <item>เพลงกำลังเริ่ม</item>

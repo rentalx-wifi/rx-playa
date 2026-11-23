@@ -102,6 +102,7 @@
     <string name="recent_searches">Недавние запросы</string>
     <string name="clear">Очистить</string>
     <string name="search_hint">Исполнители, песни, тексты и многое другое</string>
+    <string name="search_lyrics_section">По строке из песни</string>
     <string name="recent_search_edit">Изменить «%1$s»</string>
     <string name="recent_search_remove">Удалить «%1$s» из недавних запросов</string>
     <string name="storage_required_save">Для сохранения песен нужен доступ к хранилищу</string>
@@ -308,6 +309,15 @@
     <string name="synced_lyrics">Синхронизированный текст</string>
     <string name="synced_lyrics_subtitle">Подсвечивает слова в плеере по мере исполнения</string>
     <string name="lyrics_sources">Источники текстов</string>
+    <string name="lyrics_prefer_user">Свои тексты в приоритете</string>
+    <string name="lyrics_prefer_user_subtitle">Показывать написанный вами текст раньше всего, что найдут источники</string>
+    <string name="user_lyrics_add">Добавить текст вручную</string>
+    <string name="user_lyrics_edit">Изменить текст</string>
+    <string name="user_lyrics_reset">Сбросить текст</string>
+    <string name="user_lyrics_dialog_title">Ваш текст для этого трека</string>
+    <string name="user_lyrics_dialog_hint">Наберите или вставьте текст. Строки с таймкодом в начале, например [01:23.45], подсвечиваются по ходу пения.</string>
+    <string name="user_lyrics_paste">Вставить из буфера</string>
+    <string name="user_lyrics_clipboard_empty">В буфере обмена нет текста</string>
     <string name="song_cache_limit">Лимит кэша песен</string>
     <string name="clear_song_cache">Очистить кэш песен</string>
     <string name="clear_song_cache_subtitle">Освобождает место, занятое загруженным аудио</string>

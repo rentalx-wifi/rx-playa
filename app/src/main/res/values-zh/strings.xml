@@ -90,6 +90,7 @@
     <string name="recent_searches">最近搜索</string>
     <string name="clear">清除</string>
     <string name="search_hint">艺人、歌曲、歌词等</string>
+    <string name="search_lyrics_section">根据歌词中的一句</string>
     <string name="recent_search_edit">编辑“%1$s”</string>
     <string name="recent_search_remove">从最近搜索中移除“%1$s”</string>
     <string name="storage_required_save">需要存储访问权限才能保存歌曲</string>
@@ -242,6 +243,15 @@
     <string name="synced_lyrics">同步歌词</string>
     <string name="synced_lyrics_subtitle">随着演唱在播放器上高亮显示歌词</string>
     <string name="lyrics_sources">歌词来源</string>
+    <string name="lyrics_prefer_user">优先使用自己的歌词</string>
+    <string name="lyrics_prefer_user_subtitle">在歌词来源找到的内容之前显示你写的歌词</string>
+    <string name="user_lyrics_add">手动添加歌词</string>
+    <string name="user_lyrics_edit">编辑歌词</string>
+    <string name="user_lyrics_reset">重置歌词</string>
+    <string name="user_lyrics_dialog_title">这首歌你自己的歌词</string>
+    <string name="user_lyrics_dialog_hint">输入或粘贴歌词。以 [01:23.45] 这类时间戳开头的行会随歌声亮起。</string>
+    <string name="user_lyrics_paste">从剪贴板粘贴</string>
+    <string name="user_lyrics_clipboard_empty">剪贴板里没有可粘贴的文字</string>
     <string name="song_cache_limit">歌曲缓存上限</string>
     <string name="clear_song_cache">清除歌曲缓存</string>
     <string name="clear_song_cache_subtitle">释放已下载音频占用的空间</string>

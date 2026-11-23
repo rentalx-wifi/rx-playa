@@ -129,6 +129,7 @@
     <string name="recent_searches">Recent searches</string>
     <string name="clear">Clear</string>
     <string name="search_hint">Artists, Songs, Lyrics and More</string>
+    <string name="search_lyrics_section">From a line of a song</string>
     <string name="settings_search_hint">Search settings</string>
     <string name="settings_search_empty">No settings match “%1$s”</string>
     <string name="recent_search_edit">Edit “%1$s”</string>
@@ -467,6 +468,15 @@
     <string name="synced_lyrics">Synced lyrics</string>
     <string name="synced_lyrics_subtitle">Lights up the words on the player as they’re sung</string>
     <string name="lyrics_sources">Lyrics sources</string>
+    <string name="lyrics_prefer_user">Prefer your own lyrics</string>
+    <string name="lyrics_prefer_user_subtitle">Show the words you wrote before anything a lyrics source finds</string>
+    <string name="user_lyrics_add">Add lyrics manually</string>
+    <string name="user_lyrics_edit">Edit lyrics</string>
+    <string name="user_lyrics_reset">Reset lyrics</string>
+    <string name="user_lyrics_dialog_title">Your lyrics for this track</string>
+    <string name="user_lyrics_dialog_hint">Type or paste the words. Lines that start with a timestamp such as [01:23.45] light up as they are sung.</string>
+    <string name="user_lyrics_paste">Paste from clipboard</string>
+    <string name="user_lyrics_clipboard_empty">There is nothing in the clipboard to paste</string>
     <string name="song_cache_limit">Song cache limit</string>
     <string name="clear_song_cache">Clear song cache</string>
     <string name="clear_song_cache_subtitle">Frees space used by downloaded audio</string>

@@ -153,6 +153,19 @@ interface PlayerHost {
      */
     @Composable
     fun LyricsShareSheet(hazeState: HazeState, request: LyricsShareRequest, onDismiss: () -> Unit) = Unit
+
+    /**
+     * The words the listener wrote for [song] themselves — see
+     * `UserLyricsStore` on the phone. Empty where they have written none, and on
+     * a platform that keeps no such thing.
+     *
+     * Asked here rather than handed in by the caller because the player is one
+     * screen for every track it opens: the answer belongs to the track, and
+     * threading it through every call site would only make it something each of
+     * them could get wrong.
+     */
+    @Composable
+    fun rememberUserLyrics(song: Song): List<LyricLine> = emptyList()
 }
 
 private val NoCast = MutableStateFlow(CastUi())
@@ -278,6 +291,8 @@ interface PlayerSettingsSource {
     val smartTransitionWindow: StateFlow<TransitionWindow?>
     val spotifyCanvasAutoHide: StateFlow<Boolean>
     val syncedLyrics: StateFlow<Boolean>
+    /** Whether the listener's own words beat anything the sources answer. */
+    val lyricsPreferUser: StateFlow<Boolean>
     val translationLanguage: StateFlow<String>
     val versionAlignmentInProgress: StateFlow<Boolean>
 

@@ -36,6 +36,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.NorthWest
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
@@ -66,6 +67,7 @@ import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.BrowseItem
 import com.music.bitchord.data.model.BrowseType
 import com.music.bitchord.data.model.HomeSource
+import com.music.bitchord.data.model.LyricsHit
 import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.SearchFilter
 import com.music.bitchord.data.model.artworkAt
@@ -183,6 +185,25 @@ fun SearchScreen(
      * about the results, and the switcher would just push them down.
      */
     sourceSwitcher: (@Composable () -> Unit)? = null,
+    /**
+     * Songs LRCLIB matched for the line typed into the field; empty when
+     * nothing matched, when the text was a name rather than a line, or when
+     * the lookup failed.
+     */
+    lyricHits: List<LyricsHit> = emptyList(),
+    /**
+     * The lyric section's heading. Passed in rather than read from this
+     * module's resources so the wording lives with the rest of the search
+     * strings on the phone.
+     */
+    lyricsSectionTitle: String = "",
+    /**
+     * A tap on a lyric match, carrying "artist - title" for the field to
+     * search. The screen doesn't search itself: what a query means is the
+     * caller's business, and the same text has to reach the same place either
+     * way.
+     */
+    onLyricsHitClick: (String) -> Unit = {},
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -298,6 +319,18 @@ fun SearchScreen(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
         ) {
+            // Above everything else on the page: a line of a song is a much
+            // narrower question than the catalogue was asked, and its answer
+            // is worth more than anything underneath it. Only while typing or
+            // for the search that line was submitted as — the view model
+            // empties the list the moment the field moves on.
+            if (lyricHits.isNotEmpty() && !searchingLibrary) {
+                lyricMatches(
+                    title = lyricsSectionTitle,
+                    hits = lyricHits,
+                    onClick = { hit -> onLyricsHitClick(hit.searchQuery) },
+                )
+            }
             when {
                 searchingLibrary || searchingAddons || searchingPlatforms -> librarySearchResults(
                     query = query.trim(),
@@ -450,6 +483,72 @@ fun SearchScreen(
 }
 
 private data class SearchSection(val title: String?, val rows: List<SearchResult>)
+
+/**
+ * The songs LRCLIB matched, named one per row: the track, and who sang it.
+ *
+ * No artwork: LRCLIB has none, and a placeholder sleeve would read as "these
+ * are the results" when all a row actually is, is a better query for the field
+ * — tapping one searches "artist - title" and lets the catalogue answer.
+ */
+private fun LazyListScope.lyricMatches(
+    title: String,
+    hits: List<LyricsHit>,
+    onClick: (LyricsHit) -> Unit,
+) {
+    if (title.isNotBlank()) {
+        item(key = "lyrics:header") {
+            Text(
+                text = title,
+                modifier = Modifier.padding(
+                    start = PAGE_GUTTER,
+                    end = PAGE_GUTTER,
+                    top = 10.dp,
+                    bottom = 2.dp,
+                ),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+    // The same song can be published twice with different ids, and two equal
+    // keys are a crash, not a cosmetic problem — so the title is part of it.
+    items(hits, key = { "lyrics:${it.id}:${it.trackName}" }) { hit ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onClick(hit) }
+                .padding(horizontal = PAGE_GUTTER, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Rounded.MusicNote,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = hit.trackName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (hit.artistName.isNotBlank()) {
+                    Text(
+                        text = hit.artistName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
 
 /**
  * The filter strip's labels, built once.

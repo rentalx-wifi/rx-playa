@@ -274,6 +274,7 @@ fun SettingsScreen(
     val fullBleedArtwork by AppSettings.fullBleedArtwork.collectAsStateWithLifecycle()
     val legacyMeshGradient by AppSettings.legacyMeshGradient.collectAsStateWithLifecycle()
     val syncedLyrics by AppSettings.syncedLyrics.collectAsStateWithLifecycle()
+    val lyricsPreferUser by AppSettings.lyricsPreferUser.collectAsStateWithLifecycle()
     val lyricsSources by AppSettings.lyricsSources.collectAsStateWithLifecycle()
     val translationLanguage by AppSettings.translationLanguage.collectAsStateWithLifecycle()
     val theme by AppSettings.themeMode.collectAsStateWithLifecycle()
@@ -1375,6 +1376,23 @@ fun SettingsScreen(
             // sources are third-party services being reached on the user's
             // connection — which is the part worth being able to narrow.
             if (syncedLyrics) {
+                // Yours before theirs, wherever there is a lyric panel at all to
+                // draw them on — which is what the switch above decides.
+                val preferUserLyricsTitle = stringResource(R.string.lyrics_prefer_user)
+                row(preferUserLyricsTitle, "lyrics", "own", "user") {
+                    SettingsRow(
+                        icon = SfIcons.Notes,
+                        title = preferUserLyricsTitle,
+                        subtitle = stringResource(R.string.lyrics_prefer_user_subtitle),
+                        trailing = {
+                            IosSwitch(
+                                checked = lyricsPreferUser,
+                                onCheckedChange = AppSettings::setLyricsPreferUser,
+                            )
+                        },
+                        onClick = { AppSettings.setLyricsPreferUser(!lyricsPreferUser) },
+                    )
+                }
                 val lyricsBlurTitle = stringResource(R.string.blur_unfocused_lyrics)
                 row(lyricsBlurTitle, "lyrics", "blur") {
                     SettingsRow(

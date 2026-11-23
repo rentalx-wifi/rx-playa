@@ -93,6 +93,7 @@
     <string name="recent_searches">การค้นหาล่าสุด</string>
     <string name="clear">ล้าง</string>
     <string name="search_hint">ศิลปิน เพลง เนื้อเพลง และอื่น ๆ</string>
+    <string name="search_lyrics_section">จากเนื้อเพลงท่อนหนึ่ง</string>
     <string name="recent_search_edit">แก้ไข “%1$s”</string>
     <string name="recent_search_remove">นำ “%1$s” ออกจากการค้นหาล่าสุด</string>
     <string name="storage_required_save">ต้องได้รับสิทธิ์เข้าถึงพื้นที่จัดเก็บเพื่อบันทึกเพลง</string>
@@ -265,6 +266,15 @@
     <string name="synced_lyrics">เนื้อเพลงซิงค์</string>
     <string name="synced_lyrics_subtitle">ไฮไลต์คำร้องบนหน้าเครื่องเล่นตามจังหวะที่ร้อง</string>
     <string name="lyrics_sources">แหล่งเนื้อเพลง</string>
+    <string name="lyrics_prefer_user">ใช้เนื้อเพลงของคุณก่อน</string>
+    <string name="lyrics_prefer_user_subtitle">แสดงข้อความที่คุณเขียนก่อนสิ่งที่แหล่งเนื้อเพลงจะหาเจอ</string>
+    <string name="user_lyrics_add">เพิ่มเนื้อเพลงเอง</string>
+    <string name="user_lyrics_edit">แก้ไขเนื้อเพลง</string>
+    <string name="user_lyrics_reset">รีเซ็ตเนื้อเพลง</string>
+    <string name="user_lyrics_dialog_title">เนื้อเพลงของคุณสำหรับเพลงนี้</string>
+    <string name="user_lyrics_dialog_hint">พิมพ์หรือวางเนื้อเพลง บรรทัดที่ขึ้นต้นด้วยรหัสเวลา เช่น [01:23.45] จะสว่างขึ้นตามการร้อง</string>
+    <string name="user_lyrics_paste">วางจากคลิปบอร์ด</string>
+    <string name="user_lyrics_clipboard_empty">ไม่มีข้อความในคลิปบอร์ดให้วาง</string>
     <string name="song_cache_limit">ขีดจำกัดแคชเพลง</string>
     <string name="clear_song_cache">ล้างแคชเพลง</string>
     <string name="clear_song_cache_subtitle">คืนพื้นที่ที่ใช้โดยเสียงที่ดาวน์โหลดไว้</string>

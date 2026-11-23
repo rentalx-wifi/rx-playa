@@ -20,6 +20,7 @@ import com.music.bitchord.data.canvas.CanvasRepository
 import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.lyrics.LyricsTranslation
+import com.music.bitchord.data.lyrics.UserLyricsStore
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.LastPlayerScreen
@@ -93,6 +94,7 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
         override val smartTransitionWindow get() = AppSettings.smartTransitionWindow
         override val spotifyCanvasAutoHide get() = AppSettings.spotifyCanvasAutoHide
         override val syncedLyrics get() = AppSettings.syncedLyrics
+        override val lyricsPreferUser get() = AppSettings.lyricsPreferUser
         override val translationLanguage get() = AppSettings.translationLanguage
         override val versionAlignmentInProgress get() = AppSettings.versionAlignmentInProgress
 
@@ -247,6 +249,18 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
         request: LyricsShareRequest,
         onDismiss: () -> Unit,
     ) = AndroidLyricsShareSheet(hazeState = hazeState, request = request, onDismiss = onDismiss)
+
+    /**
+     * Read from [UserLyricsStore] rather than handed down from the page: the
+     * level the drawer below collects is the store's own revision, so words
+     * saved in the track's menu reach the open lyric sheet on the frame they
+     * are saved rather than on the next track.
+     */
+    @Composable
+    override fun rememberUserLyrics(song: Song): List<LyricLine> {
+        val revision by UserLyricsStore.revision.collectAsStateWithLifecycle()
+        return remember(song.videoId, song.localUri, revision) { UserLyricsStore.lines(app, song) }
+    }
 }
 
 /**

@@ -53,6 +53,7 @@
     <string name="lyrics_already_in_language">Текст уже на языке %1$s</string>
     <string name="lyrics_already_romanized">Этот текст уже написан латиницей</string>
     <string name="lyrics_by">Текст песни: %1$s</string>
+    <string name="lyrics_by_you">Ваш собственный текст</string>
     <string-array name="lyrics_intro_lines">
         <item>Бит набирает обороты</item>
         <item>Песня начинается</item>

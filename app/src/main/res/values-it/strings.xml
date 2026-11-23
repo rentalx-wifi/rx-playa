@@ -117,6 +117,7 @@
     <string name="recent_searches">Ricerche recenti</string>
     <string name="clear">Cancella</string>
     <string name="search_hint">Artisti, brani, testi e altro</string>
+    <string name="search_lyrics_section">Da un verso della canzone</string>
     <string name="recent_search_edit">Modifica “%1$s”</string>
     <string name="recent_search_remove">Rimuovi “%1$s” dalle ricerche recenti</string>
     <string name="storage_required_save">È necessario l\'accesso allo spazio di archiviazione per salvare i brani</string>
@@ -290,6 +291,15 @@
     <string name="synced_lyrics">Testi sincronizzati</string>
     <string name="synced_lyrics_subtitle">Evidenzia le parole sul player mentre vengono cantate</string>
     <string name="lyrics_sources">Sorgenti testi</string>
+    <string name="lyrics_prefer_user">Preferisci i tuoi testi</string>
+    <string name="lyrics_prefer_user_subtitle">Mostra il testo che hai scritto prima di qualunque risultato delle fonti</string>
+    <string name="user_lyrics_add">Aggiungi il testo a mano</string>
+    <string name="user_lyrics_edit">Modifica il testo</string>
+    <string name="user_lyrics_reset">Ripristina il testo</string>
+    <string name="user_lyrics_dialog_title">Il tuo testo per questo brano</string>
+    <string name="user_lyrics_dialog_hint">Scrivi o incolla il testo. Le righe che iniziano con un timestamp come [01:23.45] si illuminano mentre vengono cantate.</string>
+    <string name="user_lyrics_paste">Incolla dagli appunti</string>
+    <string name="user_lyrics_clipboard_empty">Negli appunti non c’è testo da incollare</string>
     <string name="song_cache_limit">Limite cache brani</string>
     <string name="clear_song_cache">Svuota cache brani</string>
     <string name="clear_song_cache_subtitle">Libera lo spazio usato dall\'audio scaricato</string>

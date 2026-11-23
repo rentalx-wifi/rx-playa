@@ -90,6 +90,7 @@
     <string name="recent_searches">Pencarian terbaru</string>
     <string name="clear">Hapus</string>
     <string name="search_hint">Artis, Lagu, Lirik, dan Lainnya</string>
+    <string name="search_lyrics_section">Dari sepenggal lirik</string>
     <string name="recent_search_edit">Edit “%1$s”</string>
     <string name="recent_search_remove">Hapus “%1$s” dari pencarian terbaru</string>
     <string name="storage_required_save">Akses penyimpanan diperlukan untuk menyimpan lagu</string>
@@ -242,6 +243,15 @@
     <string name="synced_lyrics">Lirik tersinkron</string>
     <string name="synced_lyrics_subtitle">Menyorot kata-kata di pemutar saat dinyanyikan</string>
     <string name="lyrics_sources">Sumber lirik</string>
+    <string name="lyrics_prefer_user">Utamakan lirik Anda sendiri</string>
+    <string name="lyrics_prefer_user_subtitle">Tampilkan tulisan Anda sebelum apa pun yang ditemukan sumber lirik</string>
+    <string name="user_lyrics_add">Tambahkan lirik secara manual</string>
+    <string name="user_lyrics_edit">Edit lirik</string>
+    <string name="user_lyrics_reset">Atur ulang lirik</string>
+    <string name="user_lyrics_dialog_title">Lirik Anda untuk lagu ini</string>
+    <string name="user_lyrics_dialog_hint">Ketik atau tempel liriknya. Baris yang diawali stempel waktu seperti [01:23.45] menyala saat dinyanyikan.</string>
+    <string name="user_lyrics_paste">Tempel dari papan klip</string>
+    <string name="user_lyrics_clipboard_empty">Tidak ada teks di papan klip untuk ditempel</string>
     <string name="song_cache_limit">Batas cache lagu</string>
     <string name="clear_song_cache">Bersihkan cache lagu</string>
     <string name="clear_song_cache_subtitle">Membebaskan ruang yang digunakan oleh audio yang diunduh</string>

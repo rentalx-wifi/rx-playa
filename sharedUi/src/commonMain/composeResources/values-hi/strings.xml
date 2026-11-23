@@ -50,6 +50,7 @@
     <string name="lyrics_already_in_language">ये लिरिक्स पहले से %1$s में हैं</string>
     <string name="lyrics_already_romanized">ये लिरिक्स पहले से लैटिन अक्षरों में हैं</string>
     <string name="lyrics_by">%1$s द्वारा लिरिक्स</string>
+    <string name="lyrics_by_you">आपके अपने बोल</string>
     <string-array name="lyrics_intro_lines">
         <item>बीट उतर रही है</item>
         <item>गाना शुरू हो रहा है</item>

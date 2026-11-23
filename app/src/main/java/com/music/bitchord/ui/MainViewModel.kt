@@ -55,6 +55,9 @@ import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.lyrics.LyricsRepository
 import com.music.bitchord.data.lyrics.LyricsSource
 import com.music.bitchord.data.lyrics.lyricsRank
+import com.music.bitchord.data.lrclib.LyricsSearch
+import com.music.bitchord.data.lrclib.looksLikeSongLyric
+import com.music.bitchord.data.model.LyricsHit
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.navigation.AppNavigator
 import com.music.bitchord.data.innertube.Innertube
@@ -267,6 +270,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     private val _typeaheadResults = MutableStateFlow<List<SearchResult>>(emptyList())
     val typeaheadResults: StateFlow<List<SearchResult>> = _typeaheadResults.asStateFlow()
+
+    /**
+     * Songs LRCLIB matched to what has been typed so far, best first.
+     *
+     * A second reading of the same keystrokes as [typeaheadResults]: the
+     * catalogue can only answer for a name, and a listener who remembers the
+     * words and not the title has nothing the catalogue understands. Only ever
+     * populated for text that looks like a lyric — see [looksLikeSongLyric] —
+     * and left empty otherwise, which is what keeps the section off ordinary
+     * searches. Cleared wherever [typeaheadResults] is.
+     */
+    private val _lyricHits = MutableStateFlow<List<LyricsHit>>(emptyList())
+    val lyricHits: StateFlow<List<LyricsHit>> = _lyricHits.asStateFlow()
 
     /** Where the Search tab looks — see [setSearchSource]. */
     private val _searchSource = MutableStateFlow(SearchSource.ALL)
@@ -1727,6 +1743,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         startSearchPipeline()
         startSuggestPipeline()
         startTypeaheadMediaPipeline()
+        startLyricsSearchPipeline()
         loadHome()
         // A page built offline is the downloads and nothing else. The feed is
         // fetched as soon as the connection comes back, without a tap, but only
@@ -2655,6 +2672,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         searchSubmitted = true
         _suggestions.value = emptyList()
         _typeaheadResults.value = emptyList()
+        viewModelScope.launch { publishLyricHits(term) }
         // Picking a suggestion or history item is deliberate, but it must NOT
         // pollute the user's YTMusic server-side search history — only an
         // explicit keyboard submission should do that.  Use the anonymous
@@ -2681,6 +2699,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             searchSubmitted = false
             _suggestions.value = emptyList()
             _typeaheadResults.value = emptyList()
+            _lyricHits.value = emptyList()
             _results.value = null
             cancelAddonSearch()
             cancelPlatformSearch()
@@ -2733,6 +2752,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         searchSubmitted = true
         _suggestions.value = emptyList()
         _typeaheadResults.value = emptyList()
+        // Committing a remembered line is the moment its matches matter most:
+        // the catalogue is about to answer with whatever its name resembles.
+        viewModelScope.launch { publishLyricHits(q) }
         when (_searchSource.value) {
             SearchSource.ADDONS -> runAddonSearch(q)
             SearchSource.ALL,
@@ -2759,6 +2781,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         searchSubmitted = true
         _suggestions.value = emptyList()
         _typeaheadResults.value = emptyList()
+        _lyricHits.value = emptyList()
         _addonResults.value = null
         _platformResults.value = null
         cancelPlatformSearch()
@@ -3178,6 +3201,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _searchSource.value = source
         _suggestions.value = emptyList()
         _typeaheadResults.value = emptyList()
+        _lyricHits.value = emptyList()
         cancelPlatformSearch()
         cancelAddonSearch()
         _searchScrollReset.value += 1
@@ -3430,6 +3454,53 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
     }
 
+    /**
+     * The same keystrokes, asked of a lyric database instead of a catalogue.
+     *
+     * Its own pipeline rather than a leg of [startTypeaheadMediaPipeline]:
+     * most queries never reach LRCLIB at all — a name is not a lyric — and
+     * making the catalogue wait on a service it has nothing to do with would
+     * be paying for the feature on every search.
+     *
+     * The debounce is the longest of the three. This text arrives by thumb, a
+     * remembered line is not typed quickly, and a wrong intermediate guess is
+     * worth nothing — so the request can wait for a pause rather than chase
+     * the letters.
+     */
+    @OptIn(FlowPreview::class)
+    private fun startLyricsSearchPipeline() = viewModelScope.launch {
+        suggestRequests
+            .debounce(LYRICS_SEARCH_DEBOUNCE_MS)
+            .collectLatest(::publishLyricHits)
+    }
+
+    /**
+     * Fills — or empties — the lyric section for [query].
+     *
+     * Called from the typing pipeline and again when the text is committed: a
+     * listener who presses enter on the words they remember has asked the
+     * catalogue a question only LRCLIB can answer, and the section has to
+     * outlive the submission to say so.
+     */
+    private suspend fun publishLyricHits(query: String) {
+        val text = query.trim()
+        // A name, or the device's own library: neither is a question LRCLIB
+        // can answer for this page.
+        if (!looksLikeSongLyric(text) || _searchSource.value == SearchSource.LIBRARY) {
+            _lyricHits.value = emptyList()
+            return
+        }
+        if (AudioCache.isOffline()) {
+            _lyricHits.value = emptyList()
+            return
+        }
+        val hits = LyricsSearch.search(text)
+        // Asked again on the way back: the field is live throughout, and an
+        // answer for text it has since moved past must not land in the section.
+        if (_query.value.trim() != text) return
+        _lyricHits.value = hits.take(LYRICS_MAX_RESULTS)
+    }
+
     /** Caches and publishes the initial result page without waiting for later pages. */
     private fun published(
         page: YtMusicRepository.SearchPage,
@@ -3614,6 +3685,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
          * needs a few results to fill the dropdown.
          */
         const val TYPEAHEAD_MEDIA_DEBOUNCE_MS = 350L
+
+        /**
+         * How long a pause means the listener has finished typing a line.
+         *
+         * Longer than either suggestion timer because of what it costs: an
+         * LRCLIB search is a third-party round trip for a section that only
+         * helps when the words are complete, so firing it mid-line would buy
+         * nothing but traffic.
+         */
+        const val LYRICS_SEARCH_DEBOUNCE_MS = 600L
+
+        /** Five is already more than a listener needs to recognise their song. */
+        const val LYRICS_MAX_RESULTS = 5
 
         /**
          * Maximum number of live media results shown in the typeahead dropdown.

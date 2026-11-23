@@ -95,6 +95,7 @@
     <string name="recent_searches">Búsquedas recientes</string>
     <string name="clear">Borrar</string>
     <string name="search_hint">Artistas, canciones, letras y más</string>
+    <string name="search_lyrics_section">Por un verso de la canción</string>
     <string name="recent_search_edit">Editar “%1$s”</string>
     <string name="recent_search_remove">Quitar “%1$s” de las búsquedas recientes</string>
     <string name="storage_required_save">Se necesita acceso al almacenamiento para guardar canciones</string>
@@ -259,6 +260,15 @@
     <string name="synced_lyrics">Letras sincronizadas</string>
     <string name="synced_lyrics_subtitle">Ilumina las palabras mientras se cantan</string>
     <string name="lyrics_sources">Fuentes de letras</string>
+    <string name="lyrics_prefer_user">Preferir tus propias letras</string>
+    <string name="lyrics_prefer_user_subtitle">Muestra tu texto antes que cualquier cosa que encuentre una fuente de letras</string>
+    <string name="user_lyrics_add">Añadir la letra a mano</string>
+    <string name="user_lyrics_edit">Editar la letra</string>
+    <string name="user_lyrics_reset">Restablecer la letra</string>
+    <string name="user_lyrics_dialog_title">Tu letra para esta canción</string>
+    <string name="user_lyrics_dialog_hint">Escribe o pega la letra. Las líneas que empiezan con una marca de tiempo como [01:23.45] se iluminan mientras se cantan.</string>
+    <string name="user_lyrics_paste">Pegar del portapapeles</string>
+    <string name="user_lyrics_clipboard_empty">No hay texto en el portapapeles</string>
     <string name="song_cache_limit">Límite de caché de canciones</string>
     <string name="clear_song_cache">Borrar caché de canciones</string>
     <string name="clear_song_cache_subtitle">Libera espacio usado por el audio descargado</string>

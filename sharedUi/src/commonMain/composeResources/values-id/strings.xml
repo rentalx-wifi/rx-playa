@@ -50,6 +50,7 @@
     <string name="lyrics_already_in_language">Lirik ini sudah dalam %1$s</string>
     <string name="lyrics_already_romanized">Lirik ini sudah memakai huruf Latin</string>
     <string name="lyrics_by">Lirik oleh %1$s</string>
+    <string name="lyrics_by_you">Lirik Anda sendiri</string>
     <string-array name="lyrics_intro_lines">
         <item>Ketukan mulai terasa</item>
         <item>Lagu segera dimulai</item>

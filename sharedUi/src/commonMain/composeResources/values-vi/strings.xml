@@ -50,6 +50,7 @@
     <string name="lyrics_already_in_language">These lyrics are already in %1$s</string>
     <string name="lyrics_already_romanized">Lời bài hát này đã dùng ký tự Latinh</string>
     <string name="lyrics_by">Lời bài hát bởi %1$s</string>
+    <string name="lyrics_by_you">Lời bạn tự viết</string>
     <string-array name="lyrics_intro_lines">
         <item>Giai điệu đang vang lên</item>
         <item>Bài hát đang bắt đầu</item>

@@ -90,6 +90,7 @@
     <string name="recent_searches">最近の検索</string>
     <string name="clear">消去</string>
     <string name="search_hint">アーティスト、曲、歌詞など</string>
+    <string name="search_lyrics_section">歌詞の一節から</string>
     <string name="recent_search_edit">「%1$s」を編集</string>
     <string name="recent_search_remove">最近の検索から「%1$s」を削除</string>
     <string name="storage_required_save">曲を保存するにはストレージへのアクセスが必要です</string>
@@ -242,6 +243,15 @@
     <string name="synced_lyrics">同期歌詞</string>
     <string name="synced_lyrics_subtitle">歌われている歌詞をプレイヤー上でハイライト表示します</string>
     <string name="lyrics_sources">歌詞のソース</string>
+    <string name="lyrics_prefer_user">自分の歌詞を優先</string>
+    <string name="lyrics_prefer_user_subtitle">歌詞ソースが見つけたものより先に、あなたが書いた歌詞を表示します</string>
+    <string name="user_lyrics_add">歌詞を手動で追加</string>
+    <string name="user_lyrics_edit">歌詞を編集</string>
+    <string name="user_lyrics_reset">歌詞をリセット</string>
+    <string name="user_lyrics_dialog_title">この曲のあなたの歌詞</string>
+    <string name="user_lyrics_dialog_hint">歌詞を入力するか貼り付けてください。[01:23.45] のようなタイムコードで始まる行は、歌に合わせて光ります。</string>
+    <string name="user_lyrics_paste">クリップボードから貼り付け</string>
+    <string name="user_lyrics_clipboard_empty">クリップボードに貼り付けるテキストがありません</string>
     <string name="song_cache_limit">曲キャッシュの上限</string>
     <string name="clear_song_cache">曲のキャッシュを削除</string>
     <string name="clear_song_cache_subtitle">ダウンロードした音声が使用している容量を解放します</string>

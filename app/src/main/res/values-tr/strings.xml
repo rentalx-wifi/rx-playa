@@ -98,6 +98,7 @@
     <string name="recent_searches">Son aramalar</string>
     <string name="clear">Temizle</string>
     <string name="search_hint">Sanatçılar, Şarkılar, Sözler ve Daha Fazlası</string>
+    <string name="search_lyrics_section">Şarkının bir dizesinden</string>
     <string name="recent_search_edit">“%1$s” öğesini düzenle</string>
     <string name="recent_search_remove">“%1$s” öğesini son aramalardan kaldır</string>
     <string name="storage_required_save">Şarkıları kaydetmek için depolama erişimi gerekiyor</string>
@@ -271,6 +272,15 @@
     <string name="synced_lyrics">Senkronize sözler</string>
     <string name="synced_lyrics_subtitle">Söylenirken oynatıcıdaki kelimeleri aydınlatır</string>
     <string name="lyrics_sources">Söz kaynakları</string>
+    <string name="lyrics_prefer_user">Kendi sözlerini tercih et</string>
+    <string name="lyrics_prefer_user_subtitle">Yazdığın sözleri, bir kaynağın bulduğu her şeyden önce göster</string>
+    <string name="user_lyrics_add">Sözleri elle ekle</string>
+    <string name="user_lyrics_edit">Sözleri düzenle</string>
+    <string name="user_lyrics_reset">Sözleri sıfırla</string>
+    <string name="user_lyrics_dialog_title">Bu parça için kendi sözlerin</string>
+    <string name="user_lyrics_dialog_hint">Sözleri yaz veya yapıştır. [01:23.45] gibi bir zaman damgasıyla başlayan satırlar söylenirken yanar.</string>
+    <string name="user_lyrics_paste">Panodan yapıştır</string>
+    <string name="user_lyrics_clipboard_empty">Panoda yapıştırılacak bir metin yok</string>
     <string name="song_cache_limit">Şarkı önbelleği sınırı</string>
     <string name="clear_song_cache">Şarkı önbelleğini temizle</string>
     <string name="clear_song_cache_subtitle">İndirilen sesin kullandığı alanı boşaltır</string>

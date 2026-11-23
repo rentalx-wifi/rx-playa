@@ -713,6 +713,18 @@ object AppSettings {
     val lyricsSources = MutableStateFlow(LyricsSource.offered.toSet())
 
     /**
+     * Whether words the listener wrote for a track beat the ones a source
+     * answers with.
+     *
+     * On by default: somebody who typed a song's words out did it because the
+     * databases had none or had the wrong ones, and showing a stranger's answer
+     * over their own would be ignoring the only person who was there. Off, the
+     * sources are taken as they answer and their own text sits in the menu,
+     * one tap away.
+     */
+    val lyricsPreferUser = MutableStateFlow(true)
+
+    /**
      * The order [lyricsSources] are asked in — see [LyricsRepository][com.music.bitchord.data.lyrics.LyricsRepository]:
      * every enabled source is asked at once, but a higher-priority one still
      * pending is never preempted by a lower one that happened to answer first.
@@ -1193,6 +1205,7 @@ object AppSettings {
             )
         }.getOrDefault(LastPlayerScreen.MAIN)
         syncedLyrics.value = prefs.getBoolean(KEY_SYNCED_LYRICS, true)
+        lyricsPreferUser.value = prefs.getBoolean(KEY_LYRICS_PREFER_USER, true)
         lyricsSources.value = readLyricsSources()
         lyricsSourceOrder.value = readLyricsSourceOrder()
         prioritizeSyllableSync.value = prefs.getBoolean(KEY_PRIORITIZE_SYLLABLE_SYNC, false)
@@ -1825,6 +1838,11 @@ object AppSettings {
     fun setPrioritizeSyllableSync(value: Boolean) {
         prioritizeSyllableSync.value = value
         prefs.edit().putBoolean(KEY_PRIORITIZE_SYLLABLE_SYNC, value).apply()
+    }
+
+    fun setLyricsPreferUser(value: Boolean) {
+        lyricsPreferUser.value = value
+        prefs.edit().putBoolean(KEY_LYRICS_PREFER_USER, value).apply()
     }
 
     fun setPaxSenixApiKey(value: String) {
@@ -2623,6 +2641,7 @@ object AppSettings {
     private const val KEY_LEGACY_MESH_GRADIENT = "legacy_mesh_gradient"
     private const val KEY_LAST_PLAYER_SCREEN = "last_player_screen"
     private const val KEY_SYNCED_LYRICS = "synced_lyrics"
+    private const val KEY_LYRICS_PREFER_USER = "lyrics_prefer_user"
     private const val KEY_LYRICS_SOURCES = "lyrics_sources"
     private const val KEY_LYRICS_SOURCES_SEEN = "lyrics_sources_seen"
     private const val KEY_LYRICS_SOURCE_ORDER = "lyrics_source_order"
