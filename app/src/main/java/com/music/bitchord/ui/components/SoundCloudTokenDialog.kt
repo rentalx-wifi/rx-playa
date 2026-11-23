@@ -80,11 +80,24 @@ fun SoundCloudTokenDialog(
             )
             Text(
                 text = error ?: stringResource(R.string.soundcloud_token_hint),
-                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+                modifier = Modifier.padding(top = 4.dp, bottom = if (error != null) 4.dp else 12.dp),
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 17.sp),
                 color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
             )
+            // The reason a session did not work is not an instruction: the sheet
+            // used to replace the one line explaining what a token is with the
+            // complaint that the old one expired, leaving nothing to act on
+            // (issue #48). Both are shown now.
+            if (error != null) {
+                Text(
+                    text = stringResource(R.string.soundcloud_token_hint),
+                    modifier = Modifier.padding(bottom = 12.dp),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 17.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
             PillTextField(
                 value = token,
                 onValueChange = {
