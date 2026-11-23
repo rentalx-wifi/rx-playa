@@ -498,7 +498,6 @@ dependencies {
     implementation("com.github.MuntashirAkon:libadb-android:3.1.1") {
         exclude(group = "org.bouncycastle")
     }
-    implementation("org.conscrypt:conscrypt-android:2.5.3")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.85")
 
     testImplementation("junit:junit:4.13.2")

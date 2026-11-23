@@ -83,8 +83,6 @@
 # libadb-android drives the pairing and transport through Conscrypt and SPAKE2,
 # both of which reach their native halves by name.
 -keep class io.github.muntashirakon.adb.** { *; }
--keep class org.conscrypt.** { *; }
 -keep class com.android.org.conscrypt.** { *; }
--dontwarn org.conscrypt.**
 -dontwarn com.android.org.conscrypt.**
 -dontwarn io.github.muntashirakon.adb.**
