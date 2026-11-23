@@ -88,6 +88,15 @@ val vkRedirectScheme = vkIdClientId.takeIf(String::isNotBlank)?.let { "vk$it" } 
 
 // See the root build.gradle.kts: one version for the phone and its watch app.
 val betaSuffix = rootProject.extra["bitchordBetaSuffix"] as String
+
+/*
+ * Which update channel a freshly installed build starts on.
+ *
+ * The stable channel is the default; an installer that wants a beta immediately
+ * asks for it with `-PbitchordChannel=beta`, and the app then opens its
+ * settings on the beta channel instead of waiting for the switch to be flipped.
+ */
+val defaultChannel = providers.gradleProperty("bitchordChannel").orNull ?: "stable"
 val supportedAbis = listOf("armeabi-v7a", "arm64-v8a", "x86_64")
 val requestedAbi = providers.gradleProperty("bitchordAbi").orNull
 require(requestedAbi == null || requestedAbi in supportedAbis) {
@@ -108,6 +117,7 @@ android {
         targetSdk = 36
         versionCode = rootProject.extra["bitchordVersionCode"] as Int
         versionName = rootProject.extra["bitchordVersionName"] as String
+        buildConfigField("String", "DEFAULT_UPDATE_CHANNEL", "\"$defaultChannel\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

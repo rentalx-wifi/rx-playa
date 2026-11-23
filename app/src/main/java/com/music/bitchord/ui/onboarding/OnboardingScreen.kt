@@ -82,12 +82,18 @@ import com.music.bitchord.ui.player.WelcomeMeshPalettes
 import com.music.bitchord.ui.player.cyclingMeshPalette
 
 /**
- * The two welcome pages: a name for Listen Together, then the YouTube sign-in.
+ * The welcome pages: which update channel to follow, a name for Listen
+ * Together, then the YouTube sign-in.
  *
  * Shown once — to new installs and, because the flag it sets is new, to anyone
- * updating from a build without it. The second page is skipped for an account
+ * updating from a build without it. The account page is skipped for an account
  * that is already signed in; asking somebody to connect what is connected
  * reads as the app having forgotten them.
+ *
+ * The channel is asked here and nowhere else. It changes what every later
+ * update installs, so it deserves one question up front — and one question
+ * only, which is why switching it later lives in the settings as a switch
+ * rather than another welcome page.
  *
  * Always drawn dark, whatever the theme, for the same reason Replay is: the
  * mesh is colour, and white type is what sits on colour.
@@ -96,18 +102,20 @@ import com.music.bitchord.ui.player.cyclingMeshPalette
 fun OnboardingScreen(
     signedIn: Boolean,
     initialName: String,
-    /** Saves the party name. Called on Next, before the second page. */
+    /** Saves the update channel the listener picked, before the name page. */
+    onChannelChosen: (Boolean) -> Unit,
+    /** Saves the party name. Called on Next, before the account page. */
     onNameChosen: (String) -> Unit,
     /** Opens the Google sign-in. The caller finishes onboarding once it lands. */
     onSignIn: () -> Unit,
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var page by rememberSaveable { mutableIntStateOf(PAGE_NAME) }
+    var page by rememberSaveable { mutableIntStateOf(PAGE_CHANNEL) }
     var name by rememberSaveable { mutableStateOf(initialName) }
     val focusManager = LocalFocusManager.current
 
-    BackHandler(enabled = page == PAGE_CONNECT) { page = PAGE_NAME }
+    BackHandler(enabled = page != PAGE_CHANNEL) { page -= 1 }
     // "Sign in with Google" goes through the app's own sign-in WebView, raised
     // over this page; the account landing is what ends the welcome.
     LaunchedEffect(signedIn, page) {
@@ -116,7 +124,7 @@ fun OnboardingScreen(
 
     // The mesh never settles on one palette: each crossfade is as long as the
     // hold, so one runs straight into the next.
-    val palette = cyclingMeshPalette(if (page == PAGE_NAME) WelcomeMeshPalettes else ConnectPalettes)
+    val palette = cyclingMeshPalette(if (page == PAGE_CONNECT) ConnectPalettes else WelcomeMeshPalettes)
 
     Box(
         modifier
@@ -166,6 +174,12 @@ fun OnboardingScreen(
         ) { shown ->
             OnboardingPage {
                 when (shown) {
+                    PAGE_CHANNEL -> ChannelPage(
+                        onChosen = { beta ->
+                            onChannelChosen(beta)
+                            page = PAGE_NAME
+                        },
+                    )
                     PAGE_NAME -> NamePage(
                         name = name,
                         onNameChange = { name = it.take(NAME_LIMIT) },
@@ -200,6 +214,49 @@ private fun OnboardingPage(content: @Composable ColumnScope.() -> Unit) {
             content = content,
         )
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ColumnScope.ChannelPage(
+    /** Saves the choice: true for beta builds, false for stable. */
+    onChosen: (Boolean) -> Unit,
+) {
+    Column {
+        Spacer(Modifier.height(56.dp))
+        Image(
+            painter = painterResource(Res.drawable.ic_logo),
+            contentDescription = null,
+            modifier = Modifier.size(width = 46.dp, height = 30.dp),
+        )
+    }
+    Spacer(Modifier.height(24.dp))
+    Title(stringResource(R.string.choose_a_channel))
+
+    Spacer(Modifier.weight(1f))
+
+    // The stable channel is the default and the first thing a thumb meets: most
+    // people never want a test build, and the one who does reads the line under
+    // the second capsule before picking it.
+    PillButton(
+        label = stringResource(R.string.update_channel_stable),
+        onClick = { onChosen(false) },
+        primary = true,
+    )
+    Spacer(Modifier.height(12.dp))
+    PillButton(
+        label = stringResource(R.string.update_channel_beta),
+        onClick = { onChosen(true) },
+        primary = false,
+    )
+    Spacer(Modifier.height(10.dp))
+    Text(
+        text = stringResource(R.string.update_beta_note),
+        style = MaterialTheme.typography.bodyMedium,
+        color = Color.White.copy(alpha = 0.55f),
+        modifier = Modifier.padding(horizontal = 4.dp),
+    )
+    Spacer(Modifier.height(16.dp))
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -433,8 +490,9 @@ private fun BackButton(onClick: () -> Unit) {
     }
 }
 
-private const val PAGE_NAME = 0
-private const val PAGE_CONNECT = 1
+private const val PAGE_CHANNEL = 0
+private const val PAGE_NAME = 1
+private const val PAGE_CONNECT = 2
 
 /** Long enough for a full name; the party server keeps the first 80. */
 private const val NAME_LIMIT = 40

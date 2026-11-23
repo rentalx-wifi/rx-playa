@@ -289,14 +289,26 @@ object AppSettings {
     val offlineMode = MutableStateFlow(false)
 
     /**
+     * Whether this build starts on the beta channel.
+     *
+     * Stable unless the installer asked otherwise with
+     * `-PbitchordChannel=beta`. Declared before the flow that reads it: a
+     * `val` later in the object would not be initialised yet at that point.
+     */
+    private val betaChannelByDefault =
+        BuildConfig.DEFAULT_UPDATE_CHANNEL.equals("beta", ignoreCase = true)
+
+    /**
      * Follow the beta channel: test builds are published before the stable one
      * and this is the switch that offers them.
      *
      * Off by default. A stable phone should never be handed a test build it
      * did not ask for — the whole point of splitting the two is that only the
-     * people who opted in see the rough ones.
+     * people who opted in see the rough ones. A build made with
+     * `-PbitchordChannel=beta` starts on the other one, which is how a beta is
+     * installed by whoever asked for it.
      */
-    val betaUpdates = MutableStateFlow(false)
+    val betaUpdates = MutableStateFlow(betaChannelByDefault)
 
     /**
      * The version whose release notes the listener has already been shown.
@@ -1113,7 +1125,7 @@ object AppSettings {
         downloadTreeUri.value = prefs.getString(KEY_DOWNLOAD_TREE_URI, "").orEmpty()
         syncDownloadedPlaylists.value = prefs.getBoolean(KEY_SYNC_DOWNLOADED_PLAYLISTS, false)
         offlineMode.value = prefs.getBoolean(KEY_OFFLINE_MODE, false)
-        betaUpdates.value = prefs.getBoolean(KEY_BETA_UPDATES, false)
+        betaUpdates.value = prefs.getBoolean(KEY_BETA_UPDATES, betaChannelByDefault)
         lastWhatsNewVersion.value = prefs.getString(KEY_LAST_WHATS_NEW, null)
         crossfadeSeconds.value = prefs.getInt(KEY_CROSSFADE, 0)
         smartFadeEnabled.value = prefs.getBoolean(KEY_SMART_FADE, false)

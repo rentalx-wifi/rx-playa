@@ -39,9 +39,13 @@ buildscript {
  * update whose versionCode is lower than the one installed.
  *
  * No "v" in the name; release tags may add it separately.
+ *
+ * Both are overridable from the command line, which is what the updater's
+ * package needs to ship a build with a pinned version:
+ * `-PbitchordVersionName=1.9.5 -PbitchordVersionCode=107`.
  */
-extra["bitchordVersionCode"] = 106
-extra["bitchordVersionName"] = "1.9.4"
+extra["bitchordVersionCode"] = providers.gradleProperty("bitchordVersionCode").orNull?.toIntOrNull() ?: 106
+extra["bitchordVersionName"] = providers.gradleProperty("bitchordVersionName").orNull ?: "1.9.4"
 
 /*
  * Bump this by hand for each sideloaded fork build. The suffix makes support
@@ -51,7 +55,7 @@ extra["bitchordVersionName"] = "1.9.4"
  *
  * Empty for a release build: 1.9.4 ships without the marker, as 1.9.1 did.
  */
-extra["bitchordBetaSuffix"] = ""
+extra["bitchordBetaSuffix"] = providers.gradleProperty("bitchordBetaSuffix").orNull ?: ""
 
 plugins {
     id("com.android.application") version "8.10.1" apply false

@@ -6190,6 +6190,7 @@ private fun BitChordApp(
                     initialName = remember {
                         ListenTogether.nickname().ifBlank { account?.name.orEmpty() }
                     },
+                    onChannelChosen = AppSettings::setBetaUpdates,
                     onNameChosen = { name ->
                         ListenTogether.setNickname(name)
                         if (!signedIn) AppSettings.setGuestProfile(name)

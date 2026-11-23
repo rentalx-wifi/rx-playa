@@ -108,8 +108,8 @@ object AppUpdateChecker {
      *
      * Both [check] and [newestVersion] ask this question; only what they do
      * with the answer differs — one offers the build, the other compares it.
-     * Stable asks for `latest`; beta asks for the list and takes its first
-     * non-draft, so a pre-release is visible there while a published one is
+     * Stable asks for `latest`; beta asks for the list and takes the newest by
+     * version, so a pre-release is visible there while a published one is
      * invisible to the stable channel.
      */
     private suspend fun releaseFrom(beta: Boolean): JSONObject? {
@@ -130,14 +130,30 @@ object AppUpdateChecker {
         return runCatching {
             if (beta) {
                 val list = JSONArray(json)
-                (0 until list.length())
+                val offered = (0 until list.length())
                     .mapNotNull { list.optJSONObject(it) }
-                    .firstOrNull { !it.optBoolean("draft", false) }
+                    .filter { !it.optBoolean("draft", false) }
+                    .map { it to versionOf(it) }
+                // The list comes back newest-created first, which is not the same
+                // as newest by version: a backported stable published after a
+                // beta would win on date and carry the older number. The issue
+                // asks for the newest of the two lines, so the order is ignored
+                // and the versions decide.
+                val newest = newestOf(offered.map { it.second })
+                (offered.firstOrNull { it.second == newest } ?: offered.firstOrNull())?.first
             } else {
                 JSONObject(json)
             }
         }.getOrNull()
     }
+
+    /** What a release calls itself, read the same way wherever it is needed. */
+    private fun versionOf(release: JSONObject): String? =
+        releaseVersion(
+            title = release.optString("name"),
+            tag = release.optString("tag_name"),
+            assetNames = assetNames(release),
+        )
 
     /** The file names a release carries, which can be the only place its version is written. */
     private fun assetNames(release: JSONObject): List<String> {
@@ -450,6 +466,16 @@ object AppUpdateChecker {
         }
         return versionOrdinal(left).compareTo(versionOrdinal(right))
     }
+
+    /**
+     * The newest of [versions], with the ones nobody labelled ignored.
+     *
+     * Used by the beta channel, which sees stables and pre-releases together
+     * and has to pick one: "newest" is the highest version by [compareVersions],
+     * not the first in the list. Null when nothing in it carries a version.
+     */
+    internal fun newestOf(versions: List<String?>): String? =
+        versions.filterNotNull().maxWithOrNull(::compareVersions)
 
     /**
      * Which way a channel switch moves this phone's version.

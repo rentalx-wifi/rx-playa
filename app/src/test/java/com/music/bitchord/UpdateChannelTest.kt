@@ -80,4 +80,14 @@ class UpdateChannelTest {
             AppUpdateChecker.channelChange("v1.9.4", "1.9.4"),
         )
     }
+
+    @Test
+    fun `the beta channel takes the newest version, not the first listed`() {
+        // GitHub orders by creation date. A backported stable published after a
+        // beta would come first while carrying the older number.
+        assertEquals("v46b24", AppUpdateChecker.newestOf(listOf("v1.9.5", "v46b24")))
+        assertEquals("v1.10.0", AppUpdateChecker.newestOf(listOf("v1.9.5", null, "v1.10.0")))
+        assertNull(AppUpdateChecker.newestOf(listOf(null, null)))
+        assertNull(AppUpdateChecker.newestOf(emptyList()))
+    }
 }
