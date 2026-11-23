@@ -124,6 +124,7 @@ import com.rentalx.playa.ui.components.trackColumnWidth
 import com.rentalx.playa.ui.player.MeshGradientBackground
 import com.rentalx.playa.ui.player.MeshPalette
 import com.rentalx.playa.ui.player.PlayerSettings
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -188,12 +189,26 @@ private fun SpotifyHomeHeader(
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 itemsIndexed(labels) { index, label ->
                     val active = index == selected
+                    // The chip used to change colour in one frame, which reads as
+                    // a jump next to a page that eases everywhere else. Two
+                    // surfaces, no layout: the crossfade costs a colour
+                    // animation and nothing else.
+                    val chipColor by animateColorAsState(
+                        targetValue = if (active) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                        animationSpec = tween(180),
+                        label = "chipColor",
+                    )
+                    val chipContent by animateColorAsState(
+                        targetValue = if (active) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        animationSpec = tween(180),
+                        label = "chipContent",
+                    )
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = if (active) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = if (active) MaterialTheme.colorScheme.onPrimary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = chipColor,
+                        contentColor = chipContent,
                         modifier = Modifier.clickable { onSelected(index) },
                     ) {
                         Text(
@@ -963,13 +978,16 @@ private fun RecentShelf(
     Column(Modifier.padding(bottom = 26.dp)) {
         RecentSectionHeader(title = localizeShelfTitle(shelf.title), subtitle = localizeShelfSubtitle(shelf.subtitle))
         val isCurrentItem = shelf.items.playingItemMatcher(currentSong)
+        // A new list of lists on every recomposition of this shelf was pure
+        // garbage: the slice only changes when the shelf itself does.
+        val columns = remember(shelf.items) { shelf.items.chunked(RECENT_TRACKS_PER_COLUMN) }
         BoxWithConstraints {
             val columnWidth = trackColumnWidth(maxWidth)
             ShelfRow(
                 contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(shelf.items.chunked(RECENT_TRACKS_PER_COLUMN)) { column ->
+                items(columns) { column ->
                     Column(Modifier.width(columnWidth)) {
                         column.forEach { item ->
                             RecentTrackRow(

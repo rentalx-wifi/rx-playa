@@ -271,6 +271,42 @@ class PlayerSheetMotion(
         }
     }
 
+    /**
+     * The system's back gesture taking the player down, 0 at rest and 1 where
+     * the platform would commit it.
+     *
+     * Drives the same [held] the finger does, so everything drawn from it —
+     * the dock, the artwork on its way to the mini player, the page below —
+     * follows the gesture without a second code path.
+     */
+    fun backGesture(progress: Float) {
+        if (!shown()) return
+        settle?.cancel()
+        closing = false
+        quietWindow()
+        held = travel() * progress.coerceIn(0f, 1f)
+    }
+
+    /** The gesture was committed: the player goes, from wherever it stands. */
+    fun backCommitted() {
+        if (!holding) return
+        close()
+    }
+
+    /** The gesture was cancelled: the player rises back from where it stopped. */
+    fun backCancelled() {
+        if (!holding) return
+        val from = held
+        closing = false
+        settle?.cancel()
+        settle = scope.launch {
+            slide(from = from, to = 0f)
+            // Hand the sheet back its own offset once it is standing where M3
+            // keeps it fully open.
+            held = Float.NaN
+        }
+    }
+
     override fun drag(delta: Float) {
         if (!holding) {
             // Only upwards starts one, and only from a closed player: a

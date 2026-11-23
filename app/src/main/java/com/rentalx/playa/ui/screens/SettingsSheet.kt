@@ -3682,6 +3682,10 @@ private fun IconTile(
                 },
                 modifier = Modifier
                     .size(68.dp)
+                    // A light mark on a transparent preview is invisible on the
+                    // dark sheet, which made the monochrome choice look broken:
+                    // the tile has its own neutral plate instead.
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(22.dp))
                     .clip(RoundedCornerShape(22.dp))
                     .border(2.dp, border, RoundedCornerShape(22.dp)),
             )
@@ -3692,6 +3696,7 @@ private fun IconTile(
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .size(68.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(22.dp))
                     .clip(RoundedCornerShape(22.dp))
                     .border(2.dp, border, RoundedCornerShape(22.dp))
                     .scale(1.5f),

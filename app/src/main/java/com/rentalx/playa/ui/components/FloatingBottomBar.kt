@@ -178,22 +178,11 @@ fun FloatingBottomBar(
 
     val pillTargetPx = if (slots.usable) selectedIndex * slots.stepPx + dragOffset else 0f
 
-    val animatedPillOffset by androidx.compose.animation.core.animateFloatAsState(
+    val pillOffset = androidx.compose.animation.core.animateFloatAsState(
         targetValue = pillTargetPx,
         animationSpec = glassSpec,
         label = "pillOffset",
     )
-
-    // How much of a tab's stride is still ahead of the indicator: 0 at rest,
-    // toward 1 in the middle of a move or under a drag that has run away from
-    // it. The stretch below is a function of this and nothing else, which is
-    // what keeps it honest — the shape can only be deformed while it is
-    // actually behind where it is going.
-    val lag = if (slots.usable) {
-        (abs(pillTargetPx - animatedPillOffset) / slots.stepPx).coerceIn(0f, 1f)
-    } else {
-        0f
-    }
 
     var lastHapticTab by remember { mutableIntStateOf(selectedIndex) }
 
@@ -244,7 +233,24 @@ fun FloatingBottomBar(
                     .width(with(density) { slots.slotPx.toDp() })
                     .height(with(density) { rowSize.height.toDp() })
                     .graphicsLayer {
-                        translationX = animatedPillOffset
+                        // Read here, and only here: taking the offset in the
+                        // composition made the whole bar — five items, each with
+                        // its own glyph animation — recompose on every frame of
+                        // the pill's spring, which is the frame that dropped
+                        // when a tab was tapped on a cheap phone.
+                        val offset = pillOffset.value
+                        // How much of a tab's stride is still ahead of the
+                        // indicator: 0 at rest, toward 1 in the middle of a move
+                        // or under a drag that has run away from it. The stretch
+                        // is a function of this and nothing else, which is what
+                        // keeps it honest — the shape can only be deformed while
+                        // it is actually behind where it is going.
+                        val lag = if (slots.usable) {
+                            (abs(pillTargetPx - offset) / slots.stepPx).coerceIn(0f, 1f)
+                        } else {
+                            0f
+                        }
+                        translationX = offset
                         // Around its own centre, so the indicator draws out
                         // both ways rather than growing a tail off one edge —
                         // a leading edge that ran ahead of the glyph it is
@@ -361,7 +367,9 @@ private fun BottomBarItem(
     nothingStyle: Boolean = false,
 ) {
     // The same spring the indicator rides, so the glyph arriving and the glass
-    // arriving are one movement rather than two that nearly agree.
+    // arriving are one movement rather than two that nearly agree. The tint
+    // follows that same spec: a tween of its own arrived later than the motion
+    // it was part of, and was the one animation "reduce motion" did not stop.
     val scale by androidx.compose.animation.core.animateFloatAsState(
         targetValue = when {
             selected && nothingStyle -> 1.03f

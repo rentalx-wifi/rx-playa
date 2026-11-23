@@ -327,7 +327,11 @@ internal fun InlineQueue(
                     item(key = "header-now-playing") {
                         QueueHeading(
                             title = stringResource(Res.string.now_playing),
-                            modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
+                            // A little lower than the sections below it: this is the
+                            // first line under the sheet's own title, and at the
+                            // smaller step it read as a part of that header rather
+                            // than as the row's own label.
+                            modifier = Modifier.padding(top = 18.dp, bottom = 6.dp),
                         )
                     }
                     item(key = nowPlaying.key) {

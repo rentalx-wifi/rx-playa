@@ -574,7 +574,7 @@ object AppSettings {
      */
     val dpiBypass = MutableStateFlow(false)
     /** Frosted refraction on the floating chrome, where the device supports it. */
-    val liquidGlassEnabled = MutableStateFlow(false)
+    val liquidGlassEnabled = MutableStateFlow(true)
 
     /** Accent role for the ordinary themes; Nothing mode ignores it. */
     val accentKey = MutableStateFlow("default")
@@ -1209,7 +1209,7 @@ object AppSettings {
         customAccent.value = prefs.getLong(KEY_CUSTOM_ACCENT, 0L).takeIf { it != 0L }
         accentFollowsIcon.value = prefs.getBoolean(KEY_ACCENT_FROM_ICON, true)
         iconAccent.value = prefs.getLong(KEY_ICON_ACCENT, 0L).takeIf { it != 0L }
-        liquidGlassEnabled.value = prefs.getBoolean(KEY_LIQUID_GLASS_ENABLED, false)
+        liquidGlassEnabled.value = prefs.getBoolean(KEY_LIQUID_GLASS_ENABLED, true)
         zapretPath.value = prefs.getString(KEY_ZAPRET_PATH, "").orEmpty()
         zapretStrategy.value = prefs.getString(KEY_ZAPRET_STRATEGY, "fake_split").orEmpty()
         zapretArgs.value = prefs.getString(KEY_ZAPRET_ARGS, "").orEmpty()

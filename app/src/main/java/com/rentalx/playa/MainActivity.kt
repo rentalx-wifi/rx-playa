@@ -12,6 +12,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -102,6 +103,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -411,6 +413,7 @@ import com.rentalx.playa.ui.replay.ReplayStoryPage
 import com.rentalx.playa.ui.replay.rememberReplayState
 import com.rentalx.playa.ui.theme.PlayaTheme
 import com.rentalx.playa.ui.theme.NothingStyleTransitionHost
+import com.rentalx.playa.ui.theme.LocalMaterial3StyleEnabled
 import com.rentalx.playa.ui.theme.LocalNothingStyleEnabled
 import com.rentalx.playa.ui.theme.nothingDotBackground
 import com.rentalx.playa.ui.theme.rememberArtworkPalette
@@ -435,6 +438,34 @@ import java.util.Locale
 /** A full first screen of a native YouTube Music radio before AutoPlay tops it up. */
 /** How much of an artist page's header scrolls away before the top fade begins. */
 private const val TOP_FADE_START = 0.55f
+
+/**
+ * The search sources that answer with a platform shelf rather than the local
+ * one.
+ *
+ * A set built in the composition was rebuilt on every keystroke of the search
+ * field — the query is what recomposes that screen — and it was built twice.
+ */
+private val PLATFORM_SEARCH_SOURCES = setOf(
+    SearchSource.ALL,
+    SearchSource.YANDEX,
+    SearchSource.SPOTIFY,
+    SearchSource.SOUNDCLOUD,
+    SearchSource.VK,
+)
+
+/**
+ * How far the page travels as a fully-committed back gesture completes, as a
+ * fraction of its width.
+ *
+ * A tenth is the same distance a tab swap moves: enough that the gesture and
+ * the page agree on direction, small enough that the page is never dragged off
+ * a display it will not be leaving.
+ */
+private const val BACK_GESTURE_TRAVEL = 0.1f
+
+/** How much the page shrinks over the same gesture. */
+private const val BACK_GESTURE_SHRINK = 0.04f
 
 /** How much of the header's height the fade takes to reach full strength. */
 private const val TOP_FADE_RAMP = 0.3f
@@ -569,7 +600,7 @@ class MainActivity : AppCompatActivity() {
                 val appBackdrop = rememberLayerBackdrop(onDraw = paintBackdrop)
                 CompositionLocalProvider(
                     LocalOverscrollFactory provides iosOverscrollFactory,
-                    LocalLiquidGlassEnabled provides liquidGlass,
+                    LocalLiquidGlassEnabled provides (liquidGlass && !LocalMaterial3StyleEnabled.current),
                     LocalAppBackdrop provides appBackdrop,
                 ) {
                     NothingStyleTransitionHost(
@@ -1033,7 +1064,8 @@ private fun PlayaApp(
     val personalizedHome by viewModel.personalizedHomeState.collectAsStateWithLifecycle()
     val topPicks by viewModel.topPicks.collectAsStateWithLifecycle()
     var homeMatchJob by remember { mutableStateOf<Job?>(null) }
-    val personalizationHint = buildList {
+    val personalizationHint = remember(personalizedHome) {
+        buildList {
         if (personalizedHome.loading.isNotEmpty()) add(context.getString(R.string.personalized_updating))
         if (personalizedHome.profile.isEmpty && personalizedHome.loading.isEmpty() && personalizedHome.unavailable.isEmpty()) {
             add(context.getString(R.string.personalized_empty))
@@ -1050,7 +1082,18 @@ private fun PlayaApp(
                 }))
         }
         add(context.getString(R.string.personalized_limitations_notice))
-    }.joinToString("\n")
+        }.joinToString("\n")
+    }
+
+    // The clock is read once a minute, not once per recomposition: this slot
+    // recomposes on every player update, and a greeting that has not changed
+    // does not need a new LocalTime and a new string built to say so.
+    val greetingHour by produceState(java.time.LocalTime.now().hour) {
+        while (true) {
+            delay(60_000)
+            value = java.time.LocalTime.now().hour
+        }
+    }
 
     val query by viewModel.query.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
@@ -3293,6 +3336,13 @@ private fun PlayaApp(
         if (!navigator.pop() && !viewModel.closeMoodGenre()) selectedTab = TAB_HOME
     }
 
+    // How far the system's back gesture has been dragged, 0..1.
+    //
+    // The platform tells the app about the gesture before it is committed —
+    // the "predictive" part of predictive back — so the page can step back
+    // with the finger instead of disappearing only once the gesture ends.
+    var backGestureProgress by remember { mutableFloatStateOf(0f) }
+
     Box(
         Modifier
             .fillMaxSize()
@@ -3318,7 +3368,22 @@ private fun PlayaApp(
         // drawn over a page, then the alerts drawn over everything. Each sheet
         // and dialog further down registers its own handler as it opens, and
         // so outranks all of these while it is up.
-        BackHandler(enabled = canGoBack, onBack = goBack)
+        // The page stack answers the system's back gesture, and steps back
+        // with it: a cancelled gesture returns it to rest, a committed one
+        // pops. Sheets and dialogs drawn over a page register their own
+        // handlers as they open and outrank this one, exactly as before.
+        PredictiveBackHandler(enabled = canGoBack) { progress ->
+            try {
+                progress.collect { info ->
+                    backGestureProgress = if (reducePlayerMotion) 0f else info.progress
+                }
+            } catch (cancelled: CancellationException) {
+                backGestureProgress = 0f
+                throw cancelled
+            }
+            backGestureProgress = 0f
+            goBack()
+        }
         // Replay's stories and its share sheet are drawn over everything, and
         // unwind in the order they were opened. Only while there is a summary
         // to draw them from — otherwise back would spend a step closing
@@ -3342,7 +3407,23 @@ private fun PlayaApp(
         // Everything a page's menu floats over, and so what [pageBackdrop]
         // takes its still of; the menus themselves are drawn outside it.
         Row(Modifier.fillMaxSize().snapshotBackdropSource(pageBackdrop)) {
-            Box(Modifier.weight(1f).fillMaxHeight()) {
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    // The page leans away from the edge the gesture came from
+                    // and dims a little, the way the platform's own screens do;
+                    // it is the same drawing, moved, not a second copy.
+                    .graphicsLayer {
+                        val p = backGestureProgress
+                        if (p > 0f) {
+                            translationX = size.width * BACK_GESTURE_TRAVEL * p
+                            val shrink = 1f - BACK_GESTURE_SHRINK * p
+                            scaleX = shrink
+                            scaleY = shrink
+                        }
+                    },
+            ) {
                 AnimatedContent(
                     // Whatever is on top of the back stack — see [AppNavigator].
                     targetState = when {
@@ -4052,14 +4133,14 @@ private fun PlayaApp(
                                 leadHero = false,
                                 spotifyStyle = true,
                                 greeting = stringResource(
-                                    when (java.time.LocalTime.now().hour) {
+                                    when (greetingHour) {
                                         in 5..11 -> R.string.home_good_morning
                                         in 12..17 -> R.string.home_good_afternoon
                                         else -> R.string.home_good_evening
                                     },
                                 ).let { greeting ->
                                     if (nothingStyle) {
-                                        "${java.time.LocalTime.now().hour.toString().padStart(2, '0')} // " +
+                                        "${greetingHour.toString().padStart(2, '0')} // " +
                                             greeting.uppercase(Locale.ROOT)
                                     } else greeting
                                 },
@@ -4325,13 +4406,7 @@ private fun PlayaApp(
                                 libraryResults = libraryResults,
                                 searchingAddons = searchSource == SearchSource.ADDONS,
                                 addonResults = addonResults,
-                                searchingPlatforms = searchSource in setOf(
-                                    SearchSource.ALL,
-                                    SearchSource.YANDEX,
-                                     SearchSource.SPOTIFY,
-                                     SearchSource.SOUNDCLOUD,
-                                     SearchSource.VK,
-                                ),
+                                searchingPlatforms = searchSource in PLATFORM_SEARCH_SOURCES,
                                 platformResults = platformResults,
                                 platformLoadingMore = platformLoadingMore,
                                 onPlatformLoadMore = viewModel::loadMorePlatformResults,
@@ -4355,14 +4430,7 @@ private fun PlayaApp(
                                 // The same queue opening the Local Music folder and
                                 // tapping the row there would give.
                                 onLibrarySongClick = { songs, index ->
-                                    if (searchSource in setOf(
-                                            SearchSource.ALL,
-                                            SearchSource.YANDEX,
-                                             SearchSource.SPOTIFY,
-                                             SearchSource.SOUNDCLOUD,
-                                             SearchSource.VK,
-                                        )
-                                    ) {
+                                    if (searchSource in PLATFORM_SEARCH_SOURCES) {
                                         songs.getOrNull(index)?.let { song ->
                                              if (song.isSpotifySourceTrack) {
                                                 withPlayableSpotify(song) { playable ->
@@ -5535,7 +5603,15 @@ private fun PlayaApp(
                     // Composed ahead of the player, so the player's own handlers —
                     // the lyrics and the queue putting themselves away first — are
                     // newer and are asked before this one.
-                    BackHandler(enabled = !reducePlayerMotion) { playerSheetMotion.close() }
+                    PredictiveBackHandler(enabled = !reducePlayerMotion) { progress ->
+                        try {
+                            progress.collect { info -> playerSheetMotion.backGesture(info.progress) }
+                        } catch (cancelled: kotlin.coroutines.cancellation.CancellationException) {
+                            playerSheetMotion.backCancelled()
+                            throw cancelled
+                        }
+                        playerSheetMotion.backCommitted()
+                    }
                     // Keeps a sheet still "settling" after a lyrics or queue
                     // scroll from taking the next touch meant for that list.
                     // See [PlayerSheetMotion.attachWindow].
