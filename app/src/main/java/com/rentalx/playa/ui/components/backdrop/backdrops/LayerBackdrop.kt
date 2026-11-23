@@ -46,6 +46,18 @@ class LayerBackdrop internal constructor(
     internal val onDraw: ContentDrawScope.() -> Unit
 ) : Backdrop {
 
+    /**
+     * While true the source draws straight to the screen and is not recorded.
+     *
+     * Recording a page into an offscreen layer and blitting it back is one
+     * extra full-screen pass per frame — measured on this app at 3.78 % janky
+     * frames against 1.15 % with the layer off. During a scroll that pass buys
+     * a blur that is itself moving, so the layer is left standing still: the
+     * glass samples the last recorded frame until motion stops, and every
+     * still frame gets the live one.
+     */
+    var paused by mutableStateOf(false)
+
     override val isCoordinatesDependent: Boolean = true
 
     internal var layerCoordinates: LayoutCoordinates? by mutableStateOf(null)

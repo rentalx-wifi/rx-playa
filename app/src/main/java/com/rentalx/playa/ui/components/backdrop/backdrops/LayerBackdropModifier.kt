@@ -79,7 +79,7 @@ private class LayerBackdropNode(
         // the edge would lose it, which upstream would not.
         // A degenerate size would record an empty layer, and unlike upstream there
         // is no direct draw left to fall back on — the page would simply vanish.
-        if (size.width < 1f || size.height < 1f) {
+        if (size.width < 1f || size.height < 1f || backdrop.paused) {
             drawContent()
             return
         }
