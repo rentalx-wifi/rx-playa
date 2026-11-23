@@ -42,10 +42,10 @@ buildscript {
  *
  * Both are overridable from the command line, which is what the updater's
  * package needs to ship a build with a pinned version:
- * `-PbitchordVersionName=1.9.5 -PbitchordVersionCode=107`.
+ * `-PplayaVersionName=1.9.5 -PplayaVersionCode=107`.
  */
-extra["bitchordVersionCode"] = providers.gradleProperty("bitchordVersionCode").orNull?.toIntOrNull() ?: 106
-extra["bitchordVersionName"] = providers.gradleProperty("bitchordVersionName").orNull ?: "1.9.4"
+extra["playaVersionCode"] = providers.gradleProperty("playaVersionCode").orNull?.toIntOrNull() ?: 107
+extra["playaVersionName"] = providers.gradleProperty("playaVersionName").orNull ?: "2.0.0"
 
 /*
  * Bump this by hand for each sideloaded fork build. The suffix makes support
@@ -55,7 +55,7 @@ extra["bitchordVersionName"] = providers.gradleProperty("bitchordVersionName").o
  *
  * Empty for a release build: 1.9.4 ships without the marker, as 1.9.1 did.
  */
-extra["bitchordBetaSuffix"] = providers.gradleProperty("bitchordBetaSuffix").orNull ?: ""
+extra["playaBetaSuffix"] = providers.gradleProperty("playaBetaSuffix").orNull ?: ""
 
 plugins {
     id("com.android.application") version "8.10.1" apply false

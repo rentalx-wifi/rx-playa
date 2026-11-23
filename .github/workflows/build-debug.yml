@@ -39,7 +39,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build dev debug APK
-        run: ./gradlew :app:assembleDevDebug -Pbitchord.bundleWear=false --no-daemon
+        run: ./gradlew :app:assembleDevDebug -Pplaya.bundleWear=false --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

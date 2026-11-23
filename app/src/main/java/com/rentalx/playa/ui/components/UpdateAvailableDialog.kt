@@ -1,0 +1,515 @@
+package com.rentalx.playa.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.halilibo.richtext.markdown.Markdown
+import com.halilibo.richtext.ui.RichTextStyle
+import com.halilibo.richtext.ui.material3.RichText
+import com.rentalx.playa.R
+import com.rentalx.playa.data.AppUpdateChecker
+import com.rentalx.playa.data.settings.AppSettings
+import com.rentalx.playa.ui.theme.LocalMaterial3StyleEnabled
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
+import dev.chrisbanes.haze.materials.HazeMaterials
+
+/** UIAlertController's own metrics: fixed narrow width, 14pt corner, 44pt rows. */
+internal val ALERT_WIDTH = 270.dp
+internal val ALERT_CORNER = 14.dp
+internal val ACTION_HEIGHT = 44.dp
+
+/**
+ * The same metrics, as Material 3 draws them.
+ *
+ * The card above is UIAlertController's, down to the 270-point width and the
+ * 44-point rows, which is right for the skin that copies that language and
+ * wrong for the Pixel one: a dialog there is wider, has 28-point corners and
+ * taller rows. Every dialog in the app measures itself through these, so the
+ * Pixel skin changes all of them at once instead of one at a time.
+ */
+@Composable
+internal fun alertWidth(): Dp = if (LocalMaterial3StyleEnabled.current) 360.dp else ALERT_WIDTH
+
+@Composable
+internal fun alertCorner(): Dp = if (LocalMaterial3StyleEnabled.current) 28.dp else ALERT_CORNER
+
+@Composable
+internal fun alertActionHeight(): Dp = if (LocalMaterial3StyleEnabled.current) 52.dp else ACTION_HEIGHT
+
+/**
+ * The dim behind the alert. Flat on purpose — the glass is the card, and
+ * blurring the wallpaper *behind* it too leaves nothing for the card to be
+ * frosted against, which is what made this read as a grey box before.
+ */
+internal val SCRIM_COLOR = Color.Black.copy(alpha = 0.28f)
+
+private val DOWNLOAD_ROW_HEIGHT = 4.dp
+
+/** How much of the card's height the release notes are allowed to fill before scrolling. */
+private val NOTES_MAX_HEIGHT = 220.dp
+
+/**
+ * Once-per-launch nudge that a newer build is on GitHub Releases — the top
+ * bar's [Icons.Rounded.Upgrade][androidx.compose.material.icons.rounded.Upgrade]
+ * icon is the quiet, always-there version of this; this is the one-time,
+ * hard-to-miss version shown the moment the check comes back.
+ *
+ * Shaped like an iOS system alert, which is the same lineage as the rest of the
+ * app's Apple Music styling: frosted card, hairline rules, full-width actions
+ * stacked under the message rather than a Material button pair in the corner.
+ *
+ * The update round trip happens here rather than in a browser: Download pulls
+ * the release's APK into the app cache (progress fills the hairline under the
+ * message), then Install hands it to the system installer. Where the release
+ * carries no APK at all, the actions fall back to opening the releases page.
+ *
+ * Sits over the whole app as an overlay rather than an Android [Dialog][androidx.compose.ui.window.Dialog]
+ * so its glass can sample the same [HazeState] the rest of the app's frosted
+ * surfaces use, the way [FrostedTopBar] and [MiniPlayer] already do.
+ */
+@OptIn(ExperimentalHazeMaterialsApi::class)
+@Composable
+fun UpdateAvailableDialog(
+    version: String,
+    notes: String?,
+    hazeState: HazeState,
+    onDismiss: () -> Unit,
+    onDownload: () -> Unit,
+    onCancelDownload: () -> Unit,
+    onInstall: () -> Unit,
+    onOpenReleasePage: () -> Unit,
+    modifier: Modifier = Modifier,
+    /** A test build off the beta channel — said plainly, not hidden in the tag. */
+    beta: Boolean = false,
+) {
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val state by AppUpdateChecker.download.collectAsStateWithLifecycle()
+    val shape = RoundedCornerShape(alertCorner())
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(SCRIM_COLOR)
+            // Tapping the scrim reads the same as Remind Me Later — nothing
+            // about this update is mandatory, so backing out of it should be as
+            // easy as getting into it. Mid-download it only closes the sheet;
+            // the download keeps going and the top-bar icon reopens this.
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .width(alertWidth())
+                .clip(shape)
+                .then(
+                    if (reduceDynamicBlur) {
+                        Modifier.background(MaterialTheme.colorScheme.surface)
+                    } else {
+                        Modifier.optimizedHazeEffect(
+                            state = hazeState,
+                            style = HazeMaterials.regular(MaterialTheme.colorScheme.surface),
+                        )
+                    },
+                )
+                // Swallows the tap before it reaches the scrim behind, so
+                // touching the card itself never dismisses it.
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                    onClick = {},
+                ),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 19.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = stringResource(R.string.software_update),
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.W600,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = when (state) {
+                        is AppUpdateChecker.DownloadState.Downloading ->
+                            stringResource(R.string.update_downloading_body, version)
+                        is AppUpdateChecker.DownloadState.Ready ->
+                            stringResource(R.string.update_ready_body, version)
+                        is AppUpdateChecker.DownloadState.Failed ->
+                            stringResource(R.string.update_failed_body, version)
+                        else ->
+                            stringResource(R.string.update_available_body, version)
+                    },
+                    modifier = Modifier.padding(top = 4.dp),
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 13.sp,
+                        lineHeight = 17.sp,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+                if (beta) {
+                    Text(
+                        text = stringResource(R.string.update_beta_note),
+                        modifier = Modifier.padding(top = 6.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 16.sp),
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+
+                // The download's progress, drawn as a thin fill across a
+                // hairline track — same weight as [AlertRule], so it reads as
+                // part of the card rather than a widget bolted onto it.
+                val downloading = state as? AppUpdateChecker.DownloadState.Downloading
+                if (downloading != null || state is AppUpdateChecker.DownloadState.Failed) {
+                    Box(
+                        Modifier
+                            .padding(top = 12.dp)
+                            .fillMaxWidth()
+                            .height(DOWNLOAD_ROW_HEIGHT)
+                            .clip(RoundedCornerShape(DOWNLOAD_ROW_HEIGHT / 2))
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)),
+                    ) {
+                        if (downloading != null && downloading.fraction > 0f) {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth(downloading.fraction)
+                                    .height(DOWNLOAD_ROW_HEIGHT)
+                                    .clip(RoundedCornerShape(DOWNLOAD_ROW_HEIGHT / 2))
+                                    .background(MaterialTheme.colorScheme.primary),
+                            )
+                        }
+                    }
+                }
+                if (state is AppUpdateChecker.DownloadState.Failed) {
+                    Text(
+                        text = (state as AppUpdateChecker.DownloadState.Failed).message,
+                        modifier = Modifier.padding(top = 6.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+
+                // The release's own notes, rendered as Markdown rather than
+                // dumped as raw text — GitHub release bodies lean on headings,
+                // bullet lists and bold for the changelog, and those are the
+                // whole point of reading this before installing.
+                if (!notes.isNullOrBlank()) {
+                    AlertRule(modifier = Modifier.padding(top = 12.dp))
+                    Text(
+                        text = stringResource(R.string.whats_new),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.W600,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Start,
+                    )
+                    ReleaseNotesBody(notes)
+                }
+            }
+
+            AlertRule()
+            when (state) {
+                is AppUpdateChecker.DownloadState.Downloading -> {
+                    AlertAction(label = stringResource(R.string.cancel), emphasised = false, onClick = onCancelDownload)
+                }
+                is AppUpdateChecker.DownloadState.Ready -> {
+                    AlertAction(label = stringResource(R.string.install_now), emphasised = true, onClick = onInstall)
+                    AlertRule()
+                    AlertAction(label = stringResource(R.string.later), emphasised = false, onClick = onDismiss)
+                }
+                is AppUpdateChecker.DownloadState.Failed -> {
+                    AlertAction(label = stringResource(R.string.try_again), emphasised = true, onClick = onDownload)
+                    AlertRule()
+                    AlertAction(label = stringResource(R.string.open_releases_page), emphasised = false, onClick = onOpenReleasePage)
+                }
+                else -> {
+                    AlertAction(label = stringResource(R.string.download_now), emphasised = true, onClick = onDownload)
+                    AlertRule()
+                    AlertAction(label = stringResource(R.string.remind_me_later), emphasised = false, onClick = onDismiss)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The release body as Markdown, under a "what's new" heading.
+ *
+ * Shared by the two cards that show a changelog — the one offering an install
+ * and the one reporting what the installed build brought — so the notes look
+ * the same whichever way the listener arrived at them.
+ */
+@Composable
+internal fun ReleaseNotesBody(notes: String) {
+    Box(
+        modifier = Modifier
+            .padding(top = 4.dp)
+            .heightIn(max = NOTES_MAX_HEIGHT)
+            .verticalScroll(rememberScrollState()),
+    ) {
+        // RichText's Material3 Text leans on LocalContentColor, which nothing
+        // here provides — the card is a plain Column.background(...), not a
+        // Surface, so without this the notes render at LocalContentColor's black
+        // default regardless of theme.
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            RichText(style = RichTextStyle.Default) {
+                Markdown(notes)
+            }
+        }
+    }
+}
+
+/**
+ * What the build this phone is running brought, once.
+ *
+ * The update card's notes are for people who have not installed the release
+ * yet; this one is for the install that already happened and was never
+ * announced — an APK taken straight from the releases page, or an update
+ * installed while the app was closed. It arrives at most once per version: the
+ * version is written down as soon as the card is dismissed, and nothing older
+ * or equal is offered again.
+ */
+@OptIn(ExperimentalHazeMaterialsApi::class)
+@Composable
+fun WhatsNewDialog(
+    version: String,
+    notes: String,
+    hazeState: HazeState,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+    val shape = RoundedCornerShape(alertCorner())
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(SCRIM_COLOR)
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .width(alertWidth())
+                .clip(shape)
+                .then(
+                    if (reduceDynamicBlur) {
+                        Modifier.background(MaterialTheme.colorScheme.surface)
+                    } else {
+                        Modifier.optimizedHazeEffect(
+                            state = hazeState,
+                            style = HazeMaterials.regular(MaterialTheme.colorScheme.surface),
+                        )
+                    },
+                )
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                    onClick = {},
+                ),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 19.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = stringResource(R.string.whats_new_title, version),
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.W600,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+                ReleaseNotesBody(notes)
+            }
+            AlertRule()
+            AlertAction(label = stringResource(R.string.close), emphasised = true, onClick = onDismiss)
+        }
+    }
+}
+
+/**
+ * The card that stands between the update-channel switch and the switch.
+ *
+ * Turning beta builds on or off changes which release the phone is measured
+ * against, and that can move it backwards: the newest beta may be older than
+ * the stable build installed, and the newest stable older than a beta. So the
+ * comparison is made first and stated in one line — "Update" or "Rollback" —
+ * with the versions either side, and a rollback says what it costs, because
+ * features and the settings that go with them do not survive it.
+ *
+ * Drawn as a Material dialog rather than the glass card above: the switch it
+ * belongs to lives on the settings screen, which speaks this language already.
+ */
+@Composable
+fun ChannelChangeDialog(
+    currentVersion: String,
+    targetVersion: String,
+    /** The channel the phone is being moved to, named on the second line. */
+    toBeta: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val rollback = AppUpdateChecker.channelChange(currentVersion, targetVersion) ==
+        AppUpdateChecker.ChannelChange.Rollback
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.update_channel_change_title)) },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(
+                        if (rollback) R.string.update_channel_rollback_line
+                        else R.string.update_channel_update_line,
+                        currentVersion,
+                        targetVersion,
+                    ),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = stringResource(
+                        R.string.update_channel_target,
+                        stringResource(
+                            if (toBeta) R.string.update_channel_beta else R.string.update_channel_stable,
+                        ),
+                    ),
+                    modifier = Modifier.padding(top = 8.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (rollback) {
+                    Text(
+                        text = stringResource(R.string.update_channel_rollback_warning),
+                        modifier = Modifier.padding(top = 8.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.update_channel_switch))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+/**
+ * Full-bleed action row. Tinted rather than filled, so the two read as equals
+ * in weight and only the font differentiates the default action — the alert's
+ * whole point is that neither choice is a trap.
+ *
+ * [destructive] is the one exception to that: an action that deletes something
+ * is red in this lineage, because the point there *is* to break the symmetry.
+ * It stays a plain row rather than a filled button, so it reads as a warning
+ * and not as the thing to press.
+ */
+@Composable
+internal fun AlertAction(
+    label: String,
+    emphasised: Boolean,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    destructive: Boolean = false,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(alertActionHeight())
+            // iOS washes the whole row instead of drawing a ripple inside it.
+            .background(
+                if (pressed) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f) else Color.Transparent,
+            )
+            .clickable(
+                enabled = enabled,
+                indication = null,
+                interactionSource = interactionSource,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = 17.sp,
+                fontWeight = if (emphasised) FontWeight.W600 else FontWeight.W400,
+            ),
+            color = (if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+                .copy(alpha = if (enabled) 1f else 0.4f),
+        )
+    }
+}
+
+/** Hairline separator — [HorizontalDivider][androidx.compose.material3.HorizontalDivider]'s 1dp reads as a bar at this scale. */
+@Composable
+internal fun AlertRule(modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(0.5.dp)
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)),
+    )
+}

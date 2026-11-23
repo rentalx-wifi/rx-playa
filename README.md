@@ -1,6 +1,6 @@
 # RX Playa
 
-**Музыка без подписок и без рекламы.** Форк [BitChord](https://github.com/kushagrasinghx/BitChord).
+**Музыка без подписок и без рекламы.** Форк [Playa](https://github.com/kushagrasinghx/Playa).
 
 [English version](README.en.md)
 
@@ -59,7 +59,7 @@ Discord RPC, Listen Together (общая очередь), обложки-кан�
    На обычном телефоне хватит `arm64`, на 32-битном - `arm32`.
 2. Разреши установку из этого источника, поставь.
 
-`arm64-v8a` · Android 8.0+ (`minSdk 26`) · пакет `com.dev.bitchord`
+`arm64-v8a` · Android 8.0+ (`minSdk 26`) · пакет `com.dev.playa`
 
 Подпись не менялась с первых сборок, поэтому новая версия ставится поверх
 предыдущей: настройки, лайки и скачанное остаются на месте.
@@ -82,8 +82,8 @@ export ANDROID_HOME=/path/to/android-sdk
 
 # release, arm64
 ./gradlew :app:assembleDevRelease \
-  -PbitchordAbi=arm64-v8a \
-  -Pbitchord.bundleWear=false
+  -PplayaAbi=arm64-v8a \
+  -Pplaya.bundleWear=false
 ```
 
 Для подписанной сборки положите `keystore.properties` по образцу
@@ -91,7 +91,7 @@ export ANDROID_HOME=/path/to/android-sdk
 init-script с подписью:
 
 ```bash
-./gradlew :app:assembleDevRelease -PbitchordAbi=arm64-v8a \
+./gradlew :app:assembleDevRelease -PplayaAbi=arm64-v8a \
   --init-script build/rx-local-signing.init.gradle
 ```
 
@@ -118,7 +118,7 @@ init-script с подписью:
 
 ## Благодарности
 
-- [BitChord](https://github.com/kushagrasinghx/BitChord) - основа, из которой
+- [Playa](https://github.com/kushagrasinghx/Playa) - основа, из которой
   вырос этот форк.
 - [Pixel Music](https://github.com/ianshulyadav/PixelMusic) - оформление, которое
   здесь перенесено: палитра, типографика, формы.

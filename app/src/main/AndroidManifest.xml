@@ -63,7 +63,7 @@
         android:maxSdkVersion="28" />
 
     <application
-        android:name=".BitChordApplication"
+        android:name=".PlayaApplication"
         android:allowBackup="true"
         android:appCategory="audio"
         android:usesCleartextTraffic="true"
@@ -75,7 +75,7 @@
         android:localeConfig="@xml/locales_config"
         android:roundIcon="@mipmap/ic_rx"
         android:supportsRtl="true"
-        android:theme="@style/Theme.BitChord"
+        android:theme="@style/Theme.Playa"
         tools:targetApi="34">
 
         <!--
@@ -134,7 +134,7 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
-            android:theme="@style/Theme.BitChord">
+            android:theme="@style/Theme.Playa">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <!--
@@ -142,7 +142,7 @@
                   the assistant, Android Auto's media list and the OEM pickers
                   that put up "Complete action using" all ask for
                   MAIN/APP_MUSIC by name and list whoever answers — a launcher
-                  entry alone is not enough, which is why BitChord was missing
+                  entry alone is not enough, which is why Playa was missing
                   from that dialog while every other player on the device was in
                   it.
                 -->
@@ -176,10 +176,10 @@
               tapped anywhere on the device.
 
               Not autoVerify. Verification is a claim to *own* these domains,
-              which BitChord doesn't — and on Android 12+ an app that has
+              which Playa doesn't — and on Android 12+ an app that has
               verified them (the YouTube Music app itself) takes the link
               without a dialog either way. Declaring the filter is what puts
-              BitChord in the "Open with" list once the user turns YT Music's
+              Playa in the "Open with" list once the user turns YT Music's
               "Open supported links" off; the SEND filter below is the path
               that always works, because sharing asks rather than routing.
 
@@ -225,7 +225,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:scheme="bitchord"
+                    android:scheme="playa"
                     android:host="party" />
             </intent-filter>
             <intent-filter>
@@ -258,7 +258,7 @@
             </intent-filter>
 
             <!--
-              Share → BitChord, from YT Music's own share sheet or from
+              Share → Playa, from YT Music's own share sheet or from
               anywhere a link can be sent. The text is whatever the sending app
               wrote around the URL, so the URL is picked out of it rather than
               parsed whole.
@@ -676,7 +676,7 @@
             android:stopWithTask="false" />
 
         <!--
-          Commands from the BitChord watch app (wearos/). Exported because Play
+          Commands from the Playa watch app (wearos/). Exported because Play
           services binds it; only messages from the same package and signing key
           on a paired watch are ever delivered, and only under this path.
         -->
@@ -687,7 +687,7 @@
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
                 <data
                     android:host="*"
-                    android:pathPrefix="/bitchord/command"
+                    android:pathPrefix="/playa/command"
                     android:scheme="wear" />
             </intent-filter>
             <!-- The watch's player reading a track through the phone. -->
@@ -695,7 +695,7 @@
                 <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
                 <data
                     android:host="*"
-                    android:pathPrefix="/bitchord/stream"
+                    android:pathPrefix="/playa/stream"
                     android:scheme="wear" />
             </intent-filter>
         </service>
@@ -817,7 +817,7 @@
         <!-- Where the Cast framework asks how this app wants to cast. -->
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
-            android:value="com.music.bitchord.playback.cast.CastOptionsProvider" />
+            android:value="com.rentalx.playa.playback.cast.CastOptionsProvider" />
         <receiver
             android:name=".data.net.ZapretBootReceiver"
             android:exported="false">

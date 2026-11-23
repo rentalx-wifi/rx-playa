@@ -49,7 +49,7 @@ val lastfmSecret: String = (
 val listenTogetherServer: String = (
     localProps.getProperty("LISTEN_TOGETHER_SERVER")
         ?: System.getenv("LISTEN_TOGETHER_SERVER")
-        ?: "https://bitchord-listen-together.onrender.com"
+        ?: "https://playa-listen-together.onrender.com"
     ).trim().trimEnd('/')
 val integrationServer: String = (
     localProps.getProperty("RX_MUSIC_BACKEND")
@@ -94,27 +94,35 @@ val vkRedirectScheme = vkIdClientId.takeIf(String::isNotBlank)?.let { "vk$it" } 
  * The TV build also has no release assets of its own yet, and
  * AppUpdateChecker reads only assets named with this module's
  * UPDATE_APK_PREFIX — so a TV install is offered no update at all rather than
- * the phone's APK, which would fail to install over `com.music.bitchord.tv`.
+ * the phone's APK, which would fail to install over `com.rentalx.playa.tv`.
  */
 val betaSuffix = ""
 
 android {
-    namespace = "com.music.bitchord"
+    namespace = "com.rentalx.playa"
     // InnerTubeX's AAR requires compiling against 37; targetSdk (runtime behaviour) stays 36.
     compileSdk = 37
 
     defaultConfig {
         // Its own id, so the TV app is a separate install from the phone app
         // rather than an upgrade over it (or under it).
-        applicationId = "com.music.bitchord.tv"
+        applicationId = "com.rentalx.playa.tv"
         // 26 keeps reach wide; real-time blur (RenderEffect) kicks in on API 31+,
         // Haze falls back to a translucent scrim below that.
         minSdk = 26
         targetSdk = 36
-        versionCode = 36
-        versionName = "1.9"
+        versionCode = 37
+        versionName = "2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // The phone's settings read this — see AppSettings.betaUpdates — and the
+        // TV module compiles those sources, so the field has to exist here too.
+        buildConfigField(
+            "String",
+            "DEFAULT_UPDATE_CHANNEL",
+            "\"${providers.gradleProperty("playaChannel").orNull ?: "stable"}\"",
+        )
 
         // Last.fm credentials are supplied locally and never committed.
         buildConfigField("String", "LASTFM_API_KEY", "\"${lastfmApiKey.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
@@ -134,7 +142,7 @@ android {
         buildConfigField("boolean", "VK_AUDIO_SCOPE_APPROVED", vkAudioScopeApproved.toString())
         buildConfigField("String", "VK_ID_REDIRECT_SCHEME", "\"$vkRedirectScheme\"")
         // The TV APKs share a GitHub release with the phone ones and are told
-        // apart by name (BitChordTV-v1.8.apk, BitChordTV-v1.8_x86_64.apk), so
+        // apart by name (PlayaTV-v1.8.apk, PlayaTV-v1.8_x86_64.apk), so
         // the updater installs the TV app here, never the phone app. See
         // AppUpdateChecker.apkAssetUrl.
         buildConfigField("String", "UPDATE_APK_PREFIX", "\"RX-PlayaTV-\"")
@@ -185,7 +193,7 @@ android {
     productFlavors {
         create("dev") {
             dimension = "env"
-            applicationId = "com.dev.bitchord.tv"
+            applicationId = "com.dev.playa.tv"
             resValue("string", "app_name", "RX Music TV")
         }
         create("prod") {
@@ -411,7 +419,7 @@ dependencies {
     // a camera scanner and an Activity with it, and nothing here reads a code —
     // a party is joined by tapping somebody else's link or typing six
     // characters. This produces the bit matrix; the drawing is ours, in
-    // [com.music.bitchord.ui.components.QrCode], so the result is styled like
+    // [com.rentalx.playa.ui.components.QrCode], so the result is styled like
     // the rest of the app rather than a stock black-and-white bitmap.
     implementation("com.google.zxing:core:3.5.3")
 
@@ -476,8 +484,8 @@ dependencies {
     // ---- Casting: Google Cast sender + the route discovery it sits on ----
     // The framework and the router only. media3-cast is left out on purpose:
     // its CastPlayer hands the receiver whatever URI a MediaItem carries, and
-    // ours are `bitchord://` addresses that only the service's resolver can
-    // turn into a real stream — see [com.music.bitchord.playback.cast.CastPlayback].
+    // ours are `playa://` addresses that only the service's resolver can
+    // turn into a real stream — see [com.rentalx.playa.playback.cast.CastPlayback].
     implementation("com.google.android.gms:play-services-cast-framework:22.2.0")
     implementation("androidx.mediarouter:mediarouter:1.8.1")
 
@@ -516,10 +524,10 @@ val verifyDevInstall = tasks.register("verifyDevInstall") {
             .drop(1)
             .mapNotNull { line -> line.split('\t').takeIf { it.size == 2 && it[1] == "device" }?.get(0) }
         serials.forEach { serial ->
-            logger.lifecycle("verifyDevInstall: compiling com.dev.bitchord on $serial")
+            logger.lifecycle("verifyDevInstall: compiling com.dev.playa on $serial")
             ProcessBuilder(
                 adbPath, "-s", serial, "shell", "cmd", "package", "compile",
-                "-m", "verify", "-f", "com.dev.bitchord",
+                "-m", "verify", "-f", "com.dev.playa",
             ).inheritIO().start().waitFor()
         }
     }

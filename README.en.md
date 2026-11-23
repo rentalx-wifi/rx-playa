@@ -1,7 +1,7 @@
 # RX Playa
 
 **Music without subscriptions and without ads.** A fork of
-[BitChord](https://github.com/kushagrasinghx/BitChord).
+[Playa](https://github.com/kushagrasinghx/Playa).
 
 [Русская версия](README.md)
 
@@ -61,7 +61,7 @@ Stated plainly, so nothing is a surprise:
 1. Open [Releases](../../releases) and download the latest APK.
 2. Allow installing from this source, install.
 
-`arm64-v8a` · Android 8.0+ (`minSdk 26`) · package `com.dev.bitchord`
+`arm64-v8a` · Android 8.0+ (`minSdk 26`) · package `com.dev.playa`
 
 The signing key has not changed since the first builds, so a new version installs
 over the previous one: settings, likes and downloads stay.
@@ -85,8 +85,8 @@ export ANDROID_HOME=/path/to/android-sdk
 
 # release, arm64
 ./gradlew :app:assembleDevRelease \
-  -PbitchordAbi=arm64-v8a \
-  -Pbitchord.bundleWear=false
+  -PplayaAbi=arm64-v8a \
+  -Pplaya.bundleWear=false
 ```
 
 For a signed build, put `keystore.properties` next to `app/` following
@@ -94,7 +94,7 @@ For a signed build, put `keystore.properties` next to `app/` following
 init script:
 
 ```bash
-./gradlew :app:assembleDevRelease -PbitchordAbi=arm64-v8a \
+./gradlew :app:assembleDevRelease -PplayaAbi=arm64-v8a \
   --init-script build/rx-local-signing.init.gradle
 ```
 
@@ -121,7 +121,7 @@ what you did just before.
 
 ## Credits
 
-- [BitChord](https://github.com/kushagrasinghx/BitChord) - the base this fork
+- [Playa](https://github.com/kushagrasinghx/Playa) - the base this fork
   grew from.
 - [Pixel Music](https://github.com/ianshulyadav/PixelMusic) - the appearance
   ported here: palette, typography, shapes.
