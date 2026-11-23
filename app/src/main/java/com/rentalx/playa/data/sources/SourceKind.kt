@@ -152,6 +152,31 @@ enum class SourceKind(
         rank = 2,
     ),
 
+    /**
+     * The listener's own Yandex Music account.
+     *
+     * Search works without signing in — the public `/search` answers anyone —
+     * and playback needs the account. Lossless is claimed because the
+     * catalogue holds it, not because this build can always read it: the API's
+     * encrypted rendition has no reader here yet, so a track is played only
+     * when it comes back as a plain file.
+     *
+     * Not worth prefetching: the great majority of resolves end in a miss
+     * (see [com.rentalx.playa.data.sources.YandexMusicSource.stream]), and a
+     * lookup whose usual answer is “no” is not worth running ahead of the
+     * listener.
+     */
+    YANDEX_MUSIC(
+        label = "Yandex Music",
+        detail = "Your own Yandex Music account. Search works signed out; playback needs the " +
+            "account, and FLAC arrives only when the API hands it over unencrypted.",
+        labels = listOf("FLAC", "Hi-Fi", "Account"),
+        needsServer = false,
+        canServeLossless = true,
+        worthPrefetching = false,
+        rank = 3,
+    ),
+
     JIOSAAVN(
         label = "JioSaavn",
         detail = "Optional JioSaavn streams up to 320kbps AAC/MP4. Catalogue matching can select the wrong song.",
@@ -159,7 +184,7 @@ enum class SourceKind(
         needsServer = false,
         canServeLossless = false,
         worthPrefetching = true,
-        rank = 3,
+        rank = 4,
     ),
 
     /**
@@ -175,7 +200,7 @@ enum class SourceKind(
         labels = listOf("Lossy", "Full catalogue", "Radio"),
         needsServer = false,
         canServeLossless = false,
-        rank = 4,
+        rank = 5,
     ),
     ;
 

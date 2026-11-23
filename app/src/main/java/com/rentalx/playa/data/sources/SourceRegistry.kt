@@ -511,6 +511,7 @@ object SourceRegistry {
         SourceKind.CUSTOM_MODULE -> ModuleSource(config)
         SourceKind.MODULE -> ModuleSource(config)
         SourceKind.JIOSAAVN -> JioSaavnSource(config)
+        SourceKind.YANDEX_MUSIC -> YandexMusicSource(config)
         SourceKind.FLASHMUSIC -> FlashMusicSource(config)
         SourceKind.YOUTUBE -> YouTubeSource(config)
     }
@@ -556,7 +557,7 @@ object SourceRegistry {
             .build()
             .toString()
 
-    private val BUILT_IN_KINDS = listOf(SourceKind.FLASHMUSIC, SourceKind.YOUTUBE)
+    private val BUILT_IN_KINDS = listOf(SourceKind.FLASHMUSIC, SourceKind.YANDEX_MUSIC, SourceKind.YOUTUBE)
 
     /**
      * Where the bundled server answers. Edit here (or on the Sources screen) to

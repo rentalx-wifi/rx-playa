@@ -415,7 +415,22 @@ class YandexMusicApi internal constructor(
      *   account cannot have this track at this tier (a free account asking for
      *   lossless gets nothing, which is an answer, not an error).
      */
-    suspend fun fileInfo(token: String, trackId: String, quality: String): List<YandexStream> {
+    suspend fun fileInfo(token: String, trackId: String, quality: String): List<YandexStream> =
+        fileInfo(token, trackId, quality, "encraw")
+
+    /**
+     * The same ask, but for a transport named by the caller.
+     *
+     * [YandexAudio.TRANSPORT_DIRECT] asks for a URL that can be opened as it
+     * is; the signature covers the transport name, so it has to be the same
+     * string the request carries.
+     */
+    suspend fun fileInfo(
+        token: String,
+        trackId: String,
+        quality: String,
+        transport: String,
+    ): List<YandexStream> {
         val timestamp = System.currentTimeMillis() / 1000
         val url = baseUrl.newBuilder()
             .addPathSegment("get-file-info")
@@ -423,8 +438,8 @@ class YandexMusicApi internal constructor(
             .addQueryParameter("trackId", trackId)
             .addQueryParameter("quality", quality)
             .addQueryParameter("codecs", YandexAudio.CODECS.joinToString(","))
-            .addQueryParameter("transports", "encraw")
-            .addQueryParameter("sign", YandexAudio.sign(timestamp, trackId, quality))
+            .addQueryParameter("transports", transport)
+            .addQueryParameter("sign", YandexAudio.sign(timestamp, trackId, quality, transport = transport))
             .build()
         val request = Request.Builder()
             .url(url)

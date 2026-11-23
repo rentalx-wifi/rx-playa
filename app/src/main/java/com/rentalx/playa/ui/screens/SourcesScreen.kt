@@ -820,6 +820,7 @@ private fun SourceRow(
                     SourceKind.CUSTOM_MODULE -> SfIcons.Extension
                     SourceKind.MODULE -> SfIcons.Extension
                     SourceKind.JIOSAAVN -> SfIcons.GraphicEq
+                    SourceKind.YANDEX_MUSIC -> SfIcons.GraphicEq
                     SourceKind.FLASHMUSIC -> SfIcons.LibraryMusic
                     SourceKind.YOUTUBE -> SfIcons.PlayCircle
                 },
