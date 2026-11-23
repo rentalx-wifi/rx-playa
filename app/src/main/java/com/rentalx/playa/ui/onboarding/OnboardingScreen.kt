@@ -72,7 +72,7 @@ import androidx.compose.ui.unit.sp
 import com.rentalx.playa.R
 import com.rentalx.playa.sharedui.resources.Res
 import com.rentalx.playa.sharedui.resources.ic_google_g
-import com.rentalx.playa.sharedui.resources.ic_logo
+import com.rentalx.playa.sharedui.resources.ic_rx_mark
 import org.jetbrains.compose.resources.painterResource
 import com.rentalx.playa.ui.icons.PlayaIcons
 import com.rentalx.playa.ui.player.MeshGradientBackground
@@ -225,9 +225,9 @@ private fun ColumnScope.ChannelPage(
     Column {
         Spacer(Modifier.height(56.dp))
         Image(
-            painter = painterResource(Res.drawable.ic_logo),
+            painter = painterResource(Res.drawable.ic_rx_mark),
             contentDescription = null,
-            modifier = Modifier.size(width = 46.dp, height = 30.dp),
+            modifier = Modifier.size(40.dp),
         )
     }
     Spacer(Modifier.height(24.dp))
@@ -277,9 +277,9 @@ private fun ColumnScope.NamePage(
         Column {
             Spacer(Modifier.height(56.dp))
             Image(
-                painter = painterResource(Res.drawable.ic_logo),
+                painter = painterResource(Res.drawable.ic_rx_mark),
                 contentDescription = null,
-                modifier = Modifier.size(width = 46.dp, height = 30.dp),
+                modifier = Modifier.size(40.dp),
             )
         }
     }

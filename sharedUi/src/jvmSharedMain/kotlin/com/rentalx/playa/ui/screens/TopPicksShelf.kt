@@ -1,6 +1,7 @@
 package com.rentalx.playa.ui.screens
 
 import androidx.compose.foundation.Canvas
+import com.rentalx.playa.sharedui.resources.ic_rx_mark
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -355,14 +356,13 @@ private fun TopPickCard(
         }
         if (branded) {
             Icon(
-                painter = painterResource(Res.drawable.ic_logo),
+                painter = painterResource(Res.drawable.ic_rx_mark),
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 12.dp, end = 12.dp)
                     .height(15.dp)
-                    .aspectRatio(730f / 484f),
             )
         }
         CardCaption(text, eyebrowColor, Modifier.align(Alignment.BottomStart))
@@ -1613,14 +1613,13 @@ private fun MoodTile(mood: TopPickMood, onClick: (TopPickMood, String) -> Unit, 
             // Picks' own, one card at a time.
             MoodArt(mood, mood.style(), Modifier.fillMaxSize(), square = true, still = true)
             Icon(
-                painter = painterResource(Res.drawable.ic_logo),
+                painter = painterResource(Res.drawable.ic_rx_mark),
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 8.dp, end = 8.dp)
                     .height(11.dp)
-                    .aspectRatio(730f / 484f),
             )
         }
         Spacer(Modifier.height(10.dp))

@@ -1,6 +1,7 @@
 package com.rentalx.playa.ui.replay
 
 import androidx.compose.foundation.background
+import com.rentalx.playa.sharedui.resources.ic_rx_mark
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -146,10 +147,10 @@ fun ReplayCreditCard(
                 )
                 Spacer(Modifier.width(10.dp))
                 Icon(
-                    painter = painterResource(Res.drawable.ic_logo),
+                    painter = painterResource(Res.drawable.ic_rx_mark),
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(width = 34.dp, height = 22.dp),
+                    modifier = Modifier.size(22.dp),
                 )
             }
 

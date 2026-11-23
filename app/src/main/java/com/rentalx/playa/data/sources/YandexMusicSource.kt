@@ -80,7 +80,7 @@ class YandexMusicSource(
         val token = token() ?: return emptyList()
         val rows = api.searchTracks(token, query, limit)
         TrackLog.d(TAG, "▶ Yandex Music \"$query\" → ${rows.size} tracks")
-        return rows.map { it.toSourceSong(configId) }
+        return rows.map { it.toSong() }
     }
 
     override suspend fun stream(trackId: String, request: StreamRequest): SourceStream? {
@@ -141,17 +141,29 @@ class YandexMusicSource(
      * A catalogue row as a song this app can play.
      *
      * The id is the source key rather than a YouTube video id: playback goes
-     * back through [stream] for it, so the audio is Yandex's own and no YouTube
-     * copy stands in.
+     * back through [YandexMusicSource.stream] for it, so the audio is Yandex's
+     * own and no YouTube copy stands in.
      */
-    private fun YandexMusicPlaylistTrack.toSourceSong(configId: String): Song = Song(
-        videoId = SourceRegistry.trackKey(configId, id),
-        title = title,
-        artist = artist,
-        albumName = album,
-        thumbnailUrl = coverUrl,
-        durationText = durationMs.takeIf { it > 0L }?.let { ms ->
-            String.format(java.util.Locale.ROOT, "%d:%02d", ms / 60_000, (ms / 1_000) % 60)
-        },
-    )
+    private fun YandexMusicPlaylistTrack.toSong(): Song = toSourceSong(configId)
 }
+
+/**
+ * A catalogue row as a song this app can play.
+ *
+ * The id is the source key rather than a YouTube video id: playback goes back
+ * through [YandexMusicSource.stream] for it, so the audio is Yandex's own and
+ * no YouTube copy stands in. Shared with the search screen, which lists Yandex
+ * rows as Yandex's rather than matching each one onto YouTube first — matching
+ * cost a lookup per row and handed back a YouTube id, which is why a track
+ * picked from Yandex used to play from YouTube (issue #29).
+ */
+internal fun YandexMusicPlaylistTrack.toSourceSong(configId: String): Song = Song(
+    videoId = SourceRegistry.trackKey(configId, id),
+    title = title,
+    artist = artist,
+    albumName = album,
+    thumbnailUrl = coverUrl,
+    durationText = durationMs.takeIf { it > 0L }?.let { ms ->
+        String.format(java.util.Locale.ROOT, "%d:%02d", ms / 60_000, (ms / 1_000) % 60)
+    },
+)

@@ -622,6 +622,18 @@ private fun RichPresencePreview(
                 },
             )
         }
+        if (button2Visible) {
+            Spacer(Modifier.height(8.dp))
+            PresenceButton(
+                label = resolved(button2Text, DiscordRPC.DEFAULT_BUTTON_2),
+                enabled = true,
+                onClick = {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, DiscordRPC.PROJECT_URL.toUri()),
+                    )
+                },
+            )
+        }
     }
 }
 

@@ -125,6 +125,8 @@ import com.rentalx.playa.data.sources.SourceKind
 import com.rentalx.playa.data.sources.FlashMusicSource
 import com.rentalx.playa.data.sources.SourceRegistry
 import com.rentalx.playa.data.sources.SourceResolver
+import com.rentalx.playa.data.sources.YandexMusicSource
+import com.rentalx.playa.data.sources.toSourceSong
 import com.rentalx.playa.data.sources.TrackMatcher
 import com.rentalx.playa.playback.AudioCache
 import com.rentalx.playa.playback.BoundedContextRequests
@@ -2921,13 +2923,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         val yandex = async {
             val token = AppSettings.yandexMusicToken.value
-            // Anonymous callers get the public endpoint, so Yandex contributes to
-            // "all platforms" without an account instead of silently vanishing.
+            val configId = SourceRegistry.active()
+                .firstOrNull { it.kind == SourceKind.YANDEX_MUSIC }
+                ?.configId
+            // Rows are Yandex's own, keyed to the source, so a tap plays
+            // Yandex's audio instead of paying for a YouTube match per row.
+            // Anonymous callers still get the public endpoint: without the
+            // source to play them they fall through to YouTube at tap time,
+            // which is where they used to be resolved anyway.
             optionalPlatformRows(SearchSource.YANDEX, failed) {
-                if (token.isBlank()) {
+                val rows = if (token.isBlank()) {
                     YandexMusicApi().searchTracksAnonymous(query, ALL_PLATFORM_PER_SOURCE)
                 } else {
                     YandexMusicApi().searchTracks(token, query, ALL_PLATFORM_PER_SOURCE)
+                }
+                if (configId == null) {
+                    ExternalPlaylistImporter.resolve(rows) { _, _ -> }.first
+                } else {
+                    rows.map { it.toSourceSong(configId) }
                 }
             }
         }
@@ -2980,7 +2993,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             )
             rows
         }
-        val yandexSongs = ExternalPlaylistImporter.resolve(yandex.await()) { _, _ -> }.first
+        val yandexSongs = yandex.await()
         currentCoroutineContext().ensureActive()
         val merged = mergePlatformSearchRows(
             spotify.await() + soundCloud.await() + vk.await() + youtube.await() + yandexSongs + configured.await(),
@@ -3061,19 +3074,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun searchYandex(query: String, limit: Int): List<Song> {
         val token = AppSettings.yandexMusicToken.value
-        // Without an account the public search endpoint still answers; the rows
-        // are then matched to playable recordings like any other provider.
-        //
-        // A network that Yandex does not answer from lands here as a throw, and
-        // the caller turns it into the VPN hint rather than into "HTTP 403":
-        // from abroad the endpoint is simply unreachable, and a raw status code
-        // reads as a broken app.
-        val tracks = if (token.isNotBlank()) {
-            YandexMusicApi().searchTracks(token, query, limit)
-        } else {
-            YandexMusicApi().searchTracksAnonymous(query, limit)
-        }
-        return ExternalPlaylistImporter.resolve(tracks) { _, _ -> }.first
+        check(token.isNotBlank()) { text(R.string.tap_to_connect) }
+        val configId = SourceRegistry.active().firstOrNull { it.kind == SourceKind.YANDEX_MUSIC }?.configId
+            ?: error("Yandex Music source is not configured")
+        // Rows stay Yandex's own rather than being matched onto YouTube: they
+        // play through [YandexMusicSource] directly, which is both faster than
+        // matching and the only way a row can be hearted into the account's
+        // own liked tracks.
+        return YandexMusicApi().searchTracks(token, query, limit).map { it.toSourceSong(configId) }
     }
 
     private suspend fun searchSpotify(query: String, limit: Int): List<Song> {

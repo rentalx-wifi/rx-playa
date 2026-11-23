@@ -93,6 +93,12 @@ class DiscordRPC(
             buttonsList.add(resolvedText to listenUrl)
         }
 
+        if (button2Visible) {
+            // The card's own link, not the track's: a permanent way back to
+            // where this build came from, whatever is playing.
+            buttonsList.add(resolveVariables(button2Text.ifEmpty { DEFAULT_BUTTON_2 }, song) to PROJECT_URL)
+        }
+
         val type = when (activityType) {
             "playing" -> Type.PLAYING
             "watching" -> Type.WATCHING
@@ -145,7 +151,10 @@ class DiscordRPC(
 
     companion object {
         const val DEFAULT_BUTTON_1 = "Listen on YouTube Music"
-        const val DEFAULT_BUTTON_2 = "RX Playa"
+        const val DEFAULT_BUTTON_2 = "Visit RX Playa"
+
+        /** Where the card's second button goes: this build's own repository. */
+        const val PROJECT_URL = "https://github.com/rx-playa-team/rx-playa"
 
         /** Discord draws the sleeve at roughly 96dp; 480px covers it on any density. */
         private const val ART_PX = 480
