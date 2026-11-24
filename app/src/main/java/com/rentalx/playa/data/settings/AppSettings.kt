@@ -574,7 +574,7 @@ object AppSettings {
      */
     val dpiBypass = MutableStateFlow(false)
     /** Frosted refraction on the floating chrome, where the device supports it. */
-    val liquidGlassEnabled = MutableStateFlow(true)
+    val liquidGlassEnabled = MutableStateFlow(false)
 
     /** Accent role for the ordinary themes; Nothing mode ignores it. */
     val accentKey = MutableStateFlow("default")
@@ -1209,19 +1209,20 @@ object AppSettings {
         customAccent.value = prefs.getLong(KEY_CUSTOM_ACCENT, 0L).takeIf { it != 0L }
         accentFollowsIcon.value = prefs.getBoolean(KEY_ACCENT_FROM_ICON, true)
         iconAccent.value = prefs.getLong(KEY_ICON_ACCENT, 0L).takeIf { it != 0L }
-        // A preference written before the glass was the default says false, and
-        // reading it as-is would keep glass off for everyone who ever touched the
-        // switch while it still defaulted to off. The first run after that change
-        // turns it on and records that it has: a choice made from here on is the
-        // listener's own and stays as they left it.
-        if (!prefs.getBoolean(KEY_LIQUID_GLASS_DEFAULTED, false)) {
+        // Off unless the listener asks for it. The glass is the most expensive
+        // thing the interface draws — a full extra draw pass per frame while a
+        // page is moving — and the release that shipped it on by default was the
+        // one people called laggy. This run turns it off once for everybody who
+        // never chose, including whoever got it on from the previous default;
+        // after that the switch is theirs.
+        if (!prefs.getBoolean(KEY_LIQUID_GLASS_SETTLED, false)) {
             prefs.edit()
-                .putBoolean(KEY_LIQUID_GLASS_DEFAULTED, true)
-                .putBoolean(KEY_LIQUID_GLASS_ENABLED, true)
+                .putBoolean(KEY_LIQUID_GLASS_SETTLED, true)
+                .putBoolean(KEY_LIQUID_GLASS_ENABLED, false)
                 .apply()
-            liquidGlassEnabled.value = true
+            liquidGlassEnabled.value = false
         } else {
-            liquidGlassEnabled.value = prefs.getBoolean(KEY_LIQUID_GLASS_ENABLED, true)
+            liquidGlassEnabled.value = prefs.getBoolean(KEY_LIQUID_GLASS_ENABLED, false)
         }
         zapretPath.value = prefs.getString(KEY_ZAPRET_PATH, "").orEmpty()
         zapretStrategy.value = prefs.getString(KEY_ZAPRET_STRATEGY, "fake_split").orEmpty()
@@ -2683,7 +2684,11 @@ object AppSettings {
     private const val KEY_CUSTOM_ACCENT = "custom_accent"
     private const val KEY_LIQUID_GLASS_ENABLED = "liquid_glass_enabled"
 
-    /** Set once, when the glass became the default rather than an opt-in. */
+    /** Set once, when the glass stopped being the default. */
+    private const val KEY_LIQUID_GLASS_SETTLED = "liquid_glass_settled_off"
+
+    /** Written by the release that made the glass the default; never read again. */
+    @Suppress("unused")
     private const val KEY_LIQUID_GLASS_DEFAULTED = "liquid_glass_defaulted_on"
     private const val KEY_ZAPRET_ARGS = "zapret_args"
     private const val KEY_ZAPRET_AUTOSTART = "zapret_autostart"
