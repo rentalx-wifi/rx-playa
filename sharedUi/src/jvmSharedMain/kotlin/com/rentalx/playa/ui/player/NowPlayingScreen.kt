@@ -1606,6 +1606,7 @@ fun NowPlayingScreen(
             onOpenOutput = openAudioOutput,
             onListenTogether = onListenTogether,
             onOpenListenTogetherMembers = openListenTogetherMembers,
+            onOpenSpeed = { showSpeed = true },
         )
         // Keep the current output caption visible in every state.
         Spacer(Modifier.height(18.dp))
@@ -1948,13 +1949,8 @@ fun NowPlayingScreen(
                                     .align(Alignment.Center)
                                     .padding(horizontal = 8.dp),
                             )
-                            // Only when the track is not at 1x — the chip is the way back to the drawer.
-                            PlaybackSpeedChip(
-                                onClick = { showSpeed = true },
-                                modifier = Modifier
-                                    .align(Alignment.CenterEnd)
-                                    .padding(end = 8.dp),
-                            )
+                            // The speed chip lives under the queue button —
+                            // see [PlayerActionRow].
                         }
                     },
                     transport = {
@@ -2179,13 +2175,8 @@ fun NowPlayingScreen(
                                             .align(Alignment.Center)
                                             .padding(horizontal = 8.dp),
                                     )
-                                    // Only when the track is not at 1x — the chip is the way back to the drawer.
-                                    PlaybackSpeedChip(
-                                        onClick = { showSpeed = true },
-                                        modifier = Modifier
-                                            .align(Alignment.CenterEnd)
-                                            .padding(end = 8.dp),
-                                    )
+                                    // The speed chip lives under the queue button —
+                                    // see [PlayerActionRow].
                                 }
                             },
                             transport = {

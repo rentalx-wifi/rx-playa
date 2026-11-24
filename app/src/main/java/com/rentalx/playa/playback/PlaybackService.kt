@@ -7353,6 +7353,49 @@ class PlaybackService : MediaLibraryService() {
         spare?.let(body)
     }
 
+    /**
+     * The rate change in flight, so that dragging the slider does not leave a
+     * dozen ramps racing each other.
+     */
+    private var speedRamp: Job? = null
+
+    /**
+     * Moves the players to [target] over a short slide instead of in one write.
+     *
+     * Media3's Sonic stretcher re-windows its overlap when the rate jumps, and
+     * on a low-bitrate source the seam between two windows is exactly what is
+     * heard as a broken, watery slowed version. Sliding the rate keeps the
+     * window moving rather than cutting it in half, and it is a handful of
+     * parameter writes — cheap enough to do on every press.
+     *
+     * The last step is the target itself, so nothing is left approximating it.
+     */
+    private fun rampPlaybackSpeed(target: PlaybackRate) {
+        speedRamp?.cancel()
+        val from = player?.playbackParameters?.speed
+            ?.takeIf { it.isFinite() && it > 0f }
+            ?: target.speed
+        if (abs(from - target.speed) < SPEED_RAMP_EPSILON) {
+            crossfade?.applyPlaybackSpeed(target) ?: eachPlayer { it.applyPlaybackRate(target) }
+            return
+        }
+        speedRamp = scope.launch {
+            val startedAt = System.nanoTime()
+            while (true) {
+                val elapsed = (System.nanoTime() - startedAt) / 1_000_000f
+                val t = (elapsed / SPEED_RAMP_MS).coerceIn(0f, 1f)
+                // Fast-out: most of the way is covered in the first half of the
+                // slide, which reads as settling at the new tempo rather than as
+                // a slow crawl into it.
+                val eased = 1f - (1f - t) * (1f - t)
+                val rate = target.copy(speed = from + (target.speed - from) * eased)
+                crossfade?.applyPlaybackSpeed(rate) ?: eachPlayer { it.applyPlaybackRate(rate) }
+                if (t >= 1f) return@launch
+                delay(SPEED_RAMP_STEP_MS)
+            }
+        }
+    }
+
     private fun observeSettings() {
         scope.launch {
             AppSettings.skipSilence.collect { on -> eachPlayer { it.skipSilenceEnabled = on } }
@@ -9869,6 +9912,15 @@ private open class FfmpegFallbackRenderersFactory(context: Context) : DefaultRen
  * vendor codec is still better than none. Wraps rather than replaces, so a
  * subclass's own selector (the FLAC one) keeps working underneath.
  */
+/** How long a speed change takes to land: long enough to be heard as a slide. */
+private const val SPEED_RAMP_MS = 340f
+
+/** How often the slide is written while it lasts. */
+private const val SPEED_RAMP_STEP_MS = 16L
+
+/** Below this the two rates are the same rate, and no ramp is worth it. */
+private const val SPEED_RAMP_EPSILON = 0.005f
+
 private fun withoutPlatformAlac(selector: MediaCodecSelector) =
     MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
         if (mimeType == MimeTypes.AUDIO_ALAC && ffmpegDecodesAlac) {

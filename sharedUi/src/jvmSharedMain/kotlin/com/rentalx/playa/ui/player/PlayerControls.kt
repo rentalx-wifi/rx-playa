@@ -594,6 +594,8 @@ internal fun PlayerActionRow(
     onToggleAutoplay: () -> Unit,
     onOpenOutput: () -> Unit,
     onListenTogether: () -> Unit,
+    /** Opens the speed drawer; the chip lives under the queue button. */
+    onOpenSpeed: () -> Unit = {},
     /** Opens [ListenTogetherMembersSheet] rather than settings directly. */
     onOpenListenTogetherMembers: () -> Unit,
 ) {
@@ -703,10 +705,11 @@ internal fun PlayerActionRow(
                     )
                 }
             }
-            Box(
-                Modifier
+            Column(
+                modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .offset { IntOffset(-(closeIn.toPx() * compactness.value).roundToInt(), 0) },
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 BottomGlyph(
                     icon = PlayaIcons.Queue,
@@ -715,6 +718,14 @@ internal fun PlayerActionRow(
                     highlighted = queueOpen,
                     haptic = if (queueOpen) Haptic.Tap else Haptic.Expand,
                 )
+                // The speed belongs under the queue button, not at the foot of
+                // the scrubber: there it sat on the remaining time, and every
+                // label the foot grew — quality, transition, this chip — moved
+                // it again. Its slot is reserved whether or not it is up, so
+                // slowing a track does not shift the row.
+                Box(Modifier.height(SPEED_CHIP_SLOT), contentAlignment = Alignment.Center) {
+                    PlaybackSpeedChip(onClick = onOpenSpeed)
+                }
             }
         }
     }
@@ -829,6 +840,14 @@ private val PLAYER_SKIP_TOUCH_SIZE = 53.dp
 private const val PLAYER_SKIP_HEIGHT_SCALE = 0.85f
 
 private val BOTTOM_ACTION_SIZE = 44.dp
+
+/**
+ * The height kept free under the queue button for the speed chip.
+ *
+ * Reserved whether or not the chip is up: a row that grew by a line the
+ * moment a track was slowed would move the queue button as well.
+ */
+private val SPEED_CHIP_SLOT = 22.dp
 
 /** What the lyrics and queue glyphs are drawn at inside [BOTTOM_ACTION_SIZE]. */
 private val BOTTOM_ICON_SIZE = 26.dp
