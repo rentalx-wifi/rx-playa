@@ -3655,10 +3655,11 @@ private fun AccentHuePicker(initial: Color, onChange: (Color) -> Unit) {
 /**
  * One icon in the grid, drawn as the launcher would draw it.
  *
- * A glass foreground holds the finished icon in its own shape on the central
- * 72 of 108 dp, so it is scaled 1.5× to fill the tile as designed; an ordinary
- * drawable goes through Android's loader unchanged. The border marks the tile
- * whose colourways are open, which is what a tap on the family row reveals.
+ * Every icon goes through Android's loader unchanged: the mark in each
+ * variant's foreground is already the same share of the canvas as the
+ * default's, and scaling the coloured ones up made their marks look bigger
+ * than the plain ones. The border marks the tile whose colourways are open,
+ * which is what a tap on the family row reveals.
  */
 @Composable
 private fun IconTile(
@@ -3702,11 +3703,7 @@ private fun IconTile(
                     .size(68.dp)
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(22.dp))
                     .clip(RoundedCornerShape(22.dp))
-                    .border(2.dp, border, RoundedCornerShape(22.dp))
-                    // A glass foreground holds the finished icon inside the
-                    // central 72 of 108 dp; the launcher scales it up, and so
-                    // does this tile. The ordinary icons are already full-size.
-                    .then(if (option.previewRes != null) Modifier.scale(1.5f) else Modifier),
+                    .border(2.dp, border, RoundedCornerShape(22.dp)),
             )
         }
         Text(
