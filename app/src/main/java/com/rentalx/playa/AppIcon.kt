@@ -48,7 +48,10 @@ enum class AppIcon(
     val accent: Long? = null,
 ) {
     Default("LauncherDefault", R.mipmap.ic_rx, R.string.app_icon_default),
-    Monochrome("LauncherMonochrome", R.mipmap.ic_monochrome, R.string.app_icon_monochrome),
+    Monochrome(
+        "LauncherMonochrome", R.mipmap.ic_monochrome, R.string.app_icon_monochrome,
+        R.drawable.ic_rx_monochrome_preview,
+    ),
 
     LiquidGlass(
         "LauncherGlassLight", R.mipmap.ic_liquid_glass, R.string.app_icon_liquid_glass,
