@@ -1,11 +1,13 @@
 package com.rentalx.playa.data.sources
 
 import com.rentalx.playa.data.TrackLog
+import com.rentalx.playa.data.TrackRatingStore
 import com.rentalx.playa.data.model.Song
 import com.rentalx.playa.data.model.durationMillis
 import com.rentalx.playa.data.model.normalizedArtistName
 import com.rentalx.playa.data.settings.AppSettings
 import com.rentalx.playa.data.yandex.YandexMusicApi
+import com.rentalx.playa.playback.QueueBuilder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -59,11 +61,22 @@ object SourceRadio {
     private const val SLOW_SOURCE_NANOS = 1_200_000_000L
     private const val SLOW_SOURCE_REST_MS = 5 * 60 * 1000L
 
-    /** How long one rotor batch is reused before asking for the next one. */
-    private const val WAVE_CACHE_MS = 4 * 60 * 1000L
-
+    /**
+     * Where the next rotor request resumes, and what this session has already
+     * served. The rotor answers five tracks per request and repeats them until
+     * it is handed the last id back as `queue`; without these two values every
+     * press of the pill was the same five songs.
+     */
     @Volatile
-    private var cachedWave: Pair<Long, List<Song>>? = null
+    private var waveCursor: String? = null
+
+    private val servedWaveIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /** How many batches one call walks, so a press never waits on the whole day. */
+    private const val WAVE_MAX_PAGES = 4
+
+    /** Favourites the rotor did not offer, brought into the station itself. */
+    private const val LIKES_PER_WAVE = 3
 
     /**
      * The account's own «Моя волна», when there is an account at all.
@@ -72,9 +85,8 @@ object SourceRadio {
      * listener plays, in every genre they play it in — a per-seed artist search
      * can only offer more of the same artist, which is not a station.
      *
-     * Cached for a few minutes because the rotor hands out a handful of tracks
-     * per session step and charging a request per autoplay tick would drain the
-     * account's own queue.
+     * Every call walks the rotor's cursor from where the last one stopped, so
+     * the next press continues the station instead of replaying its first page.
      */
     suspend fun yandexPersonalWave(limit: Int): List<Song> {
         val configId = SourceRegistry.active()
@@ -83,20 +95,59 @@ object SourceRadio {
         val token = AppSettings.yandexMusicToken.value.trim()
         if (token.isBlank()) return emptyList()
 
-        val now = System.currentTimeMillis()
-        cachedWave?.let { (at, rows) -> if (now - at < WAVE_CACHE_MS && rows.isNotEmpty()) return rows }
-
-        val rows = withTimeoutOrNull(PER_SOURCE_TIMEOUT_MS * 2) {
-            runCatching {
-                YandexMusicApi().waveTracks(token, limit).map { it.toSourceSong(configId) }
-            }.onFailure {
-                TrackLog.d("Playa", "wave radio: personal rotor failed: ${it.message}")
-            }.getOrDefault(emptyList())
-        }.orEmpty()
-
-        if (rows.isNotEmpty()) cachedWave = now to rows
-        TrackLog.d("Playa", "wave radio: personal rotor → ${rows.size} tracks")
-        return rows
+        val api = YandexMusicApi()
+        val rows = mutableListOf<Song>()
+        val seen = HashSet<String>()
+        var cursor = waveCursor
+        var pages = 0
+        while (rows.size < limit && pages < WAVE_MAX_PAGES) {
+            pages++
+            val batch = withTimeoutOrNull(PER_SOURCE_TIMEOUT_MS * 2) {
+                runCatching { api.waveTracks(token, queue = cursor) }
+                    .onFailure {
+                        TrackLog.d("Playa", "wave radio: personal rotor failed: ${it.message}")
+                    }
+                    .getOrNull()
+            } ?: break
+            val fresh = batch.tracks.filter { track ->
+                val id = track.id
+                id.isNotBlank() && seen.add(id) && servedWaveIds.add(id)
+            }
+            rows += fresh.map { it.toSourceSong(configId) }
+            val next = batch.cursor
+            if (next == null || next == cursor || batch.tracks.isEmpty()) {
+                // The station has run out of new tracks for now: begin again
+                // rather than ask the same exhausted page forever.
+                cursor = null
+                servedWaveIds.clear()
+                break
+            }
+            cursor = next
+        }
+        waveCursor = cursor
+        val disliked = TrackRatingStore.dislikedSongs()
+        val liked = TrackRatingStore.likedSongs()
+        val playable = rows.filterNot { TrackRatingStore.isDisliked(it, disliked) }
+        // A thumb-down is a verdict on the recording, not on the artist: the
+        // same track from another provider is still refused. A like is a
+        // stronger vote than the rotor's guess, so its own rows lead the station
+        // and a few favourites the rotor never offered come along with them.
+        val (favourites, rest) = playable.partition { song ->
+            liked.any { QueueBuilder.isSameRecording(it, song) }
+        }
+        val extras = liked.asSequence()
+            .filter { it.videoId.isNotBlank() }
+            .filterNot { like -> playable.any { QueueBuilder.isSameRecording(like, it) } }
+            .filter { servedWaveIds.add("liked:${it.videoId}") }
+            .take(LIKES_PER_WAVE)
+            .toList()
+        val result = favourites + extras + rest
+        TrackLog.d(
+            "Playa",
+            "wave radio: personal rotor → ${rows.size} tracks, ${result.size} after ratings, " +
+                "cursor ${cursor ?: "reset"}",
+        )
+        return result
     }
 
     /**

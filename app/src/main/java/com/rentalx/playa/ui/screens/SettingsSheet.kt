@@ -23,6 +23,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -137,6 +138,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
@@ -3674,24 +3676,26 @@ private fun IconTile(
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        val preview = option.previewRes
-        if (preview == null) {
-            AndroidView(
-                factory = { ctx ->
-                    android.widget.ImageView(ctx).apply { setImageResource(option.iconRes) }
-                },
-                modifier = Modifier
-                    .size(68.dp)
-                    // A light mark on a transparent preview is invisible on the
-                    // dark sheet, which made the monochrome choice look broken:
-                    // the tile has its own neutral plate instead.
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(22.dp))
-                    .clip(RoundedCornerShape(22.dp))
-                    .border(2.dp, border, RoundedCornerShape(22.dp)),
-            )
-        } else {
+        val context = LocalContext.current
+        val density = LocalDensity.current
+        // The first two choices are adaptive-icon XMLs, which a Compose painter
+        // cannot draw: they came out blank or cut at the tile's corner. Draw all
+        // of them through Android's own loader into a small bitmap — the same
+        // path the launcher uses — and let the tile only clip the result.
+        val res = option.previewRes ?: option.iconRes
+        val bitmap = remember(res, density) {
+            val drawable = androidx.core.content.ContextCompat.getDrawable(context, res)
+                ?: return@remember null
+            val px = with(density) { 68.dp.roundToPx() }
+            val image = android.graphics.Bitmap.createBitmap(px, px, android.graphics.Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(image)
+            drawable.setBounds(0, 0, px, px)
+            drawable.draw(canvas)
+            image.asImageBitmap()
+        }
+        if (bitmap != null) {
             Image(
-                painter = painterResource(preview),
+                bitmap = bitmap,
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
@@ -3699,7 +3703,10 @@ private fun IconTile(
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(22.dp))
                     .clip(RoundedCornerShape(22.dp))
                     .border(2.dp, border, RoundedCornerShape(22.dp))
-                    .scale(1.5f),
+                    // A glass foreground holds the finished icon inside the
+                    // central 72 of 108 dp; the launcher scales it up, and so
+                    // does this tile. The ordinary icons are already full-size.
+                    .then(if (option.previewRes != null) Modifier.scale(1.5f) else Modifier),
             )
         }
         Text(

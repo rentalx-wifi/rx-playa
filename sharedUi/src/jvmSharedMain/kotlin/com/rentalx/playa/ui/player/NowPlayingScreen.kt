@@ -3992,13 +3992,8 @@ fun NowPlayingScreen(
                                 .align(Alignment.Center)
                                 .padding(horizontal = 8.dp),
                         )
-                        // Only when the track is not at 1x — the chip is the way back to the drawer.
-                        PlaybackSpeedChip(
-                            onClick = { showSpeed = true },
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .padding(end = 8.dp),
-                        )
+                        // The speed chip lives under the queue button — see
+                        // [PlayerActionRow].
                     }
 
                     // The transport rides midway between the two blocks it separates:

@@ -7379,11 +7379,12 @@ class PlaybackService : MediaLibraryService() {
             crossfade?.applyPlaybackSpeed(target) ?: eachPlayer { it.applyPlaybackRate(target) }
             return
         }
+        val rampMs = speedRampMs(target)
         speedRamp = scope.launch {
             val startedAt = System.nanoTime()
             while (true) {
                 val elapsed = (System.nanoTime() - startedAt) / 1_000_000f
-                val t = (elapsed / SPEED_RAMP_MS).coerceIn(0f, 1f)
+                val t = (elapsed / rampMs).coerceIn(0f, 1f)
                 // Fast-out: most of the way is covered in the first half of the
                 // slide, which reads as settling at the new tempo rather than as
                 // a slow crawl into it.
@@ -7393,6 +7394,28 @@ class PlaybackService : MediaLibraryService() {
                 if (t >= 1f) return@launch
                 delay(SPEED_RAMP_STEP_MS)
             }
+        }
+    }
+
+    /**
+     * How long this particular slide should take.
+     *
+     * A thin stream is where the stretcher has least to work with: 128 kbps of
+     * a mostly-synthetic mix gives Sonic's overlap window nothing to hide its
+     * seams in, so the same rate change that is inaudible on a FLAC is heard
+     * there as a wobble. Giving those streams a longer slide — and letting the
+     * pitch-following slowed edits take the longest — is what makes a slow-down
+     * sound gradual on material that cannot afford a jump.
+     */
+    private fun speedRampMs(target: PlaybackRate): Float {
+        val kbps = player?.audioFormat?.bitrate?.let { it / 1000 } ?: 0
+        val thin = kbps in 1..191
+        val slowingDown = target.speed < 1f
+        return when {
+            thin && slowingDown -> 560f
+            thin -> 460f
+            abs(target.speed - 1f) > 0.05f -> 380f
+            else -> 280f
         }
     }
 
@@ -9912,8 +9935,7 @@ private open class FfmpegFallbackRenderersFactory(context: Context) : DefaultRen
  * vendor codec is still better than none. Wraps rather than replaces, so a
  * subclass's own selector (the FLAC one) keeps working underneath.
  */
-/** How long a speed change takes to land: long enough to be heard as a slide. */
-private const val SPEED_RAMP_MS = 340f
+// The slide is length-of-its-own, per stream — see `speedRampMs`.
 
 /** How often the slide is written while it lasts. */
 private const val SPEED_RAMP_STEP_MS = 16L

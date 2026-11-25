@@ -691,12 +691,22 @@ class YandexMusicApi internal constructor(
      * [queue] is the id the previous batch ended on — the rotor remembers its
      * session only through it. Null asks for a fresh one.
      */
+    /**
+     * One page of a rotor station.
+     *
+     * «Моя волна» answers five tracks at a time and expects the id of the last one
+     * back as `queue` — without it the next request is the same five tracks again.
+     */
+    data class YandexWaveBatch(
+        val tracks: List<YandexMusicPlaylistTrack>,
+        val cursor: String?,
+    )
+
     suspend fun waveTracks(
         token: String,
-        limit: Int = 30,
         station: String = WAVE_STATION,
         queue: String? = null,
-    ): List<YandexMusicPlaylistTrack> {
+    ): YandexWaveBatch {
         val url = baseUrl.newBuilder()
             .addPathSegments("rotor/station/$station/tracks")
             .addQueryParameter("settings2", "true")
@@ -711,9 +721,10 @@ class YandexMusicApi internal constructor(
             .get()
             .build()
         val sequence = execute(request).resultObject().arrayAt("sequence").orEmpty()
-        return sequence
-            .mapNotNull { (it as? JsonObject)?.objectAt("track")?.toImportTrack() }
-            .take(limit.coerceAtLeast(1))
+            .mapNotNull { it as? JsonObject }
+        val tracks = sequence.mapNotNull { entry -> entry.objectAt("track")?.toImportTrack() }
+        val cursor = sequence.lastOrNull()?.objectAt("track")?.stringAt("id")
+        return YandexWaveBatch(tracks = tracks, cursor = cursor)
     }
 
     private fun parse(response: Response): JsonObject {

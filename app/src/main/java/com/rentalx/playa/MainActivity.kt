@@ -153,12 +153,14 @@ import com.rentalx.playa.data.AppUpdateChecker
 import com.rentalx.playa.data.NerdStats
 import com.rentalx.playa.data.TrackLog
 import com.rentalx.playa.data.TrackRatingStore
+import com.rentalx.playa.data.sources.SourceRadio
 import com.rentalx.playa.data.innertube.InnertubeParser
 import com.rentalx.playa.data.model.BrowseType
 import com.rentalx.playa.data.model.Account
 import com.rentalx.playa.data.model.HomeShelf
 import com.rentalx.playa.data.model.LikeStatus
 import com.rentalx.playa.data.model.PlaybackSourceType
+import com.rentalx.playa.playback.RX_WAVE_SOURCE_ID
 import com.rentalx.playa.playback.contextEntryKey
 import com.rentalx.playa.data.model.SearchFilter
 import com.rentalx.playa.data.model.SearchResult
@@ -339,6 +341,7 @@ import com.rentalx.playa.ui.components.TopBarAccountButton
 import com.rentalx.playa.ui.screens.SegmentedControl
 import com.rentalx.playa.ui.components.SearchField
 import com.rentalx.playa.sharedui.resources.Res as SharedRes
+import com.rentalx.playa.sharedui.resources.autoplay
 import com.rentalx.playa.sharedui.resources.search_hint
 import com.rentalx.playa.sharedui.resources.search_addons_hint
 import com.rentalx.playa.sharedui.resources.search_library_hint
@@ -473,6 +476,12 @@ private const val BACK_GESTURE_SHRINK = 0.04f
 private const val TOP_FADE_RAMP = 0.3f
 
 private const val INITIAL_RADIO_TRACKS = 24
+
+/**
+ * Tracks the account's own station hands over at once, played while the rest of
+ * the wave is still being planned — see [startPersonalWave].
+ */
+private const val QUICK_WAVE_TRACKS = 12
 
 /**
  * How large a queue may be before reading it row by row over the binder stops
@@ -1615,6 +1624,9 @@ private fun PlayaApp(
     val replayLabel = stringResource(R.string.replay)
     val queueLabel = stringResource(R.string.queue)
     val bitWaveLabel = stringResource(R.string.bitwave)
+    // The pill keeps the RX Wave brand; the queue it starts is the app's
+    // AutoPlay, and that is what the player and the queue call it.
+    val autoplayStationName = org.jetbrains.compose.resources.stringResource(SharedRes.string.autoplay)
     val sharedLinkLabel = stringResource(R.string.shared_link)
     val openedFileLabel = stringResource(R.string.opened_file)
     val tabs = remember(homeLabel, exploreLabel, libraryLabel, favoritesLabel, searchLabel) {
@@ -2256,6 +2268,45 @@ private fun PlayaApp(
                 showQueueNotice(context.getString(R.string.offline_nothing_downloaded))
                 return@launch
             }
+            if (!offline) {
+                // What the account's own station already knows, played at once.
+                //
+                // The full plan below asks a catalogue for each seed artist and
+                // waits on every answer; on a slow catalogue that is minutes, and
+                // a press that answers minutes later reads as a press that never
+                // worked. These rows are already here — one request — and AutoPlay
+                // grows the station behind them.
+                val quick = runCatching {
+                    SourceRadio.yandexPersonalWave(QUICK_WAVE_TRACKS)
+                }.getOrDefault(emptyList())
+                val disliked = TrackRatingStore.dislikedSongs()
+                val inQueue = player.queue.mapTo(HashSet()) { it.videoId }
+                val station = quick
+                    .filterNot { it.videoId in inQueue }
+                    .filterNot { TrackRatingStore.isDisliked(it, disliked) }
+                    .distinctBy { it.videoId }
+                    .map { song ->
+                        song.withQueueSource(QueueSource(autoplayStationName, PlaybackSourceType.QUEUE))
+                            .copy(radioName = autoplayStationName, playbackSourceId = RX_WAVE_SOURCE_ID)
+                    }
+                if (station.size >= 2) {
+                    val quickController = controller
+                    if (quickController == null) {
+                        showQueueNotice(context.getString(R.string.player_not_ready))
+                        return@launch
+                    }
+                    quickController.beginRadioQueue()
+                    quickController.playSongs(station, 0)
+                    quickController.commitRadioQueue()
+                    activeRadioSeed = station.first().videoId to autoplayStationName
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.radio_started, autoplayStationName),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    return@launch
+                }
+            }
             val wave = when {
                 offline -> OfflineWave.plan(
                     downloaded = owned,
@@ -2290,18 +2341,18 @@ private fun PlayaApp(
                 if (seed == null) {
                     showQueueNotice(context.getString(R.string.no_tracks_here))
                 } else {
-                    startTrackWave(seed, bitWaveLabel)
+                    startTrackWave(seed, autoplayStationName)
                 }
                 return@launch
             }
             val head = wave.first()
             val seed = head.withQueueSource(
-                QueueSource(bitWaveLabel, PlaybackSourceType.QUEUE),
-            ).copy(radioName = bitWaveLabel)
+                QueueSource(autoplayStationName, PlaybackSourceType.QUEUE),
+            ).copy(radioName = autoplayStationName, playbackSourceId = RX_WAVE_SOURCE_ID)
             val station = listOf(seed) + wave.drop(1).map { song ->
                 song.withQueueSource(
-                    QueueSource(bitWaveLabel, PlaybackSourceType.QUEUE),
-                ).copy(radioName = bitWaveLabel)
+                    QueueSource(autoplayStationName, PlaybackSourceType.QUEUE),
+                ).copy(radioName = autoplayStationName, playbackSourceId = RX_WAVE_SOURCE_ID)
             }
             // A station replaces the queue the way the explicit one does: the
             // old rows go, the crossfade and AutoPlay work armed against them
@@ -2309,10 +2360,10 @@ private fun PlayaApp(
             activeController.beginRadioQueue()
             activeController.playSongs(station, 0)
             activeController.commitRadioQueue()
-            activeRadioSeed = seed.videoId to bitWaveLabel
+            activeRadioSeed = seed.videoId to autoplayStationName
             Toast.makeText(
                 context,
-                context.getString(R.string.radio_started, bitWaveLabel),
+                context.getString(R.string.radio_started, autoplayStationName),
                 Toast.LENGTH_SHORT,
             ).show()
         }
@@ -4082,8 +4133,8 @@ private fun PlayaApp(
                                 // album left running no longer makes the station
                                 // look like it is on.
                                 isPlaying = player.isPlaying &&
-                                    player.song?.radioName == bitWaveLabel &&
-                                    player.song?.playbackSource == bitWaveLabel,
+                                    (player.song?.radioName != null ||
+                                        player.song?.playbackSource == autoplayStationName),
                                 title = stringResource(R.string.listen_now),
                                 signedIn = signedIn,
                                 onSignIn = null,
@@ -4162,7 +4213,16 @@ private fun PlayaApp(
                                 // frame loop, not collected: a flow here would
                                 // wake this composable sixty times a second.
                                 waveEnergy = { AudioEnergy.currentBass() },
-                                onWaveToggle = startPersonalWave,
+                                // A station already up is a play/pause button, not a
+                                // restart: rebuilding the wave on every press threw
+                                // away the queue being listened to and took minutes
+                                // to come back. Anything else starts the station.
+                                onWaveToggle = {
+                                    val onStation = player.song?.let {
+                                        it.radioName != null || it.playbackSource == autoplayStationName
+                                    } == true
+                                    if (onStation) togglePlayPause() else startPersonalWave()
+                                },
                                 onWaveClick = startPersonalWave,
                                 listenerName = account?.name,
                                 leadHero = false,

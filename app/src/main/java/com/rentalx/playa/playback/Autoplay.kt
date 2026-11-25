@@ -23,6 +23,12 @@ import kotlin.random.Random
 /** Most AutoPlay-suggested tracks kept queued ahead of the current one at once. */
 const val MAX_QUEUED_AUTOPLAY = 10
 
+/**
+ * Marks a row that belongs to the listener's own RX Wave, so its AutoPlay asks
+ * the same station for the next tracks instead of guessing from the artist.
+ */
+const val RX_WAVE_SOURCE_ID = "rx-wave"
+
 /** Most liked artists whose radios one wave asks, before it gives up. */
 private const val MAX_PERSONAL_WAVE_SEEDS = 24
 
@@ -196,16 +202,26 @@ suspend fun loadAutoplayTracks(
     limit: Int = MAX_QUEUED_AUTOPLAY,
 ): Result<List<Song>> {
     val seed = youtubeSeedFor(seedSong)
+    // A wave continues from the account's own station. A per-artist search is
+    // what autoplay falls back to, and it is exactly the same-artist run the
+    // listener hears when the rotor's first five tracks end.
+    val fromWave = if (seedSong.playbackSourceId == RX_WAVE_SOURCE_ID) {
+        SourceRadio.yandexPersonalWave(limit)
+    } else {
+        emptyList()
+    }
     // A music video plays on with music videos, as YouTube Music does.
     val videos = seedSong.isVideo && seed == seedSong.videoId
-    val fromYouTube = seed
-        ?.let { youTubeRadio(it, preferVideo = videos) }
-        .orEmpty()
+    val fromYouTube = if (fromWave.isNotEmpty()) {
+        emptyList()
+    } else {
+        seed?.let { youTubeRadio(it, preferVideo = videos) }.orEmpty()
+    }
     // A station is not a YouTube feature. When that call is refused — a network
     // Google blocks answers 403 and nothing else — or the track has no YouTube
     // twin at all, the other catalogues are asked instead of the queue simply
     // ending.
-    val related = fromYouTube.ifEmpty { SourceRadio.related(seedSong, limit) }
+    val related = (fromWave.ifEmpty { fromYouTube.ifEmpty { SourceRadio.related(seedSong, limit) } })
         .filterNot { isStrangerEdit(it, seedSong) }
         .let { QueueBuilder.rankRelated(seedSong, it) }
     val extra = QueueBuilder.extend(
