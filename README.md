@@ -1,6 +1,6 @@
 # RX Playa
 
-**Музыка без подписок и без рекламы.** Форк [Playa](https://github.com/kushagrasinghx/Playa).
+**Музыка без подписок и без рекламы.** Форк Bitchord 
 
 [English version](README.en.md)
 
